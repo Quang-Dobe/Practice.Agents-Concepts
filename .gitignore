@@ -1,0 +1,224 @@
+# ---------------------------------------------------------------------------
+# Learning repo .gitignore
+# Covers: .NET (C#), TypeScript/React/Node, Python, SQL tooling, IaC,
+# IDEs (VS / Rider / VS Code), OS files, and Claude Code local settings.
+# Committed by intent: .claude/agents, .claude/commands, .claude/skills,
+# .claude/CLAUDE.md, and every docs/ + code/ folder inside topic folders.
+# ---------------------------------------------------------------------------
+
+
+# === .NET / C# =============================================================
+# Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Visual Studio
+.vs/
+*.vspscc
+*.vssscc
+
+# Rider / ReSharper
+.idea/
+*.DotSettings.user
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+# Test results / coverage
+[Tt]est[Rr]esult*/
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+*.opencover.xml
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+**/packages/*
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET / EF
+appsettings.*.local.json
+*.pfx
+*.publishsettings
+PublishProfiles/
+Migrations/*.Designer.cs.bak
+
+
+# === Node / TypeScript / React ============================================
+node_modules/
+.pnp
+.pnp.js
+.pnp.cjs
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Build artifacts
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.vite/
+.turbo/
+.cache/
+.parcel-cache/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+
+# === Python (ai/) =========================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtualenvs
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Packaging / build
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+.tox/
+.nox/
+
+# Notebooks
+.ipynb_checkpoints/
+
+
+# === Environment / Secrets ================================================
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+secrets.json
+appsettings.Development.local.json
+
+
+# === SQL / Database =======================================================
+*.bak
+*.mdf
+*.ldf
+*.ndf
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+
+# === Cloud / IaC ==========================================================
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+# Pulumi
+Pulumi.*.yaml
+!Pulumi.yaml
+
+# Serverless / SAM / CDK
+.serverless/
+.sam-build/
+cdk.out/
+.aws-sam/
+
+
+# === IDEs / Editors =======================================================
+# VS Code (allow shared settings via .vscode/extensions.json / settings.json if needed)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains
+.idea/
+*.iml
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+.\#*
+\#*\#
+
+
+# === OS files =============================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+
+# === Claude Code (keep agents / commands / skills committed) ==============
+.claude/settings.local.json
+.claude/.credentials.json
+.claude/projects/
+.claude/statsig/
+.claude/todos/
+.claude/shell-snapshots/
+.claude/ide/
+
+# Local-only memory & cache; the committed harness lives under
+# .claude/agents/, .claude/commands/, .claude/skills/, and CLAUDE.md
+.claude/memory/
