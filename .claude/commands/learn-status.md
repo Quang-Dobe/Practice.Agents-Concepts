@@ -10,15 +10,18 @@ You are producing a compact, scannable report of every topic in the learning rep
 
 ## Steps
 
-1. For each of the five categories (`frontend`, `backend`, `ai`, `database`, `cloud`):
+1. Build the category list:
+   - Start with the six standard categories in this order: `frontend`, `backend`, `ai`, `database`, `cloud`, `general-concept`.
+   - Append any extra top-level directories at the repo root that are not dot-folders and not one of the six above (alphabetically sorted). This catches user-created categories like `devops/`.
+2. For each category in that list:
    - If the category folder does not exist, skip it.
    - Otherwise, list every immediate subfolder. Each such subfolder is a topic.
-2. For each topic, check which of the standard artifacts exist:
+3. For each topic, check which of the standard artifacts exist:
    - `docs/01-overview.md`
    - `docs/02-deep-dive.md`
    - `docs/03-practice.md`
    - `code/mvp.*` (any extension)
-3. Render a single Markdown report grouped by category.
+4. Render a single Markdown report grouped by category, in the same order as step 1.
 
 ## Output format
 
@@ -38,7 +41,7 @@ You are producing a compact, scannable report of every topic in the learning rep
 | circuit-breaker   | ✓ | ✓ | ✓ | ✓ |
 | ...
 
-(repeat for ai, database, cloud)
+(repeat for ai, database, cloud, general-concept, then any extra user-created categories)
 
 ## Summary
 - Total topics: <N>

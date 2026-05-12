@@ -26,6 +26,7 @@ This is **not** a tutorial. It is not a starter template. It is the **smallest p
    | `database` | **C# / .NET 8+** for app-side code, plain `.sql` for schema/query topics | Use ADO.NET or Dapper-style raw SQL (Dapper is allowed because it's a thin micro-ORM, not a CQRS framework). Load `dotnet-backend-conventions` if writing app-side code. |
    | `cloud` | **C# / .NET 8+** for SDK-driven topics, **TypeScript** for IaC (CDK) or edge/worker topics, plain YAML/HCL for declarative IaC | Load whichever convention skill matches the file you're writing. |
    | `ai` | **Python 3.11+** | The .NET / TS rules do not apply — Python is the lingua franca here. No convention skill needed beyond standard PEP-8. |
+   | `general-concept` | **Python 3.11+** (default) | Cross-cutting concepts (CAP, idempotency, SOLID, etc.) — Python reads close to pseudocode and keeps the demo focused on the idea, not the stack. **Override allowed**: if the deep-dive doc shows the concept is intrinsically tied to one stack (e.g. `tagged-template-literals` would only make sense in JS), pick that language and load its convention skill. No convention skill needed when staying on Python. |
 
    If the user has explicitly overridden language in the topic's prior docs, follow that. Otherwise, the table above is the rule.
 

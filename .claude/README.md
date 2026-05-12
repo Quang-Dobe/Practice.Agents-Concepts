@@ -13,11 +13,13 @@ backend/circuit-breaker/
 │   ├── 02-deep-dive.md    ← What / Where / When / How / Why
 │   └── 03-practice.md     ← real-world best practices + anti-patterns
 └── code/
-    ├── mvp.py             ← minimal runnable demo (~50 LOC)
+    ├── mvp.cs             ← minimal runnable demo (~50 LOC)
     └── README.md          ← how to run it
 ```
 
-The topic is automatically classified into one of `frontend / backend / ai / database / cloud`. The folder slug is generated from the topic name. Each stage uses a dedicated Opus subagent so the main session stays light.
+A topic like `cap-theorem` would land under `general-concept/` instead of `backend/`, because the theorem itself is not tied to any single layer of the stack.
+
+The topic is automatically classified into one of `frontend / backend / ai / database / cloud / general-concept`. The folder slug is generated from the topic name. For unfamiliar keywords the classifier runs a focused web search first, then maps the result back onto that bounded set — it never invents a new top-level category. Each stage uses a dedicated Opus subagent so the main session stays light.
 
 ## File map
 
@@ -79,6 +81,7 @@ The `code-implementer` agent picks the language based on the topic's category:
 | `database` | **.NET / C#** for app-side code, plain `.sql` for schema or query-language topics | `dotnet-backend-conventions` |
 | `cloud` | **.NET** for SDK-driven topics, **TypeScript** for IaC (CDK) and edge/worker topics, YAML/HCL for declarative IaC | whichever matches |
 | `ai` | **Python 3.11+** (PEP-8, no extra skill needed) | — |
+| `general-concept` | **Python 3.11+** by default (reads close to pseudocode). Agent may override when the concept is intrinsically tied to a specific stack | matching skill if the override picks TS or .NET |
 
 The two language-convention skills (`typescript-frontend-conventions` and `dotnet-backend-conventions`) cover coding style, naming, type rules, design patterns, and architectural defaults so every demo of the same category looks consistent.
 
@@ -86,15 +89,23 @@ The two language-convention skills (`typescript-frontend-conventions` and `dotne
 
 ## How topic classification works
 
-The `topic-folder-manager` skill applies these rules in order, stopping at the first match:
+The `topic-folder-manager` skill follows a four-step protocol:
 
-1. **`ai`** — ML, LLMs, embeddings, RAG, vector search, prompt engineering, agents, training, MLOps.
-2. **`database`** — storage engines, query languages, indexing, transactions, replication. SQL or NoSQL.
-3. **`cloud`** — IaaS/PaaS/serverless, container orchestration, IaC, managed services, CDN.
-4. **`frontend`** — browser, DOM, rendering, CSS, frontend frameworks, SPA/SSR/SSG, accessibility.
-5. **`backend`** — everything else server-side. Default when nothing else fits.
+1. **Cheap name pass** — if the keyword is obviously a known term in one category (e.g. `react-suspense`, `b-tree`, `kubernetes`), classify immediately and skip the search.
+2. **Web search** — for unfamiliar keywords, acronyms, or ambiguous terms, run one focused web search (`<keyword> what is`, `<keyword> software engineering`) and read the top 2–3 snippets to identify what *kind* of thing it is.
+3. **Apply the rules**, stopping at the first match:
+   1. **`ai`** — ML, LLMs, embeddings, RAG, vector search, prompt engineering, agents, training, MLOps.
+   2. **`database`** — storage engines, query languages, indexing, transactions, replication. SQL or NoSQL.
+   3. **`cloud`** — IaaS/PaaS/serverless, container orchestration, IaC, managed services, CDN.
+   4. **`frontend`** — browser, DOM, rendering, CSS, frontend frameworks, SPA/SSR/SSG, accessibility.
+   5. **`backend`** — server-side things with a clear home in one stack: APIs, auth, server-side frameworks, transport protocols.
+   6. **`general-concept`** — **fallback only.** Cross-cutting software-engineering ideas with no natural single-layer home: CAP theorem, idempotency, SOLID, DRY, dependency injection as a *concept*, DDD vocabulary, distributed-systems theorems, generic GoF patterns.
+   7. **Existing extra category** — if the user manually created another top-level directory (e.g. `devops/`) and the web search shows the topic clearly belongs there, prefer it over `general-concept`.
+4. **Tie-break toward standard categories** — if a topic has *any* meaningful home in the five stack-bound categories, pick that. `general-concept` is reserved for topics that are intrinsically stack-agnostic.
 
-Ambiguous topics (e.g. caching, message queues, observability) have explicit tie-breakers in the skill. You can override classification by manually creating the topic folder in your preferred category before running `/learn`.
+The classifier's output is **bounded**: it will never invent a new top-level directory based on a single web search. The only way to add a new category is to manually create the folder at the repo root — the skill will then respect it on the next run.
+
+Ambiguous topics (caching, message queues, observability) have explicit tie-breakers in the skill. You can also force a placement by manually creating the topic folder in your preferred category before running `/learn`.
 
 ## Setup
 
@@ -114,7 +125,7 @@ Banned filler words: *robust, seamless, leverage, powerful, cutting-edge, delve,
 
 ## Extending the system
 
-- **Add a new category?** Edit the table in `skills/topic-folder-manager/SKILL.md`. Add the category to the layout section of `CLAUDE.md` and the loop in `commands/learn-status.md`.
+- **Add a new category?** Two ways. Quick way: just create the folder at the repo root — the `topic-folder-manager` skill will pick it up automatically as a valid landing site on the next classification run. Permanent way: also edit the rules table in `skills/topic-folder-manager/SKILL.md`, the layout section of `CLAUDE.md`, the standard list in `commands/learn-status.md`, and the language table in `agents/code-implementer.md` so the new category gets first-class treatment.
 - **Add a new document type?** Add an agent under `agents/`, add it to the pipeline in `commands/learn.md`, and update the filename whitelist in `skills/learning-doc-formatter/SKILL.md`.
 - **Change the writing style?** Edit `skills/learning-doc-formatter/SKILL.md`. All four pipeline agents inherit from it.
 

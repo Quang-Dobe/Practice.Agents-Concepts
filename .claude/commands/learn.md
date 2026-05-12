@@ -19,7 +19,7 @@ You are **not** writing the docs yourself. You are coordinating the specialist s
 
 ### Stage 0 — Resolve the topic folder
 Invoke the `topic-folder-manager` skill with the topic name `$ARGUMENTS`. It will:
-- classify the topic into one of `frontend / backend / ai / database / cloud`
+- classify the topic into one of `frontend / backend / ai / database / cloud / general-concept` (or any existing extra category folder already at the repo root) — running a focused web search first for unfamiliar keywords
 - generate a folder slug
 - create `<category>/<slug>/docs/` and `<category>/<slug>/code/` if missing
 - return the path and the next missing artifact
