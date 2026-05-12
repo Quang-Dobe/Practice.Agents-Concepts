@@ -12,6 +12,7 @@ This repository is a personal tech-learning notebook. Each topic the user studie
 ├── database/         # SQL + NoSQL, storage engines, indexing
 ├── cloud/            # IaaS/PaaS, serverless, containers, IaC
 ├── general-concept/  # cross-cutting SE ideas (CAP, idempotency, SOLID, …)
+├── TOPICS.md         # auto-generated index of every topic, grouped by category
 └── .claude/          # agents, skills, slash commands (this folder)
 ```
 
@@ -41,7 +42,7 @@ The pipeline is opinionated on purpose: every topic folder should look the same 
 ## Conventions you must follow
 
 - **Do not invent new filenames.** The four files above are the contract. No `requirements.md`, no `analyzed.md`, no `summary.md`. If something genuinely doesn't fit, raise it to the user instead of silently adding files.
-- **Always use the `topic-folder-manager` skill** to resolve a topic to a folder path. Do not classify topics ad-hoc. The skill runs a **web-search-informed** classifier for unfamiliar keywords, but its output is **bounded** to the six standard categories (or a category folder that already exists at the repo root). New top-level categories are never invented from a single web search.
+- **Always use the `topic-folder-manager` skill** to resolve a topic to a folder path. Do not classify topics ad-hoc. The skill runs a **web-search-informed** classifier for unfamiliar keywords, but its output is **bounded** to the six standard categories (or a category folder that already exists at the repo root). New top-level categories are never invented from a single web search. As its final step, the skill rewrites `TOPICS.md` at the repo root from the current filesystem state — never hand-edit that file.
 - **Always use the `learning-doc-formatter` skill's conventions** when writing any document in a topic folder. Specifically: no YAML front matter in docs, no banned marketing words, no "Hope this helps!" sign-offs.
 - **Language defaults for MVP code are fixed by category** — and the `code-implementer` agent must load the matching convention skill before writing code:
   - `frontend/` → **TypeScript** → load `typescript-frontend-conventions` skill

@@ -19,6 +19,8 @@ backend/circuit-breaker/
 
 A topic like `cap-theorem` would land under `general-concept/` instead of `backend/`, because the theorem itself is not tied to any single layer of the stack.
 
+Every `/learn*` run also refreshes `TOPICS.md` at the repo root — an auto-generated index of every topic grouped by category. It is rebuilt from the filesystem each time, so it never drifts when topics are renamed or removed.
+
 The topic is automatically classified into one of `frontend / backend / ai / database / cloud / general-concept`. The folder slug is generated from the topic name. For unfamiliar keywords the classifier runs a focused web search first, then maps the result back onto that bounded set — it never invents a new top-level category. Each stage uses a dedicated Opus subagent so the main session stays light.
 
 ## File map
@@ -44,6 +46,12 @@ The topic is automatically classified into one of `frontend / backend / ai / dat
     ├── learn-practice.md                        # stage 3 only
     ├── learn-code.md                            # stage 4 only
     └── learn-status.md                          # repo-wide progress report
+```
+
+Plus one file at the repo root, outside `.claude/`:
+
+```
+<repo root>/TOPICS.md   # auto-generated index of every topic, grouped by category
 ```
 
 ## Commands
