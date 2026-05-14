@@ -1,0 +1,47 @@
+name: Email Claude learning summary
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  send-email:
+    if: startsWith(github.event.head_commit.message, '[CLAUDE]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify TOPIC_SUMMARIZATION.md exists
+        run: |
+          if [ ! -f TOPIC_SUMMARIZATION.md ]; then
+            echo "TOPIC_SUMMARIZATION.md not found at repo root — refusing to send empty email."
+            exit 1
+          fi
+
+      - name: Prepare subject and body
+        id: prep
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          subject=$(printf '%s' "$COMMIT_MSG" | head -n 1)
+          echo "subject=$subject" >> "$GITHUB_OUTPUT"
+          {
+            echo "body<<__EOF__"
+            cat TOPIC_SUMMARIZATION.md
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send email via Gmail SMTP
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.GMAIL_USERNAME }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          from: ${{ secrets.GMAIL_USERNAME }}
+          to: tdquangcr@gmail.com
+          subject: ${{ steps.prep.outputs.subject }}
+          body: ${{ steps.prep.outputs.body }}
