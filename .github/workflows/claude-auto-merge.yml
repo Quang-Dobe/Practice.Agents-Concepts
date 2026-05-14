@@ -40,7 +40,7 @@ jobs:
           TITLE_PREFIX='[CLAUDE] ['
           REQUIRED_LABEL='claude-auto'
           # The GitHub account Routine A commits/pushes as. CHANGE THIS.
-          EXPECTED_AUTHOR='Claude'
+          EXPECTED_AUTHOR='Quang-Dobe'
 
           # When triggered by a single PR event, scope to that PR. Otherwise scan all open PRs.
           if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_review" ]]; then
