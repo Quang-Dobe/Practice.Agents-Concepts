@@ -1,15 +1,12 @@
 name: Email Claude learning summary
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
 jobs:
   send-email:
-    if: |
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.title, '[CLAUDE]')
+    if: startsWith(github.event.head_commit.message, '[CLAUDE] [')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -27,9 +24,10 @@ jobs:
       - name: Prepare subject and body
         id: prep
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          echo "subject=$PR_TITLE" >> "$GITHUB_OUTPUT"
+          SUBJECT=$(printf '%s\n' "$HEAD_COMMIT_MESSAGE" | head -n 1)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
           {
             echo "body<<__EOF__"
             cat TOPIC_SUMMARIZATION.md
