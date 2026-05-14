@@ -112,7 +112,7 @@ jobs:
       - name: Merge matched PRs
         if: steps.find.outputs.matched != ''
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.CLAUDE_APPROVER_PAT }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
