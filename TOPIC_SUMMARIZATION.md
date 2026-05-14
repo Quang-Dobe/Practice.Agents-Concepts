@@ -1,11 +1,11 @@
-# Service Worker
+# Blue-Green Deployment
 
-A Service Worker is a JavaScript file the browser runs in its own background thread, sitting between a web page and the network so it can intercept and answer every request the page makes. You register it once from a page, and from then on the browser keeps it on the side — separate from any tab — letting it observe fetches inside its scope and respond from a cache, modify them, or pass them through. It is the standards-track way to take control of the network layer in the browser without writing a native app.
+Blue-green deployment is a release strategy where you keep two identical copies of your production environment running side by side — one is live and serving users, the other sits idle. You deploy the new version to the idle copy, smoke-test it while real traffic still flows to the old one, then flip a single switch — a load balancer rule, a DNS record, a Kubernetes service selector — that hands all traffic to the new environment. The old environment stays warm in the background as an instant rollback target.
 
-Engineers reach for a Service Worker when they want pages that open instantly, work offline, receive push notifications, or quietly sync data in the background. It is the engine behind Progressive Web Apps and the only way to express caching rules that HTTP cache headers cannot — stale-while-revalidate, cache-first for app shells, network-first for APIs. It is not the right tool for sites with no offline requirements, environments without HTTPS, or work that needs synchronous access to the DOM, because a worker has no `window` or `document` and is intentionally decoupled from any single page.
+Engineers reach for it when downtime is unacceptable and rollback needs to be measured in seconds, not "rebuild and redeploy." Because the previous version stays running behind the curtain, undoing a bad release is just another flip of the same switch. It pays for itself on payments, checkout, and public APIs where users notice every hiccup. It is the wrong tool when the release contains a schema-breaking database change both colors share, when doubling capacity is genuinely too expensive, or when you actually want to expose the new build gradually to a slice of real users — that last case is what canary releases are for.
 
-The mental model is a personal mail clerk you install in your house. Every outgoing letter — every `fetch` your page makes — passes through the clerk first, who reads the address and decides whether to answer from their filing cabinet, run to the post office, or hand back last week's copy with a note. The clerk is a programmable proxy, written by you, running in JavaScript, scoped to one origin.
+Picture a theatre with two identical sets behind a curtain. The audience watches set A while the crew quietly dresses set B for the next act. When set B is ready, the curtain shifts and the audience is now looking at B — set A is still standing, lights on, ready to come back if a prop falls. Nothing is rebuilt in front of a live audience, and rolling back is a curtain pull, not a renovation.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/frontend/service-worker/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/cloud/blue-green-deployment/
