@@ -1,75 +1,109 @@
 ---
-name: topic-picker
-description: Use this skill whenever a learning command needs to autonomously choose a NEW topic the repo doesn't already have. Reads TOPICS.md, identifies gaps across the six standard categories (frontend, backend, ai, database, cloud, general-concept), and proposes one concrete topic name plus its intended category. Triggered by the `/daily-learn` slash command before it runs the full `/learn` pipeline.
+description: Autonomously pick a new topic the repo is missing, run the full /learn pipeline on it, write a plain-English TOPIC_SUMMARIZATION.md at the repo root, then commit and push as `[CLAUDE] [<category>] <topic>`.
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Task, WebSearch, WebFetch
+model: opus
 ---
 
-# Topic Picker
+# /daily-learn — Daily Autonomous Learning
 
-This skill's only job is to answer one question: **"What's a good new topic to learn today?"** It does not write docs, does not classify deeply, does not call the web. It picks, and it picks fast.
+You are running a fully autonomous daily learning loop. **No prompts to the user during execution.** Pick, learn, summarize, commit, push. Stop on the first failure.
 
-The companion skill `topic-folder-manager` is the authoritative classifier — it decides where a topic finally lives. This skill is only a *proposer*. If `topic-folder-manager` later reclassifies, that is fine.
+## Stage 0 — Pick a topic
 
-## When to invoke
+Invoke the `topic-picker` skill. Capture its three outputs:
 
-Only when a command needs to autonomously generate a topic — currently just `/daily-learn`. Never as part of `/learn`, `/learn-overview`, etc., because in those flows the user has already named the topic.
+- `PICKED_TOPIC` (human-readable name)
+- `PICKED_CATEGORY` (one of the six standard categories — used only as a hint for downstream classification)
+- `RATIONALE` (one line, log only)
 
-## The procedure
+Print one short line acknowledging the pick (e.g. `Today's topic: Service Worker (frontend) — <rationale>`) and proceed.
 
-Run these steps in order. Do not deviate.
+## Stage 1 — Run the /learn pipeline
 
-### Step 1 — Read TOPICS.md
+Execute the orchestration described in `.claude/commands/learn.md` verbatim, with `$ARGUMENTS = PICKED_TOPIC`. That covers:
 
-Read `<repo root>/TOPICS.md`. From it, build two things:
+- Stage 0 of `/learn`: invoke `topic-folder-manager` — capture `CATEGORY`, `SLUG`, `PATH`, `NEXT_STEP`. From this point on, `CATEGORY` from `topic-folder-manager` is authoritative — it may differ from `PICKED_CATEGORY` and that is fine.
+- Stages 1–4 of `/learn`: `overview-explainer` → `deep-analyzer` → `practitioner` → `code-implementer`.
 
-- `existing_slugs`: the set of every slug listed under every category (the slugs in backticks inside the markdown link text).
-- `counts`: a map of `category → number of topics`, for the six standard categories only:
-  `frontend, backend, ai, database, cloud, general-concept`.
+If `/learn` aborts at any stage (a quality gate fails, a subagent writes nothing), **stop the whole `/daily-learn` command immediately**. Do not write the summary file, do not commit, do not push. Print which stage failed and exit.
 
-If `TOPICS.md` does not exist or cannot be parsed, treat all counts as zero and `existing_slugs` as empty. Do not bail.
+If Stage 0 of `/learn` returns `NEXT_STEP: complete`, the picker has somehow chosen an existing topic. Treat that as a picker bug — print a short note (`Picker collision on '<slug>'; aborting.`) and stop. Do not pick again on the same run.
 
-### Step 2 — Pick a category
+## Stage 2 — Write TOPIC_SUMMARIZATION.md
 
-Apply these rules in order. Stop at the first match.
+After Stage 1 completes successfully, read `<CATEGORY>/<SLUG>/docs/01-overview.md` and distill it into a plain-English summary at `<repo root>/TOPIC_SUMMARIZATION.md`. **Overwrite** any existing file at that path.
 
-1. If at least one standard category has count = 0, pick uniformly at random from the zero-count categories. Filling gaps comes first.
-2. Otherwise, find the lowest count `N` across the six. Pick uniformly at random from the categories whose count equals `N`. Ties broken randomly.
+### Resolving the GitHub URL
 
-You are explicitly biased toward *evening out* the repo, not toward novelty.
+Run `git remote get-url origin`. Normalize the result into an `https://github.com/<owner>/<repo>` form:
 
-### Step 3 — Propose a topic in that category
+- If it begins with `git@github.com:`, replace with `https://github.com/` and strip the trailing `.git`.
+- If it begins with `https://github.com/`, just strip any trailing `.git`.
+- If it does not match either, abort with `Cannot resolve GitHub URL from remote.`
 
-Generate one well-known, well-defined topic in the chosen category that is **not** already in `existing_slugs`. Use your own knowledge — do not run a web search; that is `topic-folder-manager`'s job for ambiguous cases, and at this stage the topic is by construction a canonical concept you already know.
+Call the result `REPO_URL`.
 
-Hard constraints on the proposal:
+### File template
 
-- It must be a **single, focused concept**, learnable in one sitting. Not a whole framework, not a multi-week subject.
-- Its slug, generated by lowercasing and replacing non-alphanumerics with hyphens, must not already appear in `existing_slugs`. Check explicitly before returning.
-- It must be a real, accepted term in the industry — not an invented mashup.
-- Prefer **foundational** topics over trendy ones. The repo is a learning notebook, not a hype tracker.
+Write exactly this shape — no YAML front matter, no extra sections:
 
-Examples of good picks per category (use as taste reference, not as a fixed menu):
+```markdown
+# <Topic Title>
 
-| Category | Good kinds of topics |
-|---|---|
-| `frontend` | Service Worker, Virtual DOM, CSS Grid, Hydration, Web Components, IntersectionObserver, ARIA |
-| `backend` | JWT, gRPC, OAuth 2.0, Circuit Breaker, Rate Limiting, Server-Sent Events, Connection Pooling |
-| `ai` | RAG, Embeddings, Attention Mechanism, LoRA, Tokenization, Prompt Caching, Vector Search |
-| `database` | B-Tree Index, MVCC, Write-Ahead Log, Sharding, LSM Tree, Materialized View, Two-Phase Commit |
-| `cloud` | Blue-Green Deployment, Sidecar Pattern, Service Mesh, Pub/Sub, CDN Edge Caching, IAM Roles, Spot Instances |
-| `general-concept` | CAP Theorem, Idempotency, Eventual Consistency, SOLID, DRY, Domain-Driven Design, Backpressure |
+<Paragraph 1: in plain language, what this topic IS. One concept, one sentence-or-two.>
 
-If the chosen category's good picks are *all* already in `existing_slugs`, pick anything reasonable in that category not yet covered. Do not change category.
+<Paragraph 2: why it matters / when an engineer reaches for it.>
 
-### Step 4 — Return the structured response
+<Paragraph 3: one concrete example or analogy that grounds it.>
 
-Output exactly this shape, no narration, no surrounding prose:
+---
 
-```
-TOPIC: <human-readable topic name, capitalized normally>
-CATEGORY: <one of: frontend | backend | ai | database | cloud | general-concept>
-RATIONALE: <one short line — why this category, why this topic>
+Full notes: <REPO_URL>/tree/main/<CATEGORY>/<SLUG>/
 ```
 
-`RATIONALE` is for the orchestrating command's log, not for the user. One sentence, under 25 words. Example: `frontend has 0 topics; Service Worker is a foundational PWA primitive.`
+Constraints:
 
-That is the entire output of this skill.
+- Total length 150–300 words across the three paragraphs.
+- Use plain English. No bullets, no headings beyond `# <Topic Title>`.
+- Do not invent content. Everything must be derivable from `01-overview.md` — this file is a condensation, not an extension.
+- The last line is the raw URL (no markdown link syntax). Gmail will linkify it; markdown links don't render in a plain-text email body, which is what the GitHub Action sends.
+
+## Stage 3 — Commit and push
+
+Run, in this order:
+
+```bash
+git add -A
+git status --porcelain
+```
+
+If `git status --porcelain` shows no changes, abort with `Nothing to commit — earlier stages may have silently no-op'd.` Do **not** create an empty commit.
+
+Otherwise:
+
+```bash
+git commit -m "[CLAUDE] [<CATEGORY>] <PICKED_TOPIC>"
+git push
+```
+
+`<CATEGORY>` is the one returned by `topic-folder-manager`, lowercase. `<PICKED_TOPIC>` is the human-readable name from the picker, used verbatim.
+
+If `git push` fails (network, auth, non-fast-forward), report the error and stop. Do not retry — the user will resolve it manually.
+
+## Final output
+
+When all three stages complete successfully, print one clean line:
+
+```
+✓ [CLAUDE] [<CATEGORY>] <PICKED_TOPIC> — pushed.
+```
+
+Nothing else. No celebration, no doc summaries, no "hope this helps."
+
+## Things you must NOT do
+
+- Do not ask the user any question during this command. It is fully autonomous by design.
+- Do not pick a different topic if `/learn` fails partway. Stop instead — half-finished topic folders are a debugging signal, not a thing to paper over.
+- Do not commit `TOPIC_SUMMARIZATION.md` on its own. The commit must include the new topic folder too, which is why `git add -A` runs before the commit.
+- Do not amend or force-push. Always a fresh commit.
+- Do not edit `TOPICS.md` by hand here — `topic-folder-manager` already rebuilt it during Stage 1.
