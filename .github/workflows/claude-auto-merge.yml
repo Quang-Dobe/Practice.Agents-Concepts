@@ -1,0 +1,172 @@
+name: Auto-merge Claude PRs
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
+  check_suite:
+    types: [completed]
+  pull_request_review:
+    types: [submitted]
+  # Safety net: catch anything the event triggers miss
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+
+concurrency:
+  group: claude-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Identify candidate PRs
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Branch + title contract enforced by Routine A
+          BRANCH_REGEX='^claude/[a-z0-9-]+/[a-z0-9-]+(-[0-9]{8}-[0-9]{4})?$'
+          TITLE_PREFIX='[CLAUDE] ['
+          REQUIRED_LABEL='claude-auto'
+          # The GitHub account Routine A commits/pushes as. CHANGE THIS.
+          EXPECTED_AUTHOR='your-claude-bot-username'
+
+          # When triggered by a single PR event, scope to that PR. Otherwise scan all open PRs.
+          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_review" ]]; then
+            PR_NUMBERS='${{ github.event.pull_request.number }}'
+          else
+            PR_NUMBERS=$(gh pr list --state open --base main --json number --jq '.[].number' | tr '\n' ' ')
+          fi
+
+          MATCHED=()
+          for n in $PR_NUMBERS; do
+            [ -z "$n" ] && continue
+
+            DATA=$(gh pr view "$n" --json number,title,headRefName,author,isDraft,labels,commits,url)
+
+            TITLE=$(echo "$DATA"   | jq -r '.title')
+            BRANCH=$(echo "$DATA"  | jq -r '.headRefName')
+            AUTHOR=$(echo "$DATA"  | jq -r '.author.login')
+            DRAFT=$(echo "$DATA"   | jq -r '.isDraft')
+            LABELS=$(echo "$DATA"  | jq -r '[.labels[].name] | join(",")')
+            COMMIT_COUNT=$(echo "$DATA" | jq -r '.commits | length')
+            LATEST_MSG=$(echo "$DATA"   | jq -r '.commits[-1].messageHeadline')
+
+            # Filter chain — every check must pass
+            [[ "$DRAFT"        == "false"          ]] || { echo "SKIP #$n: draft";              continue; }
+            [[ "$AUTHOR"       == "$EXPECTED_AUTHOR" ]] || { echo "SKIP #$n: author=$AUTHOR";   continue; }
+            [[ "$BRANCH"       =~ $BRANCH_REGEX    ]] || { echo "SKIP #$n: branch=$BRANCH";     continue; }
+            [[ "$TITLE"        == "$TITLE_PREFIX"* ]] || { echo "SKIP #$n: title mismatch";     continue; }
+            [[ ",$LABELS,"     == *",$REQUIRED_LABEL,"* ]] || { echo "SKIP #$n: missing label"; continue; }
+            [[ "$COMMIT_COUNT" == "1"              ]] || { echo "SKIP #$n: $COMMIT_COUNT commits"; continue; }
+            [[ "$LATEST_MSG"   == "[CLAUDE] ["*    ]] || { echo "SKIP #$n: commit msg would not trigger downstream action"; continue; }
+
+            echo "MATCH #$n: $TITLE"
+            MATCHED+=("$n")
+          done
+
+          echo "matched=${MATCHED[*]:-}" >> "$GITHUB_OUTPUT"
+
+      - name: Approve matched PRs
+        if: steps.find.outputs.matched != ''
+        env:
+          # Use a separate bot account's PAT to approve, since GITHUB_TOKEN cannot
+          # approve PRs in the same repo. If you don't have one, delete this step
+          # and ensure branch protection on main does NOT require approvals.
+          GH_TOKEN: ${{ secrets.CLAUDE_APPROVER_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for n in ${{ steps.find.outputs.matched }}; do
+            # Skip if this account is also the PR author (can't self-approve)
+            PR_AUTHOR=$(gh pr view "$n" --json author --jq '.author.login')
+            APPROVER=$(gh api user --jq '.login')
+            if [[ "$PR_AUTHOR" == "$APPROVER" ]]; then
+              echo "SKIP approve #$n: approver == author"
+              continue
+            fi
+
+            # Skip if already approved by this account
+            ALREADY=$(gh pr view "$n" --json reviews \
+              --jq "[.reviews[] | select(.author.login==\"$APPROVER\" and .state==\"APPROVED\")] | length")
+            if [[ "$ALREADY" -gt 0 ]]; then
+              echo "OK #$n: already approved"
+              continue
+            fi
+
+            gh pr review "$n" --approve --body "Auto-approved by claude-auto-merge workflow."
+            echo "APPROVED #$n"
+          done
+
+      - name: Merge matched PRs
+        if: steps.find.outputs.matched != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          MERGED=0
+          SKIPPED=0
+          FAILED=0
+
+          for n in ${{ steps.find.outputs.matched }}; do
+            STATE=$(gh pr view "$n" --json mergeable,mergeStateStatus,reviewDecision)
+            MERGEABLE=$(echo  "$STATE" | jq -r '.mergeable')
+            MSTATUS=$(echo    "$STATE" | jq -r '.mergeStateStatus')
+            REVIEW=$(echo     "$STATE" | jq -r '.reviewDecision')
+
+            if [[ "$MERGEABLE" == "CONFLICTING" ]]; then
+              echo "SKIP #$n: merge conflict"; SKIPPED=$((SKIPPED+1)); continue
+            fi
+
+            case "$MSTATUS" in
+              CLEAN|HAS_HOOKS|UNSTABLE)
+                # UNSTABLE = non-required checks failing; required ones pass. Safe to merge.
+                ;;
+              BLOCKED)
+                if [[ "$REVIEW" == "REVIEW_REQUIRED" ]]; then
+                  echo "WAIT #$n: review required (configure CLAUDE_APPROVER_PAT or relax branch protection)"
+                else
+                  echo "WAIT #$n: blocked ($MSTATUS, review=$REVIEW)"
+                fi
+                SKIPPED=$((SKIPPED+1)); continue
+                ;;
+              BEHIND)
+                echo "WAIT #$n: branch behind base — update needed"; SKIPPED=$((SKIPPED+1)); continue
+                ;;
+              DIRTY)
+                echo "SKIP #$n: dirty (conflicts)"; SKIPPED=$((SKIPPED+1)); continue
+                ;;
+              UNKNOWN)
+                echo "WAIT #$n: mergeability unknown — will retry next run"; SKIPPED=$((SKIPPED+1)); continue
+                ;;
+              *)
+                echo "WAIT #$n: state=$MSTATUS"; SKIPPED=$((SKIPPED+1)); continue
+                ;;
+            esac
+
+            # Squash merge with NO --subject / --body — feature branch's single commit
+            # message ("[CLAUDE] [<category>] <topic>") passes through to main verbatim,
+            # which is what the downstream "send email" Action listens for.
+            if gh pr merge "$n" --squash --delete-branch; then
+              echo "MERGED #$n"; MERGED=$((MERGED+1))
+            else
+              echo "FAIL #$n: merge command failed"; FAILED=$((FAILED+1))
+            fi
+          done
+
+          echo "---"
+          echo "MERGED:  $MERGED"
+          echo "SKIPPED: $SKIPPED"
+          echo "FAILED:  $FAILED"
