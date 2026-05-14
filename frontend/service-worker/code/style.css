@@ -1,0 +1,6 @@
+/* Trivial CSS so we have a third precached asset besides HTML and JS.
+   Existence matters more than the rules — this is what proves the
+   install-time `cache.addAll` actually picks up multiple resources. */
+body { font: 16px system-ui, sans-serif; margin: 2rem; max-width: 40rem; }
+#status { color: #555; }
+button { padding: 0.4rem 0.8rem; }

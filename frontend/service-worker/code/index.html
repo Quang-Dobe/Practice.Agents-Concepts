@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Service Worker MVP</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <!--
+      This page exists for one reason: register the worker and make a request
+      whose interception is visible. Keep the markup boring on purpose.
+    -->
+    <h1>Service Worker MVP</h1>
+    <p id="status">registering...</p>
+
+    <!--
+      A picture-of-pic.sum-something image so we can watch the worker intercept it.
+      `picsum.photos` is a stable third-party that returns a real PNG/JPEG.
+      First load: served from network and written to cache.
+      Second load (or offline): served from cache by `event.respondWith`.
+    -->
+    <img id="demo-img" alt="random sample image" width="320"
+         src="https://picsum.photos/id/237/320/200" />
+
+    <p>
+      <button id="refetch">Re-fetch image (watch the Network tab)</button>
+    </p>
+
+    <script type="module">
+      // The worker lives at the site root so its scope is `/`. A worker at
+      // `/code/sw.js` would only control `/code/*` — see scope rules in 02-deep-dive.md.
+      const statusEl = document.getElementById('status');
+
+      if (!('serviceWorker' in navigator)) {
+        statusEl.textContent = 'Service Workers not supported in this browser.';
+      } else {
+        // `register` is a one-shot call. The browser remembers the registration
+        // across page loads — calling it on every load is idiomatic and cheap.
+        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+
+        // The first page load is uncontrolled by design (see 02-deep-dive.md § When).
+        // Wait for `ready` so the rest of the demo is meaningful.
+        await navigator.serviceWorker.ready;
+        statusEl.textContent =
+          'worker active. reload the page (or go offline) to see cache hits.';
+
+        // Re-fetch button: same URL each time, so the second click should be
+        // served from cache without a network request (look at DevTools > Network).
+        document.getElementById('refetch').addEventListener('click', async () => {
+          const r = await fetch('https://picsum.photos/id/237/320/200');
+          // `from` tells us whether the worker handled it or not. The worker
+          // attaches a custom header to cache hits — see sw.ts.
+          const from = r.headers.get('x-served-from') ?? 'network (passthrough)';
+          statusEl.textContent = `re-fetched. served from: ${from}`;
+        });
+      }
+    </script>
+  </body>
+</html>
