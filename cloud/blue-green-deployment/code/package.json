@@ -1,0 +1,12 @@
+{
+  "name": "blue-green-deployment-mvp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx mvp.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}
