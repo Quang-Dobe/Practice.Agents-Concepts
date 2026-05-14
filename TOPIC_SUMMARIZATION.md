@@ -1,11 +1,11 @@
-# Circuit Breaker
+# B-Tree Index
 
-A circuit breaker is a small wrapper around a network call that stops trying when the service on the other end is clearly broken. It watches the recent failure rate, and once things look bad it flips into an "open" state where every call returns an instant error instead of waiting on a doomed request. After a cool-down it cautiously sends a probe or two to check whether the downstream has recovered, and only then resumes normal traffic.
+A B-tree index is a sorted, shallow, very wide tree that a database keeps alongside your table so it can locate rows by key in a handful of disk reads instead of scanning every page. Each node holds hundreds of sorted keys plus pointers to child nodes, so a tree only three or four levels deep can index hundreds of millions of rows. It is the default index type in Postgres, MySQL/InnoDB, SQL Server, Oracle, and SQLite — almost every `CREATE INDEX` you write is silently building one.
 
-Engineers reach for it whenever one synchronous dependency can drag a whole service down with it. If a payment API starts taking thirty seconds to respond, every caller keeps a thread and a connection tied up for thirty seconds, the worker pool drains, and a single bad dependency turns into a company-wide outage. The breaker prevents that cascading failure: callers fail fast, the failing service gets breathing room instead of being hammered by retries, and the system as a whole stays responsive even while one piece is sick.
+Engineers reach for a B-tree whenever a query filters on a high-selectivity column — a primary key, a foreign key, an email, a timestamp range — and the table is large enough that a full scan would be too slow. B-trees stay balanced as data grows, support range scans cheaply because the leaves are kept in sorted order, and back every `UNIQUE` constraint behind the scenes. They are not the right pick for low-cardinality columns, substring searches with a leading wildcard, or vector similarity, but for the bread-and-butter "find these rows by key" workload they are the structure the database planner reaches for first.
 
-The analogy is the breaker in a house's electrical panel. Under normal load current flows through it and nobody thinks about it; when something downstream shorts, it physically opens the circuit so the fault cannot burn down the wiring upstream. A software circuit breaker does the same job for a remote call — three states (Closed, Open, Half-Open), one trip threshold, one cool-down, and a lot fewer 3am pages.
+The intuition is a phone book of phone books. The first page is not names but signposts — "A–F lives in volume 1, G–M in volume 2." You open volume 2 and its first page is again signposts pointing into smaller sections. After three or four hops you land on a single page of sorted names and scan it. That is the whole trick: very high branching factor, very shallow tree, logarithmic lookups, and effectively free range scans because the bottom pages are sorted.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/backend/circuit-breaker/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/database/b-tree-index/
