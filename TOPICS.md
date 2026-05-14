@@ -11,8 +11,8 @@ _none yet_
 ## ai (1)
 - [`harness-engineer`](ai/harness-engineer/)
 
-## database (0)
-_none yet_
+## database (1)
+- [`b-tree-index`](database/b-tree-index/)
 
 ## cloud (0)
 _none yet_
@@ -22,4 +22,4 @@ _none yet_
 
 ---
 
-**3 topics across 3 categories.**
+**4 topics across 4 categories.**
