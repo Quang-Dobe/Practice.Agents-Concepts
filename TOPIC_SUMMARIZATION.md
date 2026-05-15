@@ -1,11 +1,11 @@
-# Idempotency
+# Write-Ahead Log
 
-Idempotency is the property that running the same operation twice — or a hundred times — leaves the system in exactly the same state as running it once. The second call is a safe no-op, not a second side effect.
+A Write-Ahead Log, or WAL, is an append-only file where a database writes down "I am about to do X" before it actually does X. Only after that note is safely on disk is the change considered committed. The real data files get updated later, lazily, in whatever order is efficient.
 
-It matters because networks lie, clients retry, and message queues redeliver. If a payment, a webhook, or an email send is not idempotent, a single flaky connection can turn one charge into two and one notification into ten. Engineers reach for idempotency whenever an operation might be retried across a network boundary: payment APIs, at-least-once message consumers, webhook receivers, database migrations, and infrastructure scripts that are expected to be run repeatedly without harm. It is also the foundation on which "exactly-once" processing is built in practice — at-least-once delivery plus an idempotent consumer.
+It matters because disks are slow and crashes are common, and those two facts pull a database in opposite directions. Updating every row in its final on-disk location for every commit is too expensive; keeping changes only in memory means a single power loss can lose acknowledged writes. The WAL is the compromise that resolves the tension — one sequential append plus an fsync gives you fast commits and durable data at the same time. Engineers reach for a WAL whenever a system must survive a `kill -9`, a kernel panic, or a power cut without forgetting what it told its users it remembered, and whenever they need building blocks like point-in-time recovery, streaming replication, or change-data-capture, all of which are read off the same log stream.
 
-The light switch is the right analogy. Flicking the switch up once turns the light on; flicking it up four more times leaves the light on. The action describes a destination, not a step. A turnstile counter is the opposite — every push adds one, and there is no way to retry safely. `PUT /users/123 { "name": "Alice" }` is the switch. `POST /payments { "amount": 50 }` is the turnstile, which is why payment APIs require an idempotency key to make retries safe.
+Picture a busy kitchen. Every order goes onto a notepad at the pass and the customer only hears "got it" once the ticket is clipped to the rail. The cooks work from the rail at their own pace. If the kitchen burns down overnight, tomorrow's crew rebuilds the night's state by re-reading the tickets. That notepad is the WAL: cheap to write, expensive to lose, and the single source of truth when things go wrong.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/general-concept/idempotency/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/database/write-ahead-log/
