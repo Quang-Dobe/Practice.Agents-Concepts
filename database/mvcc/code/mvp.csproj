@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- A single flat console app. Per the topic prompt: a tiny MVP demonstrating
+         MVCC behaviour does NOT need Clean Architecture layering or a custom
+         mediator. The interesting thing here is two concurrent transactions
+         observing different row versions of the same logical row. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MvccMvp</RootNamespace>
+    <!-- Program.cs is conventional for top-level statements in .NET; we
+         additionally include mvp.cs so the file name matches the repo
+         convention of mvp.<ext>. -->
+    <StartupObject>MvccMvp.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Npgsql is the canonical Postgres client for .NET. It is not a CQRS
+         framework; it is the driver. Required because Postgres is the
+         clearest MVCC-capable engine to demo against (Postgres = MVCC only,
+         no fallback to locking). -->
+    <PackageReference Include="Npgsql" Version="8.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- mvp.cs holds the entire demo. The default Program.cs is omitted. -->
+    <Compile Remove="Program.cs" />
+    <Compile Include="mvp.cs" />
+  </ItemGroup>
+
+</Project>
