@@ -1,0 +1,116 @@
+# Sidecar Pattern — MVP
+#
+# What this manifest proves:
+#   - A single Pod runs two containers that share an `emptyDir` volume.
+#   - The "app" writes log lines to a FILE in that shared dir (it has no idea
+#     a sidecar exists; it cannot reach any network log backend).
+#   - A Fluent Bit "sidecar" tails the same file and emits parsed records to
+#     its own stdout, where `kubectl logs` can pick them up.
+#   - The sidecar is declared the modern way: an entry in `initContainers`
+#     with `restartPolicy: Always`. This is the Kubernetes native sidecar
+#     model from KEP-753 (beta in 1.29, GA in 1.33). The kubelet starts the
+#     sidecar BEFORE the main container and keeps it running for the whole
+#     Pod lifetime — solving the classic "app starts before sidecar is ready"
+#     and "sidecar dies while app is still draining" races.
+#
+# Requires Kubernetes >= 1.29 (kind v0.22+, minikube v1.32+ both fine).
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-demo
+  labels:
+    app: sidecar-demo
+spec:
+  # `emptyDir` is the drop-box. Lives and dies with the Pod, shared between
+  # every container that mounts it. tmpfs would be even better for secrets,
+  # but for log files plain emptyDir is the textbook choice.
+  volumes:
+    - name: shared-logs
+      emptyDir: {}
+    # Fluent Bit needs its config somewhere. ConfigMap mounted read-only.
+    - name: fluent-bit-config
+      configMap:
+        name: fluent-bit-config
+
+  # ---- The sidecar lives here, in initContainers, with restartPolicy: Always.
+  # The kubelet treats this entry as a long-running container with init-style
+  # ordering: it starts before `containers[*]` and is SIGTERM'd AFTER them on
+  # shutdown. Without `restartPolicy: Always` this would be a plain init
+  # container that runs once and exits — exactly what a sidecar must NOT do.
+  initContainers:
+    - name: log-shipper
+      image: fluent/fluent-bit:3.0.7
+      restartPolicy: Always   # <-- this single line is what makes it a native sidecar
+      volumeMounts:
+        - name: shared-logs
+          mountPath: /var/log/app
+          readOnly: true      # sidecar only READS what the app produces
+        - name: fluent-bit-config
+          mountPath: /fluent-bit/etc
+      # A real readiness probe matters: the Pod won't be marked Ready until
+      # the sidecar passes this, so traffic / dependents wait for the shipper.
+      readinessProbe:
+        httpGet: { path: /api/v1/health, port: 2020 }
+        periodSeconds: 2
+      resources:
+        requests: { cpu: 10m, memory: 32Mi }
+        limits:   { memory: 128Mi }   # cap memory; leave CPU unset (see practice doc)
+
+  # ---- The actual application. Knows nothing about logging infrastructure.
+  # It just writes timestamped lines to a file in /var/log/app/. In a real
+  # system this would be your microservice; here it's a one-liner so the
+  # demo stays focused on the pattern.
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - /bin/sh
+        - -c
+        - |
+          i=0
+          while true; do
+            i=$((i+1))
+            # Plain text "log line". The sidecar will parse and forward it.
+            echo "$(date -Iseconds) level=info msg=\"hello from app\" seq=$i" \
+              >> /var/log/app/app.log
+            sleep 2
+          done
+      volumeMounts:
+        - name: shared-logs
+          mountPath: /var/log/app    # same path the sidecar reads from
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits:   { memory: 64Mi }
+
+---
+# Fluent Bit config: tail the shared file, parse nothing fancy, dump to stdout.
+# Stdout is deliberate — it lets you prove the sidecar works with just
+# `kubectl logs sidecar-demo -c log-shipper`. In production this OUTPUT would
+# point at Loki, Elasticsearch, Datadog, etc.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Log_Level     info
+        # Exposes /api/v1/health on :2020 — used by the readinessProbe above.
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/app/app.log
+        Tag               app.*
+        Refresh_Interval  1
+        Read_from_Head    true
+
+    [OUTPUT]
+        # `stdout` is the demo backend. Swap for `loki`, `es`, `datadog`...
+        Name   stdout
+        Match  *
+        Format json_lines

@@ -1,11 +1,11 @@
-# MVCC (Multi-Version Concurrency Control)
+# Sidecar Pattern
 
-MVCC is the technique modern databases use to let many transactions read and write the same data at the same time without making everyone wait their turn. Instead of locking a row while one transaction is changing it, the database keeps the old copy of the row around and creates a new version alongside it, then shows each transaction the snapshot of the data that was true at the moment it started.
+The sidecar pattern attaches a small helper container to your application so they run together as one deployment unit, sharing network and local filesystem. The helper takes over chores that are not your application's actual job — shipping logs, terminating TLS, fetching short-lived secrets, retrying failed downstream calls — while your code stays focused on what the service is for.
 
-You reach for MVCC any time a system needs concurrent reads and writes on the same hot rows without sacrificing correctness. It is the default in Postgres, MySQL/InnoDB, Oracle, SQL Server (under snapshot isolation), and MongoDB's WiredTiger engine, so most engineers are already relying on it whether they think about it or not. Understanding how it works matters when long-running transactions cause table bloat, when readers and writers somehow still seem to interfere, or when a "safe" transaction produces a wrong answer because snapshot isolation is not actually serializable.
+Engineers reach for it any time the same cross-cutting plumbing would otherwise be duplicated inside dozens of microservices. Standardizing it in a sidecar means a platform team can upgrade log shipping, rotate certificates, or roll out mutual TLS across a whole fleet without touching application code. This is exactly what service meshes like Istio and Linkerd do — every Pod gets an Envoy proxy injected as a sidecar, and that proxy is what actually talks to the network. Kubernetes made native sidecar containers a first-class concept in version 1.29 and promoted them to general availability in 1.33, so the lifecycle guarantees that used to require workarounds are now built in.
 
-A useful analogy is a shared Google Doc with version history always on. If Alice opens the doc at 9:00 and Bob edits and saves at 9:01, Alice keeps seeing the 9:00 version until she refreshes — Bob's edit is a new revision sitting alongside the old one, not an overwrite. Anyone who opens the doc at 9:02 sees the new version. That is exactly what an MVCC database is doing with rows: never overwriting in place, always writing a new tagged version, and letting each transaction pick the version that was visible at its own snapshot.
+A useful picture is a motorcycle with a sidecar attached. The motorcycle is your app — fast, focused, going one place. The sidecar cabin goes everywhere the motorcycle goes, shares its fuel and destination, and carries the cargo the rider does not want to deal with: the GPS, the radio, the passenger. In Kubernetes terms, that is a single Pod with two containers sharing an IP and a volume, living and dying together, with the app talking to `localhost` and the sidecar handling the messy outside world.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/database/mvcc/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/cloud/sidecar-pattern/
