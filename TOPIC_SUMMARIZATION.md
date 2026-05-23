@@ -1,11 +1,11 @@
-# Virtual DOM
+# LSM Tree (Log-Structured Merge Tree)
 
-The Virtual DOM is a lightweight JavaScript copy of your UI tree that a framework compares against the previous copy so it can update the real browser DOM with the smallest possible set of changes. React popularized the idea, and Vue, Preact, and Inferno all use the same trick: describe what the UI should look like as plain objects, diff the new description against the old one, then patch only the parts that actually changed.
+An LSM tree is a storage structure that makes writes cheap by never erasing data in place. Instead of hunting down a record on disk and overwriting it, it buffers incoming changes in memory and later flushes them to disk in big sequential batches, tidying everything up in the background. It is the engine sitting underneath write-heavy databases like Cassandra, RocksDB, LevelDB, and ScyllaDB.
 
-Engineers reach for it because the browser's DOM is expensive to touch and stateful to manage by hand. Writing imperative code that figures out which nodes to create, update, or remove after every state change does not scale. The Virtual DOM lets you write declarative code — a function from state to UI — and lets the framework do the imperative DOM surgery for you. The cost is a small diffing pass on every update; the payoff is a sane programming model and a single batched update to the real DOM.
+Engineers reach for it whenever they have a firehose of writes and disks that hate scattered random I/O — time-series data, event logs, metrics, and IoT ingestion are the classic cases. The trade-off is that reads get a little harder, because the newest value for a key might live in memory or in any of several on-disk files, so a lookup may have to check more than one place. A background process called compaction continuously merges those files to keep read fan-out low and reclaim space from deleted or superseded data. It is the opposite design choice from a B-tree, which updates records in place and optimizes for fast single-seek reads.
 
-A useful analogy is a teacher with a whiteboard. Every few seconds a student hands you a fresh photo of what the board should look like. The lazy approach is to erase everything and copy the photo from scratch. The smart approach is to hold the new photo next to the old one, scan for the cells that actually differ, and only rewrite those. The Virtual DOM is the photo — cheap to make, cheap to compare, expensive only at the final patch step where the real DOM is touched.
+Picture a busy chef during a dinner rush: each new order gets scribbled on a sticky note and slapped on a board instantly, with no searching. When the board fills, the chef sorts the whole stack and staples it into a labeled binder, then starts fresh. To find a table's current order you check the newest binder first and stop at the first match, because the latest note wins. A cancellation is just another note (a tombstone), and periodically a helper merges binders into cleaner ones. That is an LSM tree.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/frontend/virtual-dom/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/database/lsm-tree/
