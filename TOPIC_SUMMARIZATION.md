@@ -1,11 +1,11 @@
-# JWT (JSON Web Token)
+# Service Mesh
 
-A JWT is a small, signed text string that a server hands a client to prove the client has already been authenticated. It carries a little bit of JSON describing who the user is and when the token expires, all bundled into three dot-separated, base64-encoded pieces — a header naming the signing algorithm, a payload of claims, and a signature that seals the first two parts so any change to them is detectable.
+A service mesh is a dedicated networking layer that handles the communication between microservices for you, so every service gets encryption, retries, load balancing, and tracing without changing a line of application code. It does that by splitting itself in two: a data plane of small proxies that quietly sit next to each service and carry the real traffic, and a control plane that hands those proxies their rules and certificates from the side.
 
-It matters because the signature lets any server verify a token without looking anything up in a database. That makes JWT the default building block for stateless REST and gRPC APIs, microservice-to-microservice auth, and single sign-on flows like OpenID Connect. Engineers reach for it when they need to scale horizontally without sticky sessions, and avoid it when they need instant revocation on logout or when a plain server-side session cookie would be simpler. The payload is readable by anyone who has the token, so it carries identity, not secrets.
+It matters because once a system has ten or more microservices, every team ends up re-implementing the same plumbing — TLS, retries, timeouts, circuit breakers, request tracing — slightly differently, in whatever language they happen to use. A mesh extracts that plumbing out of the apps and pushes it down into the infrastructure, so policy and observability become a platform feature instead of a library you have to upgrade in forty repos. Engineers reach for it when they need zero-trust mTLS between services, progressive delivery like canary releases, or consistent telemetry across a polyglot fleet, and they avoid it when they only have a handful of services or no platform team to own the control plane.
 
-Think of a JWT as a tamper-evident wristband at a music festival. The gate checks your ID once and snaps the wristband on you with your access tier printed on it. For the rest of the night, no booth re-checks your ID — they just glance at the wristband and check its holographic seal. If anyone scratched out "general admission" and wrote "VIP," the seal would break and the next bouncer would notice instantly. The festival keeps no list of who got a wristband; the wristband itself carries the proof.
+Picture a city of microservices, where each service is a building. Without a mesh, every building hires its own security guard, postal worker, and translator, and they all do the job slightly differently. With a mesh, the city installs a standardized concierge right outside every building's front door. Your app talks to its concierge in plain language; the concierges talk to each other in encrypted, logged, retry-capable conversations, all following the same rulebook handed down from City Hall.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/backend/jwt/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/cloud/service-mesh/

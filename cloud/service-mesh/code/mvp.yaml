@@ -1,0 +1,161 @@
+# ---------------------------------------------------------------------------
+# Service Mesh MVP - Linkerd mTLS + default-deny authorization
+#
+# What this file proves (see ../docs/02-deep-dive.md and 03-practice.md):
+#   1. The mesh gives every pod a SPIFFE-style identity tied to its
+#      ServiceAccount, with zero changes to the app container.
+#   2. A Server resource flips the default for one port from "open" to
+#      "deny everything", so you have to opt clients in by identity.
+#   3. An AuthorizationPolicy whitelists exactly one ServiceAccount
+#      (allowed-client) - anyone else hitting the same port gets 403,
+#      including traffic from another pod in the same namespace.
+#
+# Run order: linkerd inject -> kubectl apply -> exec curl from each client.
+# ---------------------------------------------------------------------------
+
+# Namespace carries the linkerd.io/inject=enabled label so the mutating
+# webhook auto-injects the linkerd2-proxy sidecar into every pod we create.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mesh-demo
+  labels:
+    linkerd.io/inject: enabled
+---
+# ---------------------------------------------------------------------------
+# server: a plain nginx pod listening on :80. Nothing mesh-aware about it.
+# The whole point is that the app is unchanged - the proxy does all the work.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: server-sa
+  namespace: mesh-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  namespace: mesh-demo
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: server } }
+  template:
+    metadata:
+      labels: { app: server }
+    spec:
+      serviceAccountName: server-sa
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 80 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  namespace: mesh-demo
+spec:
+  selector: { app: server }
+  ports: [{ port: 80, targetPort: 80 }]
+---
+# ---------------------------------------------------------------------------
+# Two clients with DIFFERENT ServiceAccounts. They run the same curl image.
+# The mesh decides who gets through based on the SA's SPIFFE identity, NOT
+# on network reachability - both pods can reach server:80 at L3.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: allowed-client-sa
+  namespace: mesh-demo
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: denied-client-sa
+  namespace: mesh-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: allowed-client
+  namespace: mesh-demo
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: allowed-client } }
+  template:
+    metadata:
+      labels: { app: allowed-client }
+    spec:
+      serviceAccountName: allowed-client-sa
+      containers:
+        - name: curl
+          image: curlimages/curl:8.10.1
+          command: ["sleep", "infinity"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: denied-client
+  namespace: mesh-demo
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: denied-client } }
+  template:
+    metadata:
+      labels: { app: denied-client }
+    spec:
+      serviceAccountName: denied-client-sa
+      containers:
+        - name: curl
+          image: curlimages/curl:8.10.1
+          command: ["sleep", "infinity"]
+---
+# ---------------------------------------------------------------------------
+# Server resource: tells Linkerd "port 80 on these pods is a managed Server".
+# The moment this exists, the default for that port flips to DENY-ALL.
+# Anything not explicitly authorized below is rejected at the inbound proxy.
+# (This is the recommended pattern from practice doc - default deny in prod.)
+# ---------------------------------------------------------------------------
+apiVersion: policy.linkerd.io/v1beta2
+kind: Server
+metadata:
+  name: server-http
+  namespace: mesh-demo
+spec:
+  podSelector:
+    matchLabels: { app: server }
+  port: 80
+  proxyProtocol: HTTP/1
+---
+# MeshTLSAuthentication is the "who" - it names identities the mesh trusts.
+# We point it at allowed-client-sa; that SA's SPIFFE ID gets the green light.
+apiVersion: policy.linkerd.io/v1alpha1
+kind: MeshTLSAuthentication
+metadata:
+  name: allowed-client-id
+  namespace: mesh-demo
+spec:
+  identityRefs:
+    - kind: ServiceAccount
+      name: allowed-client-sa
+---
+# AuthorizationPolicy is the "what" - it binds (Server) <- (identities).
+# Only allowed-client-sa can talk to server-http. denied-client-sa is
+# *not in the list*, so the inbound proxy on the server pod will 403 it
+# before nginx ever sees the request.
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: server-allow-allowed-client
+  namespace: mesh-demo
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: server-http
+  requiredAuthenticationRefs:
+    - group: policy.linkerd.io
+      kind: MeshTLSAuthentication
+      name: allowed-client-id
