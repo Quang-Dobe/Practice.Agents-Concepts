@@ -1,11 +1,11 @@
-# Attention Mechanism
+# Hydration
 
-Attention is a learned weighted average over a sequence of vectors, where the weights come from comparing a "query" vector against a set of "key" vectors to decide how much each position should contribute. It is the operation that lets every token in a sequence look directly at every other token and pull in whatever it finds relevant, instead of squeezing the whole history into a single fixed-size hidden state the way older recurrent models did.
+Hydration is the step where a server-rendered web page, which the browser is already painting as static HTML, gets "woken up" by JavaScript so that buttons, forms, and state-bound elements actually respond to the user. The framework walks the same component tree on the client that the server just rendered, matches it node-for-node against the existing DOM, and attaches event listeners and state instead of throwing the DOM away and rebuilding it.
 
-It matters because attention is the building block that made transformers — and therefore GPT, Claude, BERT, and vision transformers — possible. An engineer reaches for it whenever relationships between distant elements of a sequence matter, when the model should learn what to focus on rather than have it hard-coded, when training needs to run in parallel over long inputs, or when aligning across modalities like matching words to image patches.
+It matters because modern frontend stacks want two things at once: a fast First Contentful Paint with SEO-friendly markup, and the rich interactivity of a single-page app. Pure client-side rendering ships a blank shell and stalls until JavaScript loads. Pure server rendering paints fast but leaves the page inert. Hydration is the bridge — engineers reach for it whenever they pick a meta-framework like Next.js, Nuxt, SvelteKit, Remix, or SolidStart, and it shapes how they think about bundle size, time-to-interactive, and entire architectural variants like islands and React Server Components.
 
-A good way to picture it is a soft dictionary lookup. A normal Python dict takes a key, finds the one exact match, and returns its value. Attention does the same thing but fuzzy: each token produces a query, a key, and a value, the query is compared against every key, the scores are turned into weights that sum to one, and the output is a blend of all the values mixed in proportion to how well each one matched. So instead of retrieving one entry, you retrieve a smoothie of all entries, weighted by relevance.
+A useful picture: the server response is an unfurnished house that is already built, with walls and windows in the right places, so a visitor can walk through it the moment they arrive. The JavaScript bundle is the moving truck that pulls up a few seconds later carrying the appliances and light switches. Hydration is the movers walking room by room, matching each appliance to its outlet, and confirming the layout matches the blueprint. If a wall is in a different spot than the blueprint says, they complain loudly — that is a hydration mismatch.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/ai/attention-mechanism/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/frontend/hydration/
