@@ -1,0 +1,37 @@
+// The .proto file IS the contract. Client and server are generated from this.
+// Renaming a field is free; renumbering one silently corrupts data.
+// See docs/02-deep-dive.md for why field numbers are wire identity.
+syntax = "proto3";
+
+// The csharp_namespace option controls the generated C# namespace.
+// Both projects reference this same file via <Protobuf Include="..." />
+// in their .csproj — there is no copy-paste.
+option csharp_namespace = "GrpcMvp.Contracts";
+
+package grpcmvp.v1;
+
+// One unary RPC and one server-streaming RPC — the two shapes that best
+// illustrate what gRPC gives you over REST: typed request/response, plus
+// a streamed response over a single HTTP/2 stream (no WebSocket dance).
+service Greeter {
+  // Unary: one request, one response. The default shape.
+  rpc SayHello (HelloRequest) returns (HelloReply);
+
+  // Server-streaming: client sends one request, server pushes N replies
+  // back over the same HTTP/2 stream until it closes. The "stream"
+  // keyword on the return type is the only change vs the unary shape.
+  rpc StreamGreetings (HelloRequest) returns (stream HelloReply);
+}
+
+// Field numbers (= 1, = 2) are the wire identity. Never reuse a number;
+// reserve it instead when removing a field. See practice doc, rule #2.
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+  // Sequence number so the client can prove the stream really arrived
+  // in N pieces, not as one buffered chunk.
+  int32 sequence = 2;
+}
