@@ -1,11 +1,11 @@
-# Hydration
+# gRPC
 
-Hydration is the step where a server-rendered web page, which the browser is already painting as static HTML, gets "woken up" by JavaScript so that buttons, forms, and state-bound elements actually respond to the user. The framework walks the same component tree on the client that the server just rendered, matches it node-for-node against the existing DOM, and attaches event listeners and state instead of throwing the DOM away and rebuilding it.
+gRPC is a way to call a function on another machine as if it were local. You write one `.proto` schema that names the methods and message shapes, run a compiler, and you get strongly typed client and server code in your language of choice. Under the hood, calls travel over HTTP/2 as compact binary Protocol Buffers, with first-class support for streaming.
 
-It matters because modern frontend stacks want two things at once: a fast First Contentful Paint with SEO-friendly markup, and the rich interactivity of a single-page app. Pure client-side rendering ships a blank shell and stalls until JavaScript loads. Pure server rendering paints fast but leaves the page inert. Hydration is the bridge — engineers reach for it whenever they pick a meta-framework like Next.js, Nuxt, SvelteKit, Remix, or SolidStart, and it shapes how they think about bundle size, time-to-interactive, and entire architectural variants like islands and React Server Components.
+It matters because, between internal services, REST over HTTP/1.1 with JSON starts to feel chatty, weakly typed, and slower than it needs to be. Engineers reach for gRPC when both ends of a connection are services they control — polyglot backends that need a single source of truth for the contract, low-latency microservice traffic where JSON parsing is measurable, or real-time features like live telemetry, chat, and server push where they want streaming without bolting on WebSockets. It is not the right tool for public third-party APIs or for browsers without a proxy hop, where REST and OpenAPI still win.
 
-A useful picture: the server response is an unfurnished house that is already built, with walls and windows in the right places, so a visitor can walk through it the moment they arrive. The JavaScript bundle is the moving truck that pulls up a few seconds later carrying the appliances and light switches. Hydration is the movers walking room by room, matching each appliance to its outlet, and confirming the layout matches the blueprint. If a wall is in a different spot than the blueprint says, they complain loudly — that is a hydration mismatch.
+A useful picture: REST is sending postcards — every request restates the address and re-opens an envelope of human-readable JSON. gRPC is installing a direct phone line between two services. Both ends agree up front on which functions exist and what their arguments look like, then `client.GetUser(req)` looks like a local method call. Because the line is HTTP/2, the same connection can also carry server-pushed streams, client-pushed streams, or full bidirectional conversations without a WebSocket upgrade.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/frontend/hydration/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/backend/grpc/

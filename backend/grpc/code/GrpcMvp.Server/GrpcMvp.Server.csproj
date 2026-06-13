@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>GrpcMvp.Server</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Grpc.AspNetCore pulls in Grpc.Tools (build-time codegen),
+      Grpc.AspNetCore.Server (runtime), and Google.Protobuf (serializer).
+      One package = full server stack.
+    -->
+    <PackageReference Include="Grpc.AspNetCore" Version="2.80.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      GrpcServices="Server" tells the codegen to emit the abstract base
+      class (GreeterBase) we inherit in GreeterService.cs.
+      The path is relative to this .csproj; the same file is also
+      referenced by the Client project with GrpcServices="Client".
+      Single source of truth, two generated stubs.
+    -->
+    <Protobuf Include="..\proto\greeter.proto" GrpcServices="Server" />
+  </ItemGroup>
+
+</Project>
