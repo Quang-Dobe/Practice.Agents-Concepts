@@ -157,7 +157,7 @@ const regionCards = datasets.map(d => {
 
 const topRows = topPicks.map((l, i) => `<tr>
   <td>${i + 1}</td>
-  <td>${esc(l.district || '')} <span class="kv">(${esc(l.__region || '')})</span></td>
+  <td>${esc(l.district || '')} <span class="kv">(${esc((l.__region || '').split(' (')[0])})</span></td>
   <td>${esc(l.property_type === 'dat_tho_cu' ? 'Đất thổ cư' : 'Nhà ở')}</td>
   <td>${esc(l.total_price_label || fmtVnd(l.total_price_vnd))}</td>
   <td>${esc(l.area_m2)} m²</td>
