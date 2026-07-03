@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Region real-estate dataset",
+  "type": "object",
+  "required": ["region", "region_slug", "generated_note", "market_bands", "listings", "sources_used"],
+  "properties": {
+    "region": { "type": "string", "description": "Tên vùng, vd 'TP. Hồ Chí Minh (nhóm quận trung tâm)'" },
+    "region_slug": { "type": "string", "description": "kebab-case, dùng làm tên file & trang" },
+    "generated_note": { "type": "string", "description": "Ghi chú ngắn về cách thu thập & giới hạn" },
+    "market_bands": {
+      "type": "array",
+      "description": "Dải giá thị trường theo quận/khu",
+      "items": {
+        "type": "object",
+        "required": ["area_name", "price_per_m2_note", "source_url"],
+        "properties": {
+          "area_name": { "type": "string" },
+          "price_per_m2_low": { "type": ["number", "null"], "description": "triệu/m²" },
+          "price_per_m2_high": { "type": ["number", "null"] },
+          "price_per_m2_note": { "type": "string" },
+          "commentary": { "type": "string", "description": "1-2 câu nhận định khu vực/trục đường" },
+          "source_url": { "type": "string" }
+        }
+      }
+    },
+    "listings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "property_type", "district", "total_price_vnd", "area_m2",
+                     "source_site", "source_url", "reliability_score", "reliability_breakdown",
+                     "assessment_confidence", "price_fit", "suitability_score", "suitability_reason",
+                     "duplicate_count", "image_available"],
+        "properties": {
+          "id": { "type": "string", "description": "region_slug + '-' + số thứ tự" },
+          "title": { "type": "string" },
+          "property_type": { "enum": ["nha_o", "dat_tho_cu"] },
+          "district": { "type": "string" },
+          "ward_or_street": { "type": ["string", "null"] },
+          "total_price_vnd": { "type": "number", "description": "VND, phải < 2e9" },
+          "total_price_label": { "type": "string", "description": "vd '1 tỷ 850 triệu'" },
+          "area_m2": { "type": "number" },
+          "price_per_m2_million": { "type": ["number", "null"], "description": "đơn giá triệu/m²" },
+          "legal_status": { "type": ["string", "null"], "description": "vd 'sổ đỏ riêng', 'sổ chung', null" },
+          "posted_period": { "type": ["string", "null"], "description": "vd 'T5/2025'" },
+          "posted_confidence": { "enum": ["known", "approx", "unknown"] },
+          "source_site": { "type": "string" },
+          "source_url": { "type": "string" },
+          "description_snippet": { "type": "string" },
+          "image_available": { "type": "boolean", "description": "luôn false trong môi trường này" },
+          "dedup_key": { "type": "string" },
+          "duplicate_count": { "type": "integer", "minimum": 1 },
+          "reliability_score": { "type": "number", "minimum": 0, "maximum": 10 },
+          "reliability_breakdown": {
+            "type": "object",
+            "properties": {
+              "A_source": { "type": "number" }, "B_completeness": { "type": "number" },
+              "C_price_reasonable": { "type": "number" }, "D_fresh_unique": { "type": "number" }
+            }
+          },
+          "assessment_confidence": { "enum": ["Cao", "Trung bình", "Thấp"] },
+          "price_fit": { "type": "string" },
+          "suitability_score": { "type": "number", "minimum": 0, "maximum": 10 },
+          "suitability_reason": { "type": "string" }
+        }
+      }
+    },
+    "sources_used": { "type": "array", "items": { "type": "string" } }
+  }
+}
