@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CSS Grid — MVP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!--
+    This file is the smallest self-contained demo of CSS Grid.
+    Three independent panels live inside one page, so you can see three
+    idioms side by side without any build step. Open it in a browser
+    and turn on the Grid overlay in DevTools (click the "grid" badge
+    next to each container in the Elements panel).
+
+    Panel 1 - fr units + gap:          how tracks share leftover space.
+    Panel 2 - grid-template-areas:     a holy-grail page shell.
+    Panel 3 - auto-fit + minmax:       responsive cards without a media query.
+  -->
+
+  <style>
+    /* Minimal visual chrome so the grids are readable. Not the point of the demo. */
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; padding: 1.5rem; display: grid; gap: 2rem; }
+    section { border: 1px solid #8886; border-radius: 0.5rem; padding: 1rem; }
+    h2 { margin: 0 0 0.75rem; font-size: 1rem; letter-spacing: 0.02em; }
+    .box { background: #4f8cf722; border: 1px dashed #4f8cf7; padding: 0.75rem;
+           border-radius: 0.25rem; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+
+    /* ---------- Panel 1: fr units + gap ---------- */
+    /* Three columns, ratio 1 : 2 : 1, of whatever space is left after the gap.
+       `fr` is defined *after* gap has been subtracted, which is the whole
+       reason you should prefer it over percentages here. */
+    .panel-fr {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1fr;
+      gap: 1rem;
+    }
+
+    /* ---------- Panel 2: named areas (holy-grail shell) ---------- */
+    /* The template string reads like an ASCII drawing of the layout.
+       Every named area implicitly creates line names (header-start, main-end, ...)
+       so responsive re-declarations do not depend on brittle numeric indexes. */
+    .panel-areas {
+      display: grid;
+      grid-template-columns: 12rem 1fr 10rem;   /* nav | main | aside */
+      grid-template-rows: auto 1fr auto;         /* header | body   | footer */
+      grid-template-areas:
+        "header header header"
+        "nav    main   aside"
+        "footer footer footer";
+      gap: 0.75rem;
+      min-height: 18rem;
+    }
+    /* Each child names the area it fills. That is the entire placement API. */
+    .panel-areas > .header { grid-area: header; }
+    .panel-areas > .nav    { grid-area: nav; }
+    .panel-areas > .main   { grid-area: main; }
+    .panel-areas > .aside  { grid-area: aside; }
+    .panel-areas > .footer { grid-area: footer; }
+
+    /* ---------- Panel 3: auto-fit + minmax responsive cards ---------- */
+    /* repeat(auto-fit, minmax(min(14rem, 100%), 1fr)) is the canonical
+       "many cards on desktop, one card on mobile" pattern. No media query.
+       - auto-fit collapses empty tracks so cards stretch to fill the row.
+       - minmax(min(14rem, 100%), 1fr): each track is at least 14rem wide,
+         but capped at 100% of the container so it never overflows on narrow screens.
+       Resize the browser window and watch the column count change. */
+    .panel-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Panel 1: prove that fr divides leftover space, gap-aware. -->
+  <section>
+    <h2>1. fr units + gap  &mdash;  1fr : 2fr : 1fr</h2>
+    <div class="panel-fr">
+      <div class="box">1fr</div>
+      <div class="box">2fr (twice as wide)</div>
+      <div class="box">1fr</div>
+    </div>
+  </section>
+
+  <!-- Panel 2: prove that grid-template-areas is a self-documenting layout. -->
+  <section>
+    <h2>2. grid-template-areas  &mdash;  holy-grail shell</h2>
+    <div class="panel-areas">
+      <div class="box header">header</div>
+      <div class="box nav">nav</div>
+      <div class="box main">main</div>
+      <div class="box aside">aside</div>
+      <div class="box footer">footer</div>
+    </div>
+  </section>
+
+  <!-- Panel 3: prove that auto-fit + minmax replaces a stack of media queries.
+       Add or remove card divs to see how the count adapts. -->
+  <section>
+    <h2>3. auto-fit + minmax  &mdash;  responsive cards, no media query</h2>
+    <div class="panel-cards">
+      <div class="box">card 1</div>
+      <div class="box">card 2</div>
+      <div class="box">card 3</div>
+      <div class="box">card 4</div>
+      <div class="box">card 5</div>
+      <div class="box">card 6</div>
+    </div>
+  </section>
+
+</body>
+</html>
