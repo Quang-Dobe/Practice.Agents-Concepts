@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IntersectionObserver MVP</title>
+    <style>
+      /* Layout is minimal on purpose. The demo is the JS, not the chrome. */
+      * { box-sizing: border-box; }
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 0 16px 40vh; }
+
+      /* Sticky log so you can see callbacks while scrolling. */
+      #log-wrap {
+        position: sticky; top: 0; z-index: 10;
+        background: #111; color: #0f0; padding: 10px 12px;
+        margin: 0 -16px 16px; border-bottom: 2px solid #0f0;
+      }
+      #log-wrap h1 { margin: 0 0 6px; font-size: 13px; color: #fff; }
+      #log { margin: 0; white-space: pre; font: 12px/1.35 ui-monospace, monospace; min-height: 5em; }
+
+      /* Cards are short enough that at least one hits ratio 1.0 on a
+         normal viewport — that is what lets 'FULLY VISIBLE' ever appear. */
+      .card {
+        height: 150px; margin: 20px 0; padding: 16px;
+        border: 1px solid #ccc; border-radius: 6px; background: #fafafa;
+      }
+      .card .state { font-weight: 600; }
+
+      #lazy-panel {
+        margin: 60px 0; padding: 30px; border: 2px dashed #888;
+        border-radius: 6px; background: #fff; text-align: center; color: #888;
+      }
+      #lazy-panel.loaded { border-style: solid; border-color: #2a7; background: #eaffea; color: #050; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div id="log-wrap">
+      <h1>Last 5 IntersectionObserver entries (target ratio isIntersecting)</h1>
+      <pre id="log">(waiting for the first callback...)</pre>
+    </div>
+
+    <p>Scroll down. Watch the log update and the card labels flip between
+       <b>OFF SCREEN</b>, <b>PARTIALLY VISIBLE</b>, and <b>FULLY VISIBLE</b>.
+       The dashed panel at the bottom lazy-loads on its first intersection and
+       then unobserves itself &mdash; scroll past it, then back up, and note the
+       log no longer mentions it.</p>
+
+    <div id="feed"><!-- populated by the script below --></div>
+
+    <div id="lazy-panel">Not loaded yet &mdash; scroll me into view.</div>
+
+    <script type="module">
+      // Same logic as mvp.ts, types stripped so the browser can run it
+      // directly. Keep this file and mvp.ts in sync when you extend the demo.
+
+      const logEl = document.querySelector('#log');
+      const feedEl = document.querySelector('#feed');
+      const lazyEl = document.querySelector('#lazy-panel');
+      if (!logEl || !feedEl || !lazyEl) throw new Error('mvp: required DOM roots missing');
+
+      const recent = [];                     // ring buffer of the last 5 entries
+      const crossings = new Map();           // Element -> off->on transition count
+      const wasIntersecting = new Map();     // Element -> previous isIntersecting
+
+      const labelFor = (ratio, isIntersecting) => {
+        // Branch on the boolean FIRST — at the exact edge, isIntersecting
+        // is true even when the ratio is 0. Reading `ratio > 0` is the bug.
+        if (!isIntersecting) return 'OFF SCREEN';
+        if (ratio >= 0.999) return 'FULLY VISIBLE';
+        return 'PARTIALLY VISIBLE';
+      };
+
+      function handleEntries(entries) {
+        for (const entry of entries) {
+          recent.unshift(
+            `${entry.target.id}  ratio=${entry.intersectionRatio.toFixed(2)}  in=${entry.isIntersecting}`,
+          );
+          if (recent.length > 5) recent.length = 5;
+
+          // Threshold arrays fire on every band crossing. Guard on the
+          // OFF -> ON edge so a single sweep counts as one impression.
+          const wasIn = wasIntersecting.get(entry.target) ?? false;
+          if (entry.isIntersecting && !wasIn) {
+            crossings.set(entry.target, (crossings.get(entry.target) ?? 0) + 1);
+          }
+          wasIntersecting.set(entry.target, entry.isIntersecting);
+
+          const stateEl = entry.target.querySelector('.state');
+          const countEl = entry.target.querySelector('.count');
+          if (stateEl) stateEl.textContent = labelFor(entry.intersectionRatio, entry.isIntersecting);
+          if (countEl) countEl.textContent = String(crossings.get(entry.target) ?? 0);
+
+          // One-shot lazy panel: reveal + unobserve. From this frame on
+          // the observer no longer does per-frame work for this element.
+          if (entry.target === lazyEl && entry.isIntersecting) {
+            lazyEl.classList.add('loaded');
+            lazyEl.textContent = `LAZY PAYLOAD loaded at ${new Date().toLocaleTimeString()}`;
+            observer.unobserve(lazyEl);
+          }
+        }
+        logEl.textContent = recent.join('\n');
+      }
+
+      // ONE shared observer for every target on the page. root:null means
+      // the top-level viewport. threshold:[0, 0.5, 1] gives us three bands
+      // — that is the ONLY reason PARTIALLY vs FULLY VISIBLE is expressible.
+      const observer = new IntersectionObserver(handleEntries, {
+        root: null,
+        rootMargin: '0px',
+        threshold: [0, 0.5, 1],
+      });
+
+      for (let i = 0; i < 10; i += 1) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = `card-${i}`;
+        card.innerHTML =
+          `<b>Card ${i}</b> &middot; <span class="state">OFF SCREEN</span> &middot; ` +
+          `seen <span class="count">0</span> time(s)`;
+        feedEl.appendChild(card);
+        observer.observe(card);
+      }
+      observer.observe(lazyEl);
+    </script>
+  </body>
+</html>
