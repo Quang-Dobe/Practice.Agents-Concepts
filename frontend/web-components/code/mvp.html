@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>counter-button demo</title>
+  <style>
+    /* Hides undefined custom elements until upgrade so users never see the
+       unstyled inline-box flash before mvp.js runs. */
+    :not(:defined) { visibility: hidden; }
+
+    body { font-family: system-ui, sans-serif; padding: 2rem;
+           display: grid; gap: 1rem; max-width: 32rem; }
+
+    /* Style the shadow-internal <button> via ::part — the sanctioned way
+       to reach past the boundary. A plain `counter-button button` selector
+       would not match. */
+    counter-button::part(button) { background: #dbeafe; }
+    counter-button[data-flavor='ghost']::part(button) {
+      background: transparent; border-style: dashed;
+    }
+
+    #log { font-family: ui-monospace, monospace; color: #52525b; }
+  </style>
+</head>
+<body>
+  <h1>&lt;counter-button&gt; demo</h1>
+
+  <!-- Same tag, two configurations. Attribute drives initial state; the text
+       between the tags is projected into the default <slot> inside the shadow
+       tree — it lives in the light DOM and is styleable by the host page. -->
+  <counter-button count="0">Increment me</counter-button>
+  <counter-button count="10" data-flavor="ghost">Starts at 10</counter-button>
+
+  <div id="log">Click a button to see events.</div>
+
+  <!-- mvp.js is emitted by `tsc mvp.ts` — see README. -->
+  <script type="module" src="./mvp.js"></script>
+  <script type="module">
+    // The listener sits on document, outside both shadow trees. It only fires
+    // because the CustomEvent was dispatched with { bubbles: true, composed: true }.
+    // event.target has been retargeted to the <counter-button> host — the
+    // internal <button> is invisible from here.
+    const log = document.getElementById('log');
+    document.addEventListener('counter-change', (event) => {
+      log.textContent =
+        `counter-change from <${event.target.tagName.toLowerCase()}> → ` +
+        `count=${event.detail.count} delta=${event.detail.delta}`;
+    });
+  </script>
+</body>
+</html>
