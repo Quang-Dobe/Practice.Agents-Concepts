@@ -812,6 +812,16 @@ th {
   margin: 0 0 14px; font-size: 1.15rem;
 }
 
+/* dashboard header helpers */
+.dash__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.dash__stats { margin-top: 26px; }
+.dash__footer {
+  margin-top: 56px; padding-top: 24px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted); font-size: 0.9rem;
+}
+.dash__footer p { margin: 0 0 8px; }
+
 /* ---------------------------------------------------------------------
    9. RESPONSIVE
    --------------------------------------------------------------------- */
