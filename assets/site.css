@@ -699,7 +699,7 @@ th {
   padding-bottom: 26px;
   border-bottom: 1px solid var(--border);
 }
-.hero__eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.hero__eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
 .hero__title { font-size: 2.4rem; letter-spacing: -0.025em; margin: 0 0 10px; }
 .hero__tagline { font-size: 1.12rem; color: var(--text-muted); margin: 0; max-width: 62ch; }
 
