@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embeddings · Overview — Learning Notebook</title>
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Embeddings</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Embeddings</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Embeddings</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <p class="lead">An embedding turns a piece of content — a word, a sentence, an image, any chunk of data — into a fixed list of numbers. Train the model right, and things that mean similar things land close together in that list of numbers. Things that mean different things land far apart.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Once everything is numbers, "is this like that?" turns into a distance calculation — fast, mechanical, and easy to scale. That one trick powers <span class="term" data-gloss="retrieve by meaning instead of by keyword">semantic search</span>, retrieval-augmented generation (RAG), recommendations, clustering, and most of the "the AI understood what I meant" feeling in modern products.</p>
+          </div>
+        </div>
+
+        <h2>The mental model</h2>
+        <p>Picture a warehouse instead of a library. The librarian doesn't shelve books alphabetically — she places every book at a coordinate in the warehouse. Cookbooks end up in one corner. Murder mysteries end up in another. A book that's half-cookbook, half-memoir floats between the two. To find books "like this one," you don't read titles — you walk a small circle around its spot and grab whatever you bump into.</p>
+
+        <p>That warehouse is the embedding space. The coordinates are the <span class="term">vector</span> <span class="term__gloss">the list of numbers itself</span>. The librarian is the embedding model — often a transformer like OpenAI's <code>text-embedding-3-small</code>, Cohere's embed models, or an open one like <code>bge</code> or <code>nomic-embed</code>. Feed it text, it hands back coordinates.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["Text: a fast car"] --> B["Embedding model"]
+    B --> C["Vector of numbers"]
+    C --> D["A point in embedding space"]
+    D --> E{"Anything nearby?"}
+    E -- yes --> F["Similar meaning"]
+    E -- no --> G["Unrelated meaning"]
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: text becomes a vector, the vector becomes a point, nearby points share meaning.</figcaption>
+        </figure>
+
+        <p>Nobody hand-picked what each direction of that space means — the model learned it from billions of examples. "King" sits near "queen"; the trip from "man" to "woman" points roughly the same way as the trip from "king" to "queen." Meaning became geometry. And in real systems that warehouse isn't 2D or 3D — it usually runs 384 to 3072 <span class="term">dimensions</span> <span class="term__gloss">the length of the vector, how many numbers it holds</span> wide. Same idea, just far more directions than a person can picture.</p>
+
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a database.</strong> Embeddings are the values; a vector database (Pinecone, pgvector, Qdrant) is where you store and search them.</li>
+              <li><strong>Not the same as tokens.</strong> Tokens are the chopped-up pieces an LLM reads; embeddings are the meaning-coordinates of those pieces, or of whole texts.</li>
+              <li><strong>Not one-hot encoding or TF-IDF.</strong> Those count keywords. Embeddings capture meaning — "automobile" and "car" land next to each other, where keyword counting sees them as unrelated.</li>
+              <li><strong>Not portable across models.</strong> A vector from one model means nothing to another. You cannot mix <code>text-embedding-3-small</code> output with <code>bge-large</code> output.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You want search that gets intent, not just keywords — "how do I stop my code from crashing" should find a doc titled "exception handling."</li>
+              <li>You're building RAG and need to pull the right chunks for an LLM.</li>
+              <li>You want to cluster feedback, find near-duplicate content, or recommend "more like this."</li>
+              <li>You want to classify text without training a classifier — just compare against labeled example vectors.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You need exact matches, IDs, or structured filters — SQL or a regular index does this better.</li>
+              <li>Your dataset is a few hundred items. A keyword search and a coffee break will do.</li>
+              <li>You need to explain a decision to a regulator. "It was geometrically close" is a hard sell.</li>
+              <li>Your data changes by the second and the cost of re-embedding outweighs the search benefit.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Vector / embedding</dt><dd>The list of numbers itself.</dd></div>
+          <div><dt>Dimension</dt><dd>The length of that list — e.g. 768, 1536, 3072.</dd></div>
+          <div><dt>Embedding model</dt><dd>The neural net that produces the vector.</dd></div>
+          <div><dt>Cosine similarity</dt><dd>The usual "how close" measure between two vectors; 1.0 means pointing the same direction.</dd></div>
+          <div><dt>Vector database</dt><dd>Storage built for nearest-neighbor search over millions of vectors.</dd></div>
+          <div><dt>ANN (approximate nearest neighbor)</dt><dd>The fast-but-not-perfect search algorithms (HNSW, IVF) that make vector search scale.</dd></div>
+          <div><dt>Chunking</dt><dd>Splitting long text into small pieces before embedding, so each vector holds one coherent thought.</dd></div>
+          <div><dt>Semantic search</dt><dd>The flagship use case — retrieve by meaning, not by keyword.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
