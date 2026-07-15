@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Circuit Breaker · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
   <link rel="stylesheet" href="../../../assets/site.css">
 </head>
 <body class="cat-backend" data-category="backend">
@@ -101,10 +102,10 @@
           <pre class="mermaid">
 flowchart TB
     App["Your service — one outbound synchronous call"]
-    App --> A["1 · In-process library<br/>Polly · resilience4j · Opossum · gobreaker"]
-    App --> B["2 · Sidecar proxy<br/>Envoy · Linkerd outlier detection"]
-    App --> C["3 · Service mesh control plane<br/>Istio DestinationRule"]
-    App --> D["4 · API gateway / edge<br/>Kong · NGINX · APIM"]
+    App --> A["1 · In-process library (Polly, resilience4j, Opossum, gobreaker)"]
+    App --> B["2 · Sidecar proxy (Envoy, Linkerd outlier detection)"]
+    App --> C["3 · Service mesh control plane (Istio DestinationRule)"]
+    App --> D["4 · API gateway / edge (Kong, NGINX, APIM)"]
     A --> U[(Downstream dependency)]
     B --> U
     C --> U

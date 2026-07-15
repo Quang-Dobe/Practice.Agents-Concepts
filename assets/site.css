@@ -182,6 +182,7 @@ code {
   border: 1px solid var(--border-soft);
   padding: 0.12em 0.4em;
   border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;     /* long dotted identifiers wrap, never overflow */
 }
 pre {
   margin: 1.4em 0;
@@ -199,6 +200,7 @@ pre code {
   font-size: 0.85rem;
   line-height: 1.6;
   color: var(--text);
+  overflow-wrap: normal;       /* block code scrolls (via pre) rather than wraps */
 }
 
 /* tables — base; .tradeoff adds zebra + sticky header */

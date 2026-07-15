@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Circuit Breaker · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Circuit Breaker</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Circuit Breaker</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Circuit Breaker</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>The breaker is invisible until the day one dependency gets slow — then it's the single component that decides whether your checkout page degrades gracefully or stops responding for thirty minutes. You'll meet it in four settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS backend</div><p>Between your <code>HttpClient</code> and every third-party you can't trust: payment gateway, SMS provider, identity provider, LLM endpoint.</p></div>
+          <div class="card"><div class="card__title">Microservice mesh</div><p>Twice — as an in-process library on the client side, and as a config knob on the mesh (Envoy outlier detection, Istio <code>DestinationRule</code>) for the calls you forgot to wrap.</p></div>
+          <div class="card"><div class="card__title">Data tier</div><p>Around databases and caches that hang: Postgres failover, a Redis cluster repartitioning, an Elasticsearch node GC-pausing.</p></div>
+          <div class="card"><div class="card__title">LLM features</div><p>Inference endpoints have wide tail latency, partial outages, and rate-limit storms. The breaker stops one bad provider from holding every web worker hostage.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">One breaker per downstream dependency, not per call site</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Keep one breaker instance per logical dependency (<code>payments-api</code>, <code>geocoder-api</code>) and inject it everywhere. In Polly v8, that's one named <code>ResiliencePipeline</code> per upstream, registered with <code>IHttpClientFactory</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Health is a property of the <em>callee</em>, not the call site. Per-call-site breakers fragment state — ten endpoints learn Payments is down independently, ten times.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Constructing a <code>new CircuitBreaker(...)</code> inside a handler. State resets every request and the breaker never trips.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Pick granularity deliberately: per-service in-process, per-host at the mesh</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use a per-service breaker in application code, and let Envoy
+              <span class="term">outlier detection</span>
+              <span class="term__gloss">the mesh feature that ejects an individual sick replica from the pool</span>
+              eject individual sick replicas at the sidecar.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A per-service breaker treats one bad replica as a global outage; a per-host breaker treats a whole-service outage as ten independent ejections that flap. Each covers what the other can't.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Implementing per-host breaking in application code. You'll reinvent a load balancer badly.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Choose error-rate thresholds, not consecutive counts, above toy scale</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use a sliding-window failure-ratio threshold — e.g. 50% over the last 100 calls or 30 seconds — with a non-trivial minimum throughput (20–100 depending on traffic).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Consecutive-failure counts trip on bursty traffic and miss slow degradations where 40% of calls fail forever. Ratios with a sample floor are stable under both spikes and lulls.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"Trip after 5 failures in a row." That's the Hystrix-era default, and it's wrong for almost every production service.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Tune thresholds to your traffic shape, then leave them alone</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Start at 50% failure ratio, minimum throughput set so the breaker sees at least one full sample per minute at normal load, and a break duration of 15–60 seconds. Watch state-transition metrics for a week, then adjust once.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Too tight (10% failure, throughput 5) flaps on routine 502s and the team learns to ignore alerts. Too loose (90% failure, throughput 1000) means the breaker never trips before the thread pool is gone.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Copying defaults from a blog post. Polly's (10% failure, 100 throughput, 5s break) and resilience4j's (50%, 100, 60s) are conservative starting points, not production values.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Always include slow-call detection</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Treat calls over a latency threshold as failures (<code>slowCallDurationThreshold</code> in resilience4j, a custom predicate in Polly). Set it at roughly your p99 + headroom, not your timeout.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The failure that kills you isn't 500s — it's calls that succeed in 28 seconds when they normally take 80ms. Pure error-rate breakers happily watch a dependency drag you under as long as it eventually returns 200.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Relying on the request timeout alone to convert slowness into a failure. By the time the timeout fires, the thread is already gone.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Order the pipeline: timeout (inner) → retry → circuit breaker (outer)</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Wrap so the timeout fires per attempt, retries happen inside the breaker's view of "one call" (e.g. <code>MaxRetryAttempts = 2</code> with exponential backoff), and the breaker observes the final outcome of that
+              <span class="term">attempt-bundle</span>
+              <span class="term__gloss">all retries of a single logical call, counted by the breaker as one outcome</span>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>If retry is inside the breaker, one bad call is counted as N failures and it trips too fast. If the breaker is inside retry, retries keep hammering an open breaker.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Wiring three independent decorators in arbitrary order and assuming it works. This is the single most common Polly/resilience4j misconfiguration.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    C[Caller] --> B["Circuit Breaker (outermost)"]
+    B --> R["Retry (2 attempts, backoff)"]
+    R --> T["Timeout (per attempt)"]
+    T --> H[HttpClient]
+    H --> U[(Upstream)]
+          </pre>
+          <figcaption class="diagram__caption">Nesting order: the breaker sits outermost so it sees the final outcome of the whole attempt-bundle; the timeout fires innermost, once per attempt.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Design the fallback before you ship the breaker</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Decide per breaker exactly what happens when it's open: stale cache, a default object, a degraded UI, or a 503 with <code>Retry-After</code>. Implement and test that path explicitly.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A breaker without a fallback just converts a slow failure into a fast one. Sometimes that's correct — a faster 503 beats thread starvation — but the choice should be deliberate.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A "fallback" that calls a second flaky service synchronously. You've doubled the failure surface.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Emit state transitions as first-class events; alert on duration-Open</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Wire <code>OnOpened</code>, <code>OnHalfOpened</code>, <code>OnClosed</code> into OpenTelemetry / Micrometer. Track state, trip count, half-open success rate, and short-circuit count. Alert when a breaker stays Open longer than N minutes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Open breakers hide upstream errors — your usual "5xx from dependency X" alert goes silent because you stopped calling X. The breaker becomes the only honest signal.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Logging only. State transitions buried in app logs are unfindable during an incident.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Don't share one breaker across unrelated calls</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Separate breakers for <code>/charge</code> and <code>/refund</code> if they hit different upstream subsystems, even on the same vendor. Likewise for read vs. write paths on the same database.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A read-only replica being down should not stop you from writing. One breaker conflates two health signals and trips on the union.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single "stripe" breaker covering every Stripe endpoint your app uses.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Make 4xx not count (mostly)</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Configure the classifier to count network errors, 5xx, gRPC <code>UNAVAILABLE</code> / <code>DEADLINE_EXCEEDED</code>, and slow calls. Exclude 4xx — except 429 in some setups, and never 408.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A 404 or 401 means <em>your call</em> was wrong, not that the upstream is sick. Counting them trips the breaker during a bad deploy of your own service.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>The default "any exception trips" from toy implementations.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Accept per-pod state, or push to the mesh</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>If you run N replicas, decide consciously whether N independent breaker states is acceptable (usually yes — they converge fast under shared traffic) or whether you need Envoy/Istio enforcement for a global view.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Synchronising breaker state across pods through Redis is a classic anti-pattern: you've added a new single point of failure to protect against one.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Building a "distributed circuit breaker" with shared storage. The pattern is intentionally local.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Breaker around in-process code</p>
+            <p>Wrapping a local function call "for safety". There's no thread pool to protect and no recovery semantics — you've added latency and a state machine for nothing. Let the exception propagate.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Retries inside the breaker</p>
+            <p>A 5× retry nested inside a 50% threshold breaker amplifies one failed call into five recorded failures and trips on a single bad request. Put the breaker outside the retry, or count attempt-bundles.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Shared breaker across unrelated calls</p>
+            <p>One <code>httpClient</code> breaker covering payments, search, and analytics. Now a search outage stops payments. Split per dependency.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Breaker without timeouts</p>
+            <p>The breaker only sees failures it can observe; a call that hangs forever never trips it. Always pair with a per-attempt timeout.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Health-check-driven breaker</p>
+            <p>Driving breaker state from a separate <code>/health</code> poller. Health checks lie — only real call outcomes are truthful. Use traffic, not pings.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Breaker as load balancer</p>
+            <p>Using state to "pick a healthier upstream". That's outlier detection's job at the mesh layer. A breaker decides <em>whether</em> to call, not <em>where</em>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Set-and-forget thresholds</p>
+            <p>Tuning once at launch and never revisiting. Traffic shape changes — what was a 50% sample at launch is now 5% of one second's traffic. Re-tune annually or when load changes by &gt;2×.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Fallback hiding a real bug</p>
+            <p>Returning cached prices from 2 weeks ago because the breaker has been Open for 2 weeks. The fallback worked; the alerting didn't. Alert on Open duration, not just upstream errors.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">E-commerce checkout, flaky payments</div>
+            <p>Mid-size retailer, ~500 RPS peak. A per-vendor breaker wraps each processor (Stripe, Adyen, a regional bank). When one vendor's p99 jumps past 3s the breaker opens and checkout fails over to a secondary. <em>Lesson:</em> fast failure is what makes the fallback cheap enough to use inside the user's patience budget.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">LLM feature, primary + fallback model</div>
+            <p>A SaaS app using GPT-class inference for summarisation. A breaker wraps the premium model; on Open, requests fall back to a smaller, faster model with a quality disclaimer. Slow-call detection dominates — 5xx is rare, but 45-second responses are common during provider incidents. <em>Lesson:</em> without slow-call detection, the breaker is decorative on LLM endpoints.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Mesh outlier detection, polyglot fleet</div>
+            <p>A platform team running Istio across Go, Python, and Node configures <code>DestinationRule.outlierDetection</code> once per namespace. Per-host ejection happens transparently; app code stays clean. <em>Lesson:</em> mesh enforcement is uniform but coarse — keep an in-process breaker for when "200 OK with <code>{error: ...}</code>" is a failure.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Database connection breaker on failover</div>
+            <p>A reporting service with a Postgres primary that occasionally fails over. A breaker around the connection pool fast-fails for 30 seconds after detecting connection refusals, letting the read-replica path take over instantly. <em>Lesson:</em> breakers belong around data tiers too — the same starvation dynamics apply to connection pools.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Metrics:</strong> are state, trip count, short-circuit count, half-open success rate, and time-in-Open all exported to your dashboard?</li>
+              <li><strong>Alerting:</strong> does an alert fire when any breaker stays Open longer than your SLO threshold (typically 5–15 minutes)?</li>
+              <li><strong>Fallback tested:</strong> is the Open-state code path covered by a test that forces the breaker open?</li>
+              <li><strong>Pipeline order:</strong> is it timeout → retry → breaker (innermost to outermost), and the same in every service?</li>
+              <li><strong>Predicate sanity:</strong> does the classifier exclude 4xx (other than 429/408) and include slow calls?</li>
+              <li><strong>Granularity audit:</strong> exactly one breaker per logical dependency — not per call site, not shared across vendors?</li>
+              <li><strong>Per-attempt timeout:</strong> does every breaker have a sibling timeout so hanging calls never go unobserved?</li>
+              <li><strong>Onboarding:</strong> can a new engineer find the config in under 2 minutes and explain what trips it?</li>
+              <li><strong>Mesh vs library:</strong> is it documented which layer owns breaking for each dependency, so the two don't fight?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">No breaker → first incident.</span> A slow third-party API pins every worker thread. The fix is a copy-pasted breaker around that one call, usually with <code>consecutive failures = 5</code> because that's what the README showed. It works for a quarter.</li>
+          <li><span class="steps__title">Proliferation → consolidation.</span> Every team adds its own breaker with different defaults and metrics. A platform team consolidates behind a shared library — <code>Microsoft.Extensions.Http.Resilience</code> in .NET shops, a <code>resilience4j-spring-boot3</code> starter in Java shops — so every outbound <code>HttpClient</code> shares one pipeline. This is the painful migration: delete every bespoke breaker and debate thresholds team by team.</li>
+          <li><span class="steps__title">Push concerns to the mesh.</span> As the org adopts Istio or Linkerd, outlier detection covers the per-host layer and application breakers shrink to where they add unique value:
+            <span class="term">bulkhead</span>
+            <span class="term__gloss">isolating resource pools so one bad dependency can't drain them all</span>-style isolation, business-error classification, and typed fallbacks. Teams that reach this stage stop talking about circuit breakers and start talking about SLOs.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.pollydocs.org/strategies/circuit-breaker.html" rel="noopener">Polly v8 circuit-breaker docs</a> — the canonical .NET reference; read "Defaults" and "Failure handling" slowly.</li>
+          <li><a href="https://resilience4j.readme.io/docs/circuitbreaker" rel="noopener">resilience4j circuit-breaker docs</a> — the best treatment of count-based vs time-based windows, plus the slow-call spec.</li>
+          <li><a href="https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/outlier" rel="noopener">Envoy outlier detection</a> — why "circuit breaking" and "outlier detection" are two distinct features, and why you usually want both.</li>
+          <li>Michael Nygard, <em>Release It!</em> (2nd ed., 2018) — the chapter where the pattern was named; still the most honest treatment of why stability patterns exist.</li>
+          <li><a href="https://blog.christianposta.com/microservices/comparing-envoy-and-istio-circuit-breaking-with-netflix-hystrix/" rel="noopener">Christian Posta — Comparing Envoy and Istio Circuit Breaking with Hystrix</a> — how mesh-layer breaking maps onto the Hystrix mental model people still carry.</li>
+          <li><a href="https://developers.redhat.com/articles/2025/09/29/how-implement-and-monitor-circuit-breakers-openshift-service-mesh-3" rel="noopener">Red Hat — Circuit breakers in OpenShift Service Mesh 3</a> — a recent worked example of mesh-side config and Prometheus alerts.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

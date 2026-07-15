@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embeddings · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Embeddings</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Embeddings</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Embeddings</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <h2>Where you'll meet it</h2>
+        <p>In a SaaS product's "ask our docs" or "search our catalog" feature, embeddings sit between user queries and the corpus — behind the API tier, in front of a vector store. When latency spikes or answers go sideways, this layer gets blamed second (after the LLM) and found guilty first. In an enterprise RAG pipeline, embeddings power retrieval — and retrieval, not generation, is where 70%+ of production RAG failures start.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Docs / catalog search</div><p>Behind the API tier, in front of a vector store, feeding an LLM downstream.</p></div>
+          <div class="card"><div class="card__title">Recommendation &amp; dedup</div><p>A dense vector per entity plus a k-NN query, replacing hand-built features.</p></div>
+          <div class="card"><div class="card__title">Code &amp; multimodal search</div><p>The only practical way to query unstructured content by intent, not tokens.</p></div>
+        </div>
+
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Pick the model for your domain, not the overall leaderboard</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Shortlist 3–5 MTEB models for your task, then test on a 200–500-query holdout from your own data.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>The top overall model averages 50+ tasks. A third-place general model often beats #1 by 5–10 points on a narrow domain.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Using <code>text-embedding-3-large</code> "because the tutorial did" — it has cost real teams six-figure bills they didn't need.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Chunk by structure first, tokens second</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Split on headings, sections, or function boundaries, then cap at 256–512 tokens with 10–20% overlap.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Structural <span class="term">chunking</span> <span class="term__gloss">splitting long text into smaller pieces before embedding</span> measured 87% retrieval accuracy vs. ~13% for fixed-size chunks on clinical data.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>1000-character chunks with 200-character overlap, applied blindly to PDFs, code, and chat logs alike.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Run hybrid search, then rerank</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Retrieve top-50 with dense + BM25 (reciprocal rank fusion), then rerank to top-5 with a cross-encoder.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Dense models miss rare entities and part numbers that BM25 catches. Reranking lifts RAGAS scores 15–30% for ~50–150 ms.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>"Pure dense is enough" — invisible until someone searches "Form 1099-MISC" and gets a generic tax-tips page back.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Normalize once, at write time</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>L2-normalize before storage, use dot product as the metric, and spot-check the vector norm monthly.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Un-normalized vectors plus dot product silently rank by magnitude, not meaning — one of the top three dense-retrieval bugs.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Mixing normalized and un-normalized writes because one ingestion job skipped the step.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Right-size dimensions; default to a Matryoshka-truncatable model</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Start at <code>d=768</code> or <code>1024</code>. If storage gets tight, truncate a Matryoshka model to 256 or 512 and re-check recall.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p><code>text-embedding-3-large</code> at <code>d=256</code> beats <code>ada-002</code> at <code>d=1536</code> on MTEB — halving <code>d</code> halves your vector-DB bill.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Picking <code>d=3072</code> because "more sounds better," then quadrupling RAM at 50M vectors.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Match the query/passage prefix the model expects</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Read the model card. For <code>e5</code>, <code>bge</code>, <code>nomic</code>, prepend <code>query:</code> to queries and <code>passage:</code> to documents.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Forgetting the asymmetric prefix silently costs 30–50% recall — the pipeline still looks like it's working.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Copy-pasting an OpenAI call and swapping in <code>bge-large</code> without reading its instructions.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Tune the index for your actual workload</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>For HNSW start at <code>M=16, ef_construction=200, ef_search=64</code>, then sweep. Past 10M vectors with tight RAM, switch to IVF-PQ.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Default knobs target generic benchmarks. Filters that reject over 90% of vectors can fragment an HNSW graph and blow up tail latency.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Treating the vector DB as a black box — "it worked at 100k in staging" is not a load test for 50M.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Pick the vector store for operational fit, not the leaderboard</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>pgvector on existing Postgres under ~10–50M vectors; Qdrant for heavy filtering; Milvus at billion scale; Pinecone for zero ops.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>The biggest hidden cost is a second backup story and a second on-call rotation — not query latency.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Pinecone for a 200k-vector prototype at $70/month when one <code>CREATE EXTENSION vector</code> would do.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Plan for re-embedding from day one</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Store the source text, chunk boundaries, model name, and model version next to every vector.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Every embedding pipeline eventually switches models; mixing two model versions in one index produces noise, not results.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>"We'll re-embed when we need to" — without provenance metadata you can't even tell which vectors are stale.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Evaluate with a golden set, not vibes</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Keep a 200–1000-row set of (query, expected doc) pairs from real logs. Measure recall@10, MRR, and NDCG@10 on every change.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Embedding quality drifts silently — no errors, no stack traces, just a customer complaint three weeks later.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Trusting MTEB scores alone. Public benchmarks never replace a measurement on your own corpus.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Cache aggressively, keyed on (text hash, model, version)</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Hash the normalized text plus model id and version; store the vector in a KV store with a long TTL.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Up to 60–80% of production queries are near-duplicates of recent ones. Caching cuts cost and latency together.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Caching by raw text only — a model version bump then silently serves stale vectors.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Guard against leakage in evaluation</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Split eval sets by document or by time — never by chunk.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Chunk-level splits leak near-duplicate passages across train and test, inflating recall by 10–30 points.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Random row-level shuffles on a chunk table — the model ends up memorizing, not generalizing.</p>
+          </div>
+        </article>
+
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Chunk-and-pray</p>
+            <p>Splitting every document into 1000-character chunks with no regard for structure, then hoping retrieval works. Fails on tables, code, and multi-sentence reasoning.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Mixing model versions in one index</p>
+            <p>Re-embedding half the corpus with a new model and querying across both spaces. The spaces are unrelated; results are noise. Always full-backfill behind a feature flag.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Cosine on un-normalized vectors</p>
+            <p>Storing raw outputs, querying with dot product, and assuming it equals cosine. It silently ranks by magnitude. Normalize at write time, period.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Choosing the vector DB by leaderboard QPS</p>
+            <p>Picking Milvus because a benchmark blog said so, with 200k vectors and one engineer. The operational overhead dwarfs the performance gain. Match the tool to your scale.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">No reranker</p>
+            <p>Trusting the <span class="term" data-gloss="an encoder that turns a query and a document into vectors independently, then compares them">bi-encoder</span>'s top-5 directly. The top-50 is noisy; a cross-encoder rerank turns noise into precision. Add it before tuning anything else.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Treating chunks as the source of truth</p>
+            <p>Storing only chunk text, not the parent document ID or offsets. When you need to re-chunk — and you will — you can't.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Skipping the query/passage prefix</p>
+            <p>Using <code>e5</code>, <code>bge</code>, or <code>nomic</code> without the model's required asymmetric prefix. Halves recall, no error message, ships to prod undetected.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Embedding the entire 10 MB PDF</p>
+            <p>Passing whole documents straight to an embedding endpoint, hitting context limits, and getting silently truncated. Chunk first, embed second, log token counts.</p>
+          </div>
+        </div>
+
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Mid-size SaaS support KB</div>
+            <p>~500k articles + tickets, pgvector, BGE-large at <code>d=1024</code>, hybrid search + Cohere rerank, P99 ~300 ms. Switching to heading-aware chunking moved NDCG@10 from 0.61 to 0.78 — bigger than any model swap.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multilingual e-commerce</div>
+            <p>~20M products, 12 languages, Cohere <code>embed-multilingual-v4</code> at <code>d=1024</code> in Qdrant. Pre-filtering <code>in_stock=true</code> at the store level cut wasted retrieval work by 70% — after switching from HNSW to IVF.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Monorepo code search</div>
+            <p>~30M code chunks, function-level chunking, <code>voyage-code-3</code>, Qdrant. Function-level chunking beat file-level by ~20 NDCG points, but only once parent-class signatures were prepended to each chunk.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">RAG legal assistant</div>
+            <p>~5M case-law passages, domain-tuned model, Milvus at <code>d=768</code>, BM25-first hybrid. BM25 outranks dense for ~40% of queries (statute numbers, party names).</p>
+          </div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph Ingest["Ingest, offline"]
+        D["Source documents"] --> C["Chunk by structure + token budget"]
+        C --> E1["Embed each chunk"]
+        E1 --> S[("Vector store")]
+    end
+    subgraph Query["Query time"]
+        Q["User query"] --> E2["Embed query"]
+        E2 --> R["Retrieve top-50, dense + BM25 (RRF)"]
+        S --> R
+        R --> RR["Rerank to top-5, cross-encoder"]
+        RR --> L["LLM prompt"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">The production pattern in one picture: chunk, embed, store, retrieve, rerank, then hand five good chunks to the LLM.</figcaption>
+        </figure>
+
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li>Tracking embed-API P50/P99 latency, vector-DB query P50/P99, weekly recall@10 on a golden set, and cache hit rate?</li>
+              <li>If the embedding API goes down, does the pipeline fall back to BM25-only, or fail hard — and is that tested?</li>
+              <li>Does every stored vector carry <code>(model_name, model_version, embedded_at)</code>, queryable for staleness?</li>
+              <li>Is there a tested backfill job that re-embeds the corpus behind a feature flag with no downtime?</li>
+              <li>Is PII stripped before it reaches a third-party embedding API? Are vectors themselves treated as sensitive?</li>
+              <li>Is there a per-tenant cap on embed-API spend, a cache hit rate above 50%, and a measured reason for your <code>d</code>?</li>
+              <li>For your top 10 query shapes, what fraction of vectors survive metadata filters? Over 90% filtered means IVF, not HNSW.</li>
+              <li>Can a new engineer find the current model, the eval set, and how to run an offline benchmark in under 30 minutes?</li>
+              <li>Is a scheduled job comparing recall@10 today vs. 30 days ago? Drift is silent without it.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Tutorial stack.</span> OpenAI <code>text-embedding-3-small</code> + Chroma or pgvector + a chunker that splits on 1000 characters. Fine for the demo and the first ~50k documents.</li>
+          <li><span class="steps__title">First wave.</span> Retrieval quality plateaus; a customer escalation forces a reranker, then hybrid search, then structural chunking — each a real refactor.</li>
+          <li><span class="steps__title">Second wave.</span> The corpus crosses ~5M vectors. Index builds take hours, or the vector-DB bill becomes visible to the CFO — triggering a store migration nobody planned for, because no one wrote down the model version per vector.</li>
+          <li><span class="steps__title">Third wave.</span> The team switches embedding models for cost, quality, or domain fit, and finally builds the re-embedding pipeline it should have built on day one.</li>
+          <li><span class="steps__title">Mature stack.</span> Structural chunking with model-version metadata, hybrid retrieval with a tuned rerank, a store sized to the corpus, a golden eval set wired into CI, and a cache layer in front.</li>
+        </ol>
+
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://huggingface.co/spaces/mteb/leaderboard" rel="noopener">MTEB Leaderboard — Hugging Face</a> — the only honest cross-model comparison. Filter by your task before trusting any number.</li>
+          <li><a href="https://www.pinecone.io/learn/hybrid-search-intro/" rel="noopener">Pinecone Learn: Hybrid Search and Reranking</a> — the canonical, vendor-neutral explanation of RRF and rerank.</li>
+          <li><a href="https://www.anthropic.com/news/contextual-retrieval" rel="noopener">Anthropic's Contextual Retrieval</a> — prepending context to each chunk drops retrieval failure rates by ~50% on real corpora.</li>
+          <li><a href="https://blog.premai.io/building-production-rag-architecture-chunking-evaluation-monitoring-2026-guide/" rel="noopener">Building Production RAG: Chunking, Evaluation &amp; Monitoring (2026)</a> — pragmatic, recent, covers what most tutorials skip.</li>
+          <li><a href="https://www.firecrawl.dev/blog/best-vector-databases" rel="noopener">Choosing a Vector Database — Firecrawl</a> — a current, fair comparison of pgvector, Pinecone, Qdrant, Milvus, Weaviate at production scale.</li>
+          <li><a href="https://www.sbert.net/" rel="noopener">Sentence-Transformers Documentation</a> — the best practical reference for how bi-encoders, cross-encoders, and rerankers fit together.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
