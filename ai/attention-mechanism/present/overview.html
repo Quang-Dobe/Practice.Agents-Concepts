@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attention Mechanism · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Attention Mechanism</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Attention Mechanism</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Attention Mechanism</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Before attention, models read a sequence one step at a time and squeezed everything they had seen so far into one fixed-size memory. That worked for short sentences and broke on long ones.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Attention lets every position in a sequence look directly at every other position and pull in whatever it finds useful, with "useful" learned from data. It is the building block that made transformers — and so GPT, Claude, BERT, and vision transformers — possible.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a soft dictionary lookup. A normal Python <code>dict</code> takes a key, finds the one entry that matches exactly, and hands back its value. Attention does the same job, but fuzzy. Each token produces three vectors:</p>
+        <ul>
+          <li>A <span class="term">query</span><span class="term__gloss">"here is what I am looking for"</span> — what this token wants to find.</li>
+          <li>A <span class="term">key</span><span class="term__gloss">"here is what I advertise about myself"</span> — what each other token offers.</li>
+          <li>A <span class="term">value</span><span class="term__gloss">"here is what I hand over if you pick me"</span> — the payload that gets passed along.</li>
+        </ul>
+        <p>To build the output for one token, take its query and compare it against every key in the sequence with a dot product. A bigger dot product means a closer match. Those scores turn into weights that add up to 1, and the output is the weighted blend of all the values — a smoothie of every entry, mixed in proportion to how well each one matched the question. Training teaches the model what makes a good query, key, and value for the task at hand.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    Tok["Query from the word 'was'"] --> Cmp{"Compare to every key"}
+    K1["key: cat"] --> Cmp
+    K2["key: dog"] --> Cmp
+    K3["key: chased, tired, ..."] --> Cmp
+    Cmp --> W["weights: mostly cat, a little dog"]
+    W --> Bl["blend the matching values"]
+    Bl --> Out["output ≈ value of 'cat'"]
+          </pre>
+          <figcaption class="diagram__caption">"The cat that the dog chased was tired." When the model reads "was," its query asks "what is my subject?" — the key for "cat" matches strongly, so the output is mostly the value of "cat."</figcaption>
+        </figure>
+
+        <p>That is the whole idea. No entry is fetched whole; every entry contributes a little, weighted by fit.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a recurrent network.</strong> RNNs pass information step by step through a hidden state; attention compares all positions in parallel.</li>
+              <li><strong>Not a convolution.</strong> Convolutions look at a fixed local window; attention's "window" is the whole sequence, and the weights depend on content, not position.</li>
+              <li><strong>Not memory in the database sense.</strong> Nothing is stored between passes — queries, keys, and values are recomputed from the current input every time.</li>
+              <li><strong>Not the transformer.</strong> Attention is one ingredient; transformers also need feed-forward layers, residual connections, and normalization.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Relationships between distant elements of a sequence matter — language, code, DNA, time series.</li>
+              <li>You want the model to learn <em>what to focus on</em> rather than hard-coding it.</li>
+              <li>You need parallel training on long inputs — attention computes every position in one matrix multiply.</li>
+              <li>You're aligning across modalities, like matching words to image patches.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Sequences are very long and the compute budget is tight — plain attention costs grow with the square of length.</li>
+              <li>The problem is strictly local with no long-range structure — a small CNN or MLP is cheaper and sufficient.</li>
+              <li>The dataset is tiny — attention has many parameters and tends to overfit without enough data or regularization.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Token</dt><dd>One element of the input sequence — a word piece, an image patch, and so on.</dd></div>
+          <div><dt>Embedding</dt><dd>The vector representation of a token.</dd></div>
+          <div><dt>Query (Q)</dt><dd>What a token is looking for.</dd></div>
+          <div><dt>Key (K)</dt><dd>What each token advertises about itself.</dd></div>
+          <div><dt>Value (V)</dt><dd>What each token hands over if it's picked.</dd></div>
+          <div><dt>Attention weights</dt><dd>The normalized similarity scores between one query and all keys.</dd></div>
+          <div><dt>Self-attention</dt><dd>Q, K, and V all come from the same sequence — every token attends to its peers.</dd></div>
+          <div><dt>Cross-attention</dt><dd>Q comes from one sequence, K and V from another — e.g. a decoder attending to an encoder.</dd></div>
+          <div><dt>Transformer</dt><dd>The architecture built around stacked self-attention layers.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

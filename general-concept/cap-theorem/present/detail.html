@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CAP Theorem · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CAP Theorem</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CAP Theorem</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CAP Theorem</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>CAP began as Eric Brewer's 2000 PODC keynote conjecture and became a proven theorem in 2002, when Seth Gilbert and Nancy Lynch published the formal version. No implementation of a read-write register on an unreliable network can give you all three of these at once:</p>
+        <ul>
+          <li><strong>Consistency (C).</strong> Every read sees the most recent completed write, as if there were only one copy of the data — this is
+            <span class="term">linearizability</span>
+            <span class="term__gloss">the strongest single-object consistency model: operations appear to happen atomically, in real-time order</span>,
+            strictly stronger than sequential, causal, or eventual consistency.</li>
+          <li><strong>Availability (A).</strong> Every request a non-failing node receives gets a non-error response — eventually, with no time bound stated. Refusing to answer breaks this; being slow does not.</li>
+          <li><strong>Partition tolerance (P).</strong> The network is allowed to drop or arbitrarily delay any messages between nodes — the normal, asynchronous behavior of a real IP network.</li>
+        </ul>
+        <p>"Pick two of three" is sloppy shorthand. The honest reading: <strong>partitions will happen, and during one you must choose either C or A for the affected data.</strong> CAP sits in the family of <strong>impossibility results</strong> in distributed computing, alongside FLP (Fischer-Lynch-Paterson, 1985 — async consensus is impossible with even one faulty process) and the Two Generals Problem. Its natural successor is <strong>PACELC</strong> (Abadi, 2010), which adds the steady-state question: when there is <em>no</em> partition, do you pick Latency or Consistency? PACELC is the more complete design tool, since a healthy network is what a system spends 99.9% of its time in.</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Replica</dt><dd>A node holding a copy of the data — the unit a partition can split apart.</dd></div>
+          <div><dt>Register</dt><dd>The simple get/set data abstraction the proof uses. Real systems generalize this to key-value stores, rows, or documents.</dd></div>
+          <div><dt>Linearizability</dt><dd>The formal definition of C: operations appear to take effect atomically, consistent with real time.</dd></div>
+          <div><dt>Partition</dt><dd>Two non-empty groups of nodes that can no longer exchange messages.</dd></div>
+          <div><dt>Quorum</dt><dd>The subset of replicas required to acknowledge a read or write — N replicas, W writes, R reads; <code>R + W &gt; N</code> gives strong consistency.</dd></div>
+          <div><dt>Consensus</dt><dd>Agreement among nodes on a single value despite failures — the mechanism (Paxos, Raft, ZAB) CP systems use to enforce linearizability.</dd></div>
+        </dl>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>CAP is a property of the <strong>data layer of a distributed system</strong> — any system that replicates state across nodes talking over an unreliable network. It says nothing about single-node databases, stateless app servers, or synchronous RPC that doesn't replicate state.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Coordination services — CP</div><p>ZooKeeper (ZAB), etcd (Raft), Consul (Raft). Built to give you linearizable locks and leader election.</p></div>
+          <div class="card"><div class="card__title">Strongly consistent SQL-on-distributed — CP</div><p>Google Spanner, CockroachDB, YugabyteDB, FoundationDB. Paxos/Raft variants over data ranges.</p></div>
+          <div class="card"><div class="card__title">Dynamo-style key-value — AP by default, tunable</div><p>Cassandra, DynamoDB, Riak, ScyllaDB.</p></div>
+          <div class="card"><div class="card__title">Multi-model, selectable consistency</div><p>Azure Cosmos DB exposes five named consistency levels; MongoDB tunes via <code>readConcern</code>/<code>writeConcern</code>.</p></div>
+          <div class="card"><div class="card__title">Multi-region deployments</div><p>Any active-active stateful service across regions is making a CAP choice, whether the team names it or not.</p></div>
+        </div>
+        <p>Three toolchains show up around this layer:</p>
+        <ul>
+          <li><strong>For consensus:</strong> etcd, ZooKeeper, Consul, the Hashicorp Raft library, Lamport's original Paxos papers, Ongaro's Raft thesis (2014).</li>
+          <li><strong>For AP conflict resolution:</strong> Automerge and Yjs (CRDT libraries used in collaborative editing), Riak's built-in CRDTs, Redis CRDB (enterprise edition).</li>
+          <li><strong>For testing partition behavior:</strong> Jepsen (Kyle Kingsbury's framework, which has embarrassed nearly every distributed database at some point), Chaos Mesh, Toxiproxy, the Linux <code>tc netem</code> / <code>iptables</code> toolchain.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Through the 1990s the dominant model was one relational database with maybe a hot standby. As internet-scale services grew, single-node systems hit ceilings and operators began sharding and replicating. Brewer's 2000 conjecture distilled what those operators had already learned: you can't have single-box strong consistency <em>and</em> stay up when the network misbehaves at scale. Gilbert and Lynch's 2002 proof made it rigorous. Amazon's 2007 Dynamo paper then showed a production system that explicitly chose AP — and the NoSQL wave followed.</p>
+          </div>
+        </div>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Use it as a lens when</p>
+            <ul>
+              <li>Choosing a replicated datastore for a multi-region, multi-AZ, or geographically distributed deployment.</li>
+              <li>Designing the failure-mode behavior of a stateful service — what happens to writes in the minority partition?</li>
+              <li>Reviewing a vendor's "consistency" marketing claim — you need to ask "linearizable, or something weaker?"</li>
+              <li>Reasoning about a correctness-critical operation (payments, inventory decrement, leader election) where stale reads are dangerous.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Don't rely on it alone when</p>
+            <ul>
+              <li>You're operating a single node — no partitions, no theorem.</li>
+              <li>You're picking SQL vs. NoSQL on schema or query grounds — CAP doesn't map cleanly onto that axis.</li>
+              <li>You need to compare two AP systems, or two CP systems, against each other — CAP groups them into the same bucket.</li>
+              <li>You need a per-operation consistency contract — specify linearizable, causal, read-your-writes, or eventual instead.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>The impossibility argument, in plain terms: two nodes A and B both hold a register <code>x = 0</code>. A client writes <code>x = 1</code> to A. The network partitions. A client then reads <code>x</code> from B. B never received the write. If B answers (Availability), it returns stale <code>0</code> — breaking Consistency. If B refuses or hangs, it breaks Availability instead. No protocol on B can do better; B has no information about A's write.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant Client
+    participant A as Node A
+    participant B as Node B
+    Client->>A: write x = 1
+    A-->>Client: ack
+    Note over A,B: network partitions — A and B can't talk
+    Client->>B: read x
+    alt B answers (chooses Availability)
+        B-->>Client: x = 0, stale — breaks Consistency
+    else B refuses or hangs (chooses Consistency)
+        B-->>Client: no answer — breaks Availability
+    end
+          </pre>
+          <figcaption class="diagram__caption">The proof itself, as one request: B either lies about freshness or stops answering. There is no third option.</figcaption>
+        </figure>
+
+        <h3>How CP systems implement the choice</h3>
+        <p>CP systems use a consensus protocol — Raft, Multi-Paxos, or ZAB — so every committed write is acknowledged by a majority
+          <span class="term">quorum</span>
+          <span class="term__gloss">the subset of replicas that must acknowledge a read or write before it counts</span>
+          before returning success. During a partition, only the side holding a majority can elect a leader and accept writes; the minority side rejects writes, and usually linearizable reads too. A typical Raft write:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Client sends the write to the leader.</span></li>
+          <li><span class="steps__title">Leader appends to its log</span> and sends <code>AppendEntries</code> to every follower.</li>
+          <li><span class="steps__title">Majority acknowledges.</span> Once a majority (including the leader) have persisted the entry, it is committed.</li>
+          <li><span class="steps__title">Leader applies and responds.</span> The leader applies the entry to its state machine and returns success.</li>
+          <li><span class="steps__title">Followers catch up</span> on their next heartbeat.</li>
+          <li><span class="steps__title">Minority stalls.</span> A minority partition can never reach a majority, so step 3 never completes — writes time out. That timeout <em>is</em> the C-over-A choice, written in code.</li>
+        </ol>
+        <p>Examples: etcd, ZooKeeper, Spanner (Paxos per tablet plus TrueTime for global ordering), CockroachDB (Raft per range).</p>
+
+        <h3>How AP systems implement the choice</h3>
+        <p>Dynamo-style systems replicate to N nodes and let the client choose R and W per request — <em>sloppy quorums</em>. If a target replica is unreachable, the write lands on a substitute node with a
+          <span class="term" data-gloss="a marker telling a substitute node to forward data once the intended owner returns">hinted handoff</span>
+          marker. Concurrent writes are reconciled with
+          <span class="term" data-gloss="a per-replica counter that tracks which writes causally preceded which">vector clocks</span>
+          (Dynamo, Riak) or last-write-wins by timestamp (Cassandra).
+          <span class="term">Anti-entropy</span>
+          <span class="term__gloss">a background Merkle-tree sync that fixes divergence between replicas after the fact</span>
+          and read repair fix divergence later. The system never refuses a write just because some replicas are unreachable.</p>
+
+        <h3>Tunable consistency is the norm</h3>
+        <p>Modern systems are rarely statically CP or AP — they let you dial it per request:</p>
+        <ul>
+          <li><strong>Cassandra</strong> exposes <code>ONE</code>, <code>QUORUM</code>, <code>LOCAL_QUORUM</code>, <code>EACH_QUORUM</code>, <code>ALL</code>, <code>ANY</code> per query. <code>QUORUM</code> reads plus <code>QUORUM</code> writes with <code>R + W &gt; N</code> gives strong consistency; <code>ONE</code>/<code>ONE</code> is fully AP.</li>
+          <li><strong>DynamoDB</strong> defaults to eventually consistent reads (half the read-capacity cost); set <code>ConsistentRead=true</code> per request for strongly consistent reads on the base table. Global secondary indexes are eventual-only.</li>
+          <li><strong>MongoDB</strong> picks via <code>readConcern</code> and <code>writeConcern</code> — <code>majority</code> is the strong setting.</li>
+          <li><strong>Cosmos DB</strong> picks one of five consistency levels at the account or request scope.</li>
+        </ul>
+        <p>"Cassandra is AP" is a default, not a law.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>CP via majority consensus</td><td>Linearizable reads/writes, simple mental model</td><td>Minority partition rejects writes; write latency = slowest of majority; needs odd N</td></tr>
+              <tr><td>AP with sloppy quorum</td><td>Always writeable, low write latency</td><td>Conflicts, requires client-side or merge-time reconciliation</td></tr>
+              <tr><td>Last-write-wins</td><td>Trivial merge logic</td><td>Silent data loss on concurrent writes</td></tr>
+              <tr><td>CRDTs</td><td>Automatic conflict-free merge, strong eventual consistency</td><td>Restricted data types, larger metadata, more complex implementation</td></tr>
+              <tr><td>Leader lease (CP)</td><td>Linearizable reads off the leader without a round trip</td><td>Lease expiry causes a write stall; clock-skew sensitive</td></tr>
+              <tr><td>Quorum reads (<code>R + W &gt; N</code>)</td><td>Strong consistency without a leader</td><td>Higher latency per operation, sensitive to slow replicas</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Split brain in a supposedly CP system</p>
+            <p>Two leaders accept writes at the same time. Cause: an even-sized cluster, a partial partition, or a leader that can't detect it lost quorum (clock skew on leases).</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">A long GC pause looks like a partition</p>
+            <p>A stop-the-world pause longer than the heartbeat interval triggers a new leader election while the "dead" leader is still about to wake up and accept writes.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Asymmetric partition</p>
+            <p>A can talk to B, but B can't talk to A. Many heartbeat implementations get confused and flap leaders.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">AP read-your-writes violations</p>
+            <p>A client writes to one coordinator, immediately reads from a different one, and gets stale data. Fix: session tokens or client-side stickiness.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Last-write-wins clock skew</p>
+            <p>Clocks drift between nodes, so the "later" write is actually earlier in wall-clock time. A user's data silently disappears.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Minority writes accepted, then rolled back</p>
+            <p>Some misconfigured systems let the minority side accept writes that get dropped on heal. A properly CP system should never do this.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Real IP networks are asynchronous: messages can be lost or arbitrarily delayed, and a node holding a request cannot tell "the other side is slow" from "the other side is unreachable." Given that ambiguity, a node must either answer locally — risking staleness — or wait — risking unavailability. CAP is the formal statement of that fork.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 520 190" role="img" aria-labelledby="capSvgTitle capSvgDesc" width="520" style="max-width:100%">
+            <title id="capSvgTitle">The two-node impossibility argument</title>
+            <desc id="capSvgDesc">Node A holds the fresh value x=1 after a write. The network link to Node B is broken. A client asks Node B for x, and Node B must either answer with the stale value 0 or refuse to answer.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="20" y="30" width="140" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="90" y="55" fill="var(--accent)" text-anchor="middle">Node A</text>
+              <text x="90" y="75" fill="var(--text)" text-anchor="middle">x = 1 (fresh)</text>
+
+              <rect x="360" y="30" width="140" height="60" rx="8" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="430" y="55" fill="var(--text)" text-anchor="middle">Node B</text>
+              <text x="430" y="75" fill="var(--text-faint)" text-anchor="middle">x = 0 (stale)</text>
+
+              <line x1="160" y1="60" x2="360" y2="60" stroke="var(--danger)" stroke-width="2" stroke-dasharray="6 6"/>
+              <text x="260" y="45" fill="var(--danger)" text-anchor="middle">✕ link down</text>
+
+              <text x="260" y="120" fill="var(--text-muted)" text-anchor="middle">Client asks Node B: "what is x?"</text>
+
+              <rect x="20" y="140" width="220" height="40" rx="6" fill="none" stroke="var(--danger)"/>
+              <text x="130" y="164" fill="var(--danger)" text-anchor="middle">Answer "0" → stale, breaks C</text>
+
+              <rect x="280" y="140" width="220" height="40" rx="6" fill="none" stroke="var(--warn)"/>
+              <text x="390" y="164" fill="var(--warn)" text-anchor="middle">Refuse / hang → breaks A</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Node B has no way to know about A's write. It can only pick which property to break.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <ul>
+          <li><strong>"Just don't allow partitions" was tried.</strong> Single-master systems with a hot standby attempted this. It works until the cross-AZ link flaps for 200ms — at which point you either failed over erroneously (split brain) or didn't fail over and the master is gone.</li>
+          <li><strong>A synchronous, bounded-delay network would let you build CA systems</strong> — some hardware-isolated, single-rack clusters approximate this. But you've moved the problem: exceeding the bound now produces incorrect behavior instead of merely degraded behavior. Most operators prefer the latter.</li>
+          <li><strong>The "CA" label in textbook tables is misleading.</strong> A single-node database is trivially "CA" because its only partition takes the whole system down. That tells you nothing useful, because it has no distributed behavior to describe.</li>
+        </ul>
+        <p>CAP's C is linearizability — not the C in ACID (which means "the database stays inside its own constraints") and not "eventual consistency" (what AP systems offer). Marketing copy routinely blurs these. When a vendor says "strongly consistent," ask whether they mean linearizable, or merely something stronger than a weak default.</p>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026, most production systems are distributed by default — even a "single" Postgres on a managed cloud is replicated to a standby, and most teams run multi-region. Spanner-class systems and CockroachDB have made CP at planetary scale practical, partly by engineering partitions to be rare enough that the availability cost is smaller than the network's own outage rate. CRDTs have moved from research curiosity to production reality in collaborative editors (Figma, Linear, Notion's local-first work). The interesting design space has shifted from "CP or AP" to "what consistency level per operation, and what's the latency cost when there's no partition" — exactly what PACELC is for. CAP remains the entry point: it gives you the vocabulary to reject the marketing claim that a system is somehow both linearizable and always available.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

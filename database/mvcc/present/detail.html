@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MVCC · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">MVCC</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">MVCC</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">MVCC</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>MVCC is a concurrency-control protocol where every logical row is an ordered chain of immutable physical versions, each stamped with the transaction that created it and, if deleted, the one that obsoleted it. A reading transaction never takes a shared lock. Instead it carries a
+          <span class="term">snapshot</span>
+          <span class="term__gloss">a record of which transactions were already committed the moment this transaction began</span>
+          and walks each row's version chain, picking the one version that snapshot can see. Writers append new versions, take row-level exclusive locks only to keep two writers from clashing on the same row, and commit by marking their transaction ID as committed in a central commit log (Postgres <code>clog</code>, InnoDB <code>trx_sys</code>, Oracle's SCN-stamped transaction table). The protocol's native isolation level is <strong>snapshot isolation</strong>; true serializability is an opt-in layer on top.</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Transaction ID (XID / trx_id / SCN)</dt><dd>A monotonically assigned ID per write transaction. Postgres uses a 32-bit XID; InnoDB a 48-bit trx_id; Oracle a 6-byte System Change Number; CockroachDB/YugabyteDB a 64-bit Hybrid Logical Clock timestamp.</dd></div>
+          <div><dt>Row version (tuple)</dt><dd>One physical copy of a row plus a header carrying the creator XID, the deleter XID (or none), and engine-specific bits.</dd></div>
+          <div><dt>Version chain</dt><dd>The linked sequence of versions of one logical row, walked newest to oldest.</dd></div>
+          <div><dt>Snapshot</dt><dd>A triple: every XID below a horizon is settled, every XID at or above a ceiling is in the future, and a short list of XIDs were in flight the instant the snapshot was taken.</dd></div>
+          <div><dt>Visibility rule</dt><dd>A yes/no check: is this version's creator committed and visible to my snapshot, and is its deleter not?</dd></div>
+          <div><dt>Garbage collector</dt><dd>The background process that removes versions no live snapshot can still see — Postgres <code>VACUUM</code>/autovacuum, InnoDB's purge thread, Oracle's UNDO retention recycling.</dd></div>
+          <div><dt>Commit log</dt><dd>The authoritative record of which XIDs committed vs. aborted, consulted by every visibility check.</dd></div>
+        </dl>
+
+        <p>MVCC is one of three families of concurrency control:</p>
+        <ul>
+          <li><strong>Pessimistic locking</strong> — strict two-phase locking (S2PL), used by DB2 and pre-2005 SQL Server.</li>
+          <li><strong>Optimistic concurrency control</strong> — validate at commit time, used by some in-memory engines like Hekaton.</li>
+          <li><strong>Multi-version (MVCC)</strong> — this one.</li>
+        </ul>
+        <p>MVCC is usually paired with row-level write locks, so it is not lock-free overall — it is lock-free <em>for readers</em>. Its closest cousin is the optimistic MVCC used in distributed systems (Spanner, CockroachDB), which adds a timestamp-ordering layer so MVCC works across nodes without one central XID allocator.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Inside the storage engine, in the tuple access layer that sits between the buffer manager and the query executor. The visibility check runs on every tuple read by every plan node — one of the hottest code paths in the system. In Postgres it is the function <code>HeapTupleSatisfiesMVCC</code>; in InnoDB it is <code>ReadView::changes_visible</code>.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Ex["Executor — plan nodes reading tuples"]
+    Ex --> TA["Tuple access layer — runs visible(version, snapshot) on every read"]
+    TA --> BM["Buffer manager — pages in memory"]
+    BM --> St[("On-disk storage")]
+    GC["Garbage collector — VACUUM, purge, or undo recycling"] -. reclaims .-> St
+          </pre>
+          <figcaption class="diagram__caption">The visibility check sits one layer below the query executor — the hottest code path in an MVCC engine.</figcaption>
+        </figure>
+
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Single-node OLTP</div><p>PostgreSQL (its only concurrency model), MySQL/InnoDB (default since 5.5 — MyISAM had none), Oracle (since v3, the original commercial MVCC).</p></div>
+          <div class="card"><div class="card__title">Optional in the box</div><p>SQL Server under <code>READ_COMMITTED_SNAPSHOT</code> or <code>ALLOW_SNAPSHOT_ISOLATION</code> (off by default; lock-based otherwise). MongoDB via WiredTiger (default since 3.2).</p></div>
+          <div class="card"><div class="card__title">Distributed SQL</div><p>CockroachDB, YugabyteDB, Google Spanner, TiDB, FoundationDB — MVCC is the substrate that makes consistent reads across shards possible.</p></div>
+        </div>
+
+        <h3>Tooling to know</h3>
+        <ul>
+          <li><strong>Postgres bloat:</strong> <code>pgstattuple</code>, <code>pg_visibility</code>, the <code>pg_stat_user_tables</code> view, plus <code>pg_repack</code> / <code>pg_squeeze</code> for online table rebuilds.</li>
+          <li><strong>InnoDB undo:</strong> <code>INFORMATION_SCHEMA.INNODB_TRX</code>, <code>innodb_undo_tablespaces</code>, and the History list length metric in <code>SHOW ENGINE INNODB STATUS</code>.</li>
+          <li><strong>Oracle:</strong> <code>V$UNDOSTAT</code>, <code>DBA_HIST_UNDOSTAT</code>, the <code>UNDO_RETENTION</code> parameter.</li>
+          <li><strong>Distributed MVCC:</strong> CockroachDB's <code>crdb_internal.kv_inflight_trace_spans</code>, YugabyteDB's <code>yb-admin</code> with HLC inspection.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Reads and writes touch the same hot rows and readers cannot tolerate waiting.</li>
+              <li>You need point-in-time consistent reads — reporting, backups, change-data-capture — against a live OLTP store.</li>
+              <li>Many application threads share a connection pool and need predictable per-transaction views.</li>
+              <li>You are picking a database. At this point MVCC is the default; the question is which flavour.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip or tune it down when</p>
+            <ul>
+              <li>You run very long transactions on a high-write table — they pin old versions and starve VACUUM/purge, ballooning storage.</li>
+              <li>You expect snapshot isolation to be serializable. It is not — invariants prone to write skew (on-call rosters, account balances across rows) need SSI or <code>SELECT ... FOR UPDATE</code>.</li>
+              <li>You have a single-writer workload with no real concurrency (SQLite in WAL mode is fine; full MVCC is overkill).</li>
+              <li>You are doing bulk <code>UPDATE</code>s on most of a Postgres table — append-in-place MVCC produces bloat equal to the update size and forces a heavy VACUUM.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a read through a
+          <span class="term">version chain</span>
+          <span class="term__gloss">the linked sequence of versions of one logical row, walked newest to oldest</span>,
+          and a write through it right after:</p>
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant T1 as Reader txn
+    participant Chain as Row version chain
+    participant T2 as Writer txn
+    T1->>Chain: BEGIN — take snapshot (xmin horizon, xmax, in-flight list)
+    T2->>Chain: UPDATE — write new version, xmin = T2
+    Chain-->>T2: old version's xmax set to T2
+    T2->>Chain: COMMIT — T2 marked committed in the commit log
+    T1->>Chain: SELECT — walk the chain newest to oldest
+    Chain-->>T1: run visible(version, snapshot) on each version
+    Note over T1,Chain: T2 is not in T1's snapshot — the pre-update version is still visible
+    Chain-->>T1: return the old version
+          </pre>
+          <figcaption class="diagram__caption">T1's snapshot was frozen before T2 committed, so T1 keeps reading the old version even though T2's write has already landed.</figcaption>
+        </figure>
+
+        <p>There are two dominant ways to build that chain. Both give the same outward behaviour; the storage differs.</p>
+
+        <h3>Family 1: append-new-version-in-place (Postgres)</h3>
+        <p>Each heap tuple carries a creator XID (<code>t_xmin</code>) and a deleter XID (<code>t_xmax</code>, zero if still live) in its header.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Begin.</span> A virtual XID is allocated; a real XID is assigned lazily on first write.</li>
+          <li><span class="steps__title">First read.</span> Take a snapshot: the oldest still-running XID, the next XID to be handed out, and the list of XIDs currently active.</li>
+          <li><span class="steps__title">Update.</span> Write a new tuple with <code>t_xmin = my_xid</code>; set the old tuple's <code>t_xmax = my_xid</code>. The old tuple's pointer (<code>ctid</code>) links to the new one — that link is the version chain. The
+            <span class="term" data-gloss="Heap-Only Tuple: skips the index update when no indexed column changed and the new row fits the same page">HOT</span>
+            optimisation skips re-indexing when it can.</li>
+          <li><span class="steps__title">Commit.</span> Write "my XID → committed" to the commit log. No tuples are touched.</li>
+          <li><span class="steps__title">Later read.</span> Check visibility: is the creator committed, below my snapshot's ceiling, and not in my in-flight list? Is the deleter either unset, aborted, or above my snapshot? Both pass → the version is visible.</li>
+          <li><span class="steps__title">VACUUM.</span> Scans for tuples whose deleter is committed and older than every live snapshot, then reclaims their space. Autovacuum triggers at <code>autovacuum_vacuum_scale_factor</code> — default 0.2, i.e. 20% of a table dead.</li>
+          <li><span class="steps__title">Freezing.</span> XIDs are 32-bit and wrap near 4.3 billion. Before half that space is used, VACUUM stamps old tuples as permanently visible. <code>autovacuum_freeze_max_age</code> defaults to 200 million; missing the deadline forces single-user-mode recovery.</li>
+        </ol>
+
+        <h3>Family 2: current-version-in-place with an undo chain (InnoDB, Oracle)</h3>
+        <p>The clustered index always holds the current version. Older versions are rebuilt on demand.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Update.</span> Modify the row in place, but first write a before-image undo record to the rollback segment and point the row's <code>DB_ROLL_PTR</code> at it.</li>
+          <li><span class="steps__title">Reader snapshot.</span> Build a ReadView — InnoDB's snapshot object. Under <code>REPEATABLE READ</code> it is built once per transaction; under <code>READ COMMITTED</code>, once per statement.</li>
+          <li><span class="steps__title">Read.</span> If the in-place row's transaction ID is invisible to the ReadView, walk <code>DB_ROLL_PTR</code> into the undo log, applying records in reverse until a visible version turns up. More CPU per read, but the row never moves, so index pointers stay valid.</li>
+          <li><span class="steps__title">Purge.</span> A background thread (<code>innodb_purge_threads</code>, default 4 since 5.7) drops undo records once no active ReadView needs them. The History list length — the depth of un-purged records — climbing past 1 million is the classic sign of a stuck long transaction.</li>
+          <li><span class="steps__title">Oracle.</span> Same model with UNDO tablespaces and an <code>UNDO_RETENTION</code> parameter; running past retention throws the well-known <code>ORA-01555 snapshot too old</code>.</li>
+        </ol>
+
+        <h3>Isolation levels under MVCC</h3>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Level</th><th scope="col">Postgres</th><th scope="col">InnoDB</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>READ UNCOMMITTED</td><td>Treated as READ COMMITTED</td><td>Reads latest committed (no dirty reads)</td></tr>
+              <tr><td>READ COMMITTED</td><td>New snapshot per statement</td><td>New ReadView per statement</td></tr>
+              <tr><td>REPEATABLE READ</td><td>Single snapshot per transaction, no phantoms (true SI)</td><td>Single ReadView per transaction; gap locks added on locking reads to block phantoms</td></tr>
+              <tr><td>SERIALIZABLE</td><td>SI + predicate-locking SSI on top</td><td>Falls back to S2PL (degenerates to locking)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Postgres's <code>REPEATABLE READ</code> already forbids phantom reads because the snapshot is genuinely consistent — stronger than the plain SQL-92 definition of the level.</p>
+
+        <h3>Serializable Snapshot Isolation (SSI)</h3>
+        <ul>
+          <li>Postgres 9.1+ implements Cahill, Röhm &amp; Fekete's 2008 algorithm.</li>
+          <li>It tracks rw-antidependencies between concurrent snapshot-isolation transactions using <code>SIReadLock</code> predicate locks — held only by serializable transactions, and never blocking a write.</li>
+          <li>When two consecutive rw-edges form a
+            <span class="term" data-gloss="two conflicting read/write edges in a row between concurrent transactions">dangerous structure</span>
+            in the conflict graph, one transaction is aborted with SQLSTATE <code>40001</code>. The application must retry.</li>
+          <li>SSI removes write skew while keeping the read-never-blocks-write property of plain SI. The cost is a false-positive abort rate under contention.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gain</th><th scope="col">Cost</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Append-in-place (Postgres)</td><td>Updates are O(1) writes, no undo lookup on read</td><td>Bloat; index amplification; VACUUM I/O</td></tr>
+              <tr><td>Undo-chain (InnoDB/Oracle)</td><td>Stable row location, indexes don't churn</td><td>Per-read undo traversal; rollback segment contention</td></tr>
+              <tr><td>SI as default</td><td>Reads never block; intuitive snapshot semantics</td><td>Write skew is possible</td></tr>
+              <tr><td>32-bit XID (Postgres)</td><td>Compact tuple header</td><td>Wraparound machinery and the 200M-XID freeze cliff</td></tr>
+              <tr><td>64-bit HLC (CockroachDB)</td><td>Globally comparable across nodes, no central XID allocator</td><td>Requires NTP; "uncertainty intervals" cause read restarts</td></tr>
+              <tr><td>SSI on top of SI</td><td>True serializability with non-blocking reads</td><td>False-positive aborts under contention</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Postgres table bloat under wide UPDATEs</p>
+            <p>Updating every row of a 100 GB table writes 100 GB of new tuples and marks 100 GB dead. Cause: append-in-place semantics.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">"Idle in transaction" holding the xmin horizon</p>
+            <p>A forgotten open transaction in an app pool pins the horizon, so VACUUM can't reclaim anything system-wide.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">InnoDB history list explosion</p>
+            <p>Same pattern: a long-running <code>REPEATABLE READ</code> transaction blocks purge; the undo tablespace grows without bound.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>ORA-01555 snapshot too old</code></p>
+            <p>A long query needs an undo record already recycled under <code>UNDO_RETENTION</code> pressure. Cause: undo is finite, MVCC is not.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">XID wraparound emergency shutdown (Postgres)</p>
+            <p>Autovacuum is disabled or stuck; the database's frozen-XID age approaches 2 billion; Postgres refuses writes. Cause: freezing did not keep up.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">SSI serialization-failure storms</p>
+            <p>A heavily contended predicate (e.g. counting rows where status = pending) produces a high rate of <code>40001</code> aborts under serializable. Cause: false positives in dangerous-structure detection.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Write skew under SI</p>
+            <p>Two transactions read a shared invariant, each verifies it, each updates a <em>different</em> row, both commit — the invariant is now violated. Cause: SI is not serializable.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>The problem MVCC solves is the read-write contention tax of single-version stores. In a single-version world, a consistent read either takes a shared lock — blocking writers and queueing behind them — or sees torn, half-written state. Neither is acceptable for a database that must also serve reporting queries. MVCC decouples the read path from the write path by trading storage (multiple versions) for concurrency — the central time-space-concurrency trade in database design.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 210" role="img" aria-labelledby="contTitle contDesc" width="560" style="max-width:100%">
+            <title id="contTitle">Read-write contention, with and without MVCC</title>
+            <desc id="contDesc">Without MVCC, readers queue behind a row lock held by a writer. With MVCC, each reader gets its own row version and none of them wait.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">Single-version — shared lock queue</text>
+              <rect x="10" y="34" width="70" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="45" y="56" fill="var(--danger)" text-anchor="middle" font-size="11">writer</text>
+              <rect x="90" y="34" width="60" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              <text x="120" y="56" fill="var(--text-faint)" text-anchor="middle" font-size="11">reader</text>
+              <rect x="156" y="34" width="60" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              <text x="186" y="56" fill="var(--text-faint)" text-anchor="middle" font-size="11">reader</text>
+              <rect x="222" y="34" width="60" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              <text x="252" y="56" fill="var(--text-faint)" text-anchor="middle" font-size="11">reader</text>
+              <text x="90" y="86" fill="var(--text-faint)" font-size="11">← queued, waiting on the write lock</text>
+
+              <text x="10" y="130" fill="var(--text-muted)">MVCC — each reader has its own version</text>
+              <rect x="10" y="144" width="70" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="45" y="166" fill="var(--accent)" text-anchor="middle" font-size="11">writer</text>
+              <rect x="90" y="144" width="60" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="120" y="166" fill="var(--accent)" text-anchor="middle" font-size="10">reader v1</text>
+              <rect x="156" y="144" width="60" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="186" y="166" fill="var(--accent)" text-anchor="middle" font-size="10">reader v2</text>
+              <rect x="222" y="144" width="60" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="252" y="166" fill="var(--accent)" text-anchor="middle" font-size="10">reader v3</text>
+              <text x="90" y="196" fill="var(--text-faint)" font-size="11">← all proceed at once, no queue</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">MVCC caps the read-write contention tax by giving every reader its own version instead of a place in line.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>An alternative — timestamp-ordered single-version reads with a restart on out-of-order access — was tried. System R prototyped it and it lost, because of cascading aborts and starvation under skewed workloads. Multi-versioning sidesteps both: an out-of-order read simply reads the older version, no restart needed.</p>
+        <p>The split between append-in-place (Postgres) and undo-chain (InnoDB/Oracle) is not arbitrary either. Postgres assumed cheap sequential writes and aggressive background cleanup. InnoDB assumed a clustered-index layout where moving a row is expensive because it invalidates secondary-index pointers. Both are coherent designs reflecting different priors about workload shape — neither is universally better.</p>
+        <p>The other deliberate choice is snapshot isolation, not serializability, as the default. SI gives 95% of the intuitive correctness for 0% of the lock overhead. True serializability was the SQL standard's original goal but proved too expensive in practice. SSI is the modern compromise: serializability with SI's non-blocking read path intact, paid for in commit-time aborts instead of lock waits.</p>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026, every default-choice OLTP database — open source, commercial, single-node, distributed — runs MVCC. The growth area is <strong>distributed MVCC</strong>: CockroachDB, YugabyteDB, Spanner, TiDB, and the newer serverless Postgres-compatible stores (Neon, Aurora DSQL) all extend MVCC over Hybrid Logical Clocks or TrueTime to deliver consistent snapshots across regions. The single-node fundamentals here are the prerequisite for reasoning about them — every distributed-transaction failure eventually reduces to "whose snapshot saw whose version, and when did the garbage collector run."</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>B-Tree Index · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">B-Tree Index</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">B-Tree Index</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">B-Tree Index</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Ask a database for <code>WHERE user_id = 42</code> and the naive answer is: read every row and check. That works for a hundred rows. It dies at a hundred million.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>A B-tree index is a separate on-disk structure: a tree of sorted keys with pointers back to the real rows. It turns a linear scan into a handful of hops. It's the default index in PostgreSQL, MySQL/InnoDB, SQL Server, Oracle, and SQLite — fast for exact matches, fast for ranges, and it stays even-shaped as the table grows. Almost every plain <code>CREATE INDEX</code> you've written built one of these.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a phone book, but a strange one. The first page isn't names — it's a short list of signposts: "A–F live in volume 1, G–M in volume 2, N–S in volume 3, T–Z in volume 4." You grab volume 2. Its first page is signposts again: "G–H in section 2a, I–J in 2b…" You keep descending.</p>
+        <ul>
+          <li>After 3 or 4 hops you land on one page holding a few hundred names, sorted.</li>
+          <li>You scan that single page and you're done.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    A["Root: A-F in vol.1, G-M in vol.2..."] --> B["Volume 2: G-H in 2a, I-J in 2b..."]
+    B --> C["Section 2b: one sorted page of names"]
+    C --> D["Scan this one page - done"]
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: follow signposts a few times, land on one small sorted page, scan it.</figcaption>
+        </figure>
+
+        <p>That's a B-tree. Each node is a "page" holding many sorted keys — often hundreds — plus pointers to child pages. The branching factor, called
+          <span class="term">fan-out</span>
+          <span class="term__gloss">how many children one node points to</span>,
+          is deliberately huge. High fan-out keeps the tree shallow: a tree only 3 or 4 levels deep can index hundreds of millions of rows. Hundreds of millions of rows, three or four disk reads — that's the whole trick.</p>
+
+        <p>Two properties matter, and both fall straight out of the shape:</p>
+        <ul>
+          <li><strong>Sorted.</strong> A range query like <code>created_at BETWEEN '2026-01-01' AND '2026-02-01'</code> finds the start key once, then walks sideways along the leaves. No re-descending from the top.</li>
+          <li><strong>Balanced.</strong> Every leaf sits at the same depth, so lookups cost the same whether the key is the smallest, the largest, or in the middle.</li>
+        </ul>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a hash index.</strong> Hash indexes beat B-trees on raw equality but can't do range scans, <code>ORDER BY</code>, or prefix matches.</li>
+              <li><strong>Not a bitmap index.</strong> Bitmap indexes shine on low-<span class="term" data-gloss="fraction of rows a query keeps; higher is better for index use">selectivity</span> columns (gender, status) in warehouses, not on point lookups.</li>
+              <li><strong>Not a full-text index.</strong> A B-tree matches whole keys or left-anchored prefixes, not "documents containing the word bicycle."</li>
+              <li><strong>Not the table itself.</strong> The index stores keys and row pointers; the row data usually lives elsewhere (the clustered index is the one exception — more in Detail).</li>
+              <li><strong>Not literally called "B-tree" in most engines.</strong> It's almost always a
+                <span class="term">B+tree</span>
+                <span class="term__gloss">a close cousin: internal nodes hold only routing keys, and all row data sits in the linked leaves</span>,
+                a close cousin covered in the deep dive.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Looking up rows by a primary key or foreign key.</li>
+              <li>Filtering on a high-selectivity column (<code>email</code>, <code>order_id</code>, <code>created_at</code>).</li>
+              <li>Running range queries: <code>BETWEEN</code>, <code>&lt;</code>, <code>&gt;</code>, <code>ORDER BY</code> on the indexed column.</li>
+              <li>Doing left-anchored <code>LIKE 'foo%'</code> searches.</li>
+              <li>Enforcing uniqueness — a <code>UNIQUE</code> constraint is backed by a B-tree.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The column has very few distinct values (a boolean like <code>is_active</code>) — it barely narrows anything.</li>
+              <li>The table is small enough that a full scan already takes a few milliseconds.</li>
+              <li>The column is write-heavy and rarely read — maintenance cost outweighs the read gain.</li>
+              <li>You need substring search (<code>LIKE '%foo%'</code>) — a leading wildcard defeats the sort order.</li>
+              <li>You need geospatial or vector similarity search — reach for GiST, R-tree, or an ANN index instead.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Node / page</dt><dd>One unit of the tree, sized to a disk block — often 8 KB or 16 KB.</dd></div>
+          <div><dt>Root, internal, leaf</dt><dd>The top, middle, and bottom layers of the tree.</dd></div>
+          <div><dt>Fan-out</dt><dd>How many children a node can have. High fan-out keeps the tree shallow.</dd></div>
+          <div><dt>Key</dt><dd>The indexed value — e.g. an <code>email</code> string.</dd></div>
+          <div><dt>Pointer / row ID</dt><dd>What a leaf entry points to: the physical address of the row.</dd></div>
+          <div><dt>Selectivity</dt><dd>The fraction of rows a query keeps. Higher is better for index use.</dd></div>
+          <div><dt>Clustered vs. secondary index</dt><dd>Whether the table itself is stored in index order, or the index sits alongside it.</dd></div>
+          <div><dt>Balanced</dt><dd>Every leaf is at the same depth. The "B" stands for <em>balanced</em>, not <em>binary</em>.</dd></div>
+        </dl>
+
+        <!-- WHAT'S NEXT -->
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

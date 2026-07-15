@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gRPC · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">gRPC</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">gRPC</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">gRPC</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Two services need to talk over a network. REST bolts a text format onto HTTP and hopes both sides agree on the shape of the JSON. gRPC picks the shape first, in a contract file, and generates the code that speaks it.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>gRPC is Google's open-source framework for service-to-service calls. You write one <code>.proto</code> file describing methods and messages, run a compiler, and get typed client and server code in your language — <strong>11+ languages</strong> are supported. Calls travel over <strong>HTTP/2</strong> as binary Protobuf, smaller and faster to parse than JSON over HTTP/1.1, with streaming built in.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>REST is like sending postcards. Each request is its own note: a verb (<code>GET</code>, <code>POST</code>), an address (<code>/users/42</code>), and human-readable JSON inside. Every postcard re-states the destination and re-opens a fresh envelope.</p>
+
+        <p>gRPC is more like installing a direct phone line between two services. Both sides agree up front on exactly which functions exist and what their arguments look like — that agreement is the
+          <span class="term">.proto contract</span>
+          <span class="term__gloss">a schema file that defines a service's methods and message shapes</span>:</p>
+
+        <pre><code>service UserService {
+  rpc GetUser (GetUserRequest) returns (User);
+  rpc WatchUserEvents (UserId) returns (stream UserEvent);
+}</code></pre>
+
+        <p>From the caller's side, <code>client.GetUser(req)</code> looks like an ordinary function call. The generated
+          <span class="term">stub</span>
+          <span class="term__gloss">client-side code that makes a remote call look like a local one</span>
+          does the real work underneath: turning the arguments into binary, sending them down a shared connection, and turning the answer back into a typed object.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["client.GetUser(req)"] --> B["Stub encodes to binary Protobuf"]
+    B --> C["Single HTTP/2 connection"]
+    C --> D["Server stub decodes"]
+    D --> E["Your handler runs"]
+    E --> F["Response encoded, sent back on the same stream"]
+    F --> G["Caller gets a typed User"]
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: a normal-looking function call, with encoding, transport, and decoding hidden inside the stub.</figcaption>
+        </figure>
+
+        <p>Because HTTP/2 lets one connection carry many streams at the same time, that same phone line can also carry a server pushing updates, a client pushing updates, or both at once — no WebSocket handshake, no long-polling. Two ideas carry most of the design: <strong>the schema is the source of truth</strong> (no more guessing what fields an endpoint returns), and <strong>the wire format is binary and streamable</strong> (no more parsing megabytes of JSON to read three fields).</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not REST.</strong> REST is resource-oriented over HTTP/1.1 with human-readable JSON; gRPC is method-oriented over HTTP/2 with binary Protobuf.</li>
+              <li><strong>Not GraphQL.</strong> GraphQL lets clients shape their own queries; gRPC locks the shape to the <code>.proto</code> contract.</li>
+              <li><strong>Not a message queue.</strong> gRPC is synchronous request/response, plus streaming; Kafka or RabbitMQ handle asynchronous, durable, fan-out messaging.</li>
+              <li><strong>Not browser-native.</strong> Browsers can't speak raw gRPC — you need gRPC-Web and a proxy in front.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Internal service-to-service calls, where you control both ends.</li>
+              <li>A polyglot backend — Go here, C# there, Python somewhere else — needs one shared contract.</li>
+              <li>Latency or payload size is a real cost: JSON parsing and HTTP/1.1 overhead show up in the numbers.</li>
+              <li>Real-time features need streaming: live telemetry, chat, progress updates, server push.</li>
+              <li>Mobile clients, where payload size and battery matter.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Public APIs for third-party developers — REST and OpenAPI are still the common language.</li>
+              <li>Browser apps with no proxy layer in front.</li>
+              <li>Simple CRUD you'd rather poke with <code>curl</code>.</li>
+              <li>The team has no discipline yet for generated code, breaking-change review, and schema versioning.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>RPC</dt><dd>Remote Procedure Call — calling a function that actually runs on another machine.</dd></div>
+          <div><dt>Protocol Buffers (Protobuf)</dt><dd>Google's compact binary serialization format and schema language.</dd></div>
+          <div><dt>.proto file</dt><dd>The contract: defines services, methods, and message types.</dd></div>
+          <div><dt>Stub</dt><dd>Generated client code that makes remote calls look local.</dd></div>
+          <div><dt>HTTP/2</dt><dd>The transport; multiplexes many streams over a single connection.</dd></div>
+          <div><dt>Unary RPC</dt><dd>One request, one response — the default shape.</dd></div>
+          <div><dt>Streaming RPC</dt><dd>Client-stream, server-stream, or bidirectional.</dd></div>
+          <div><dt>Channel</dt><dd>A long-lived connection a client reuses to issue many calls.</dd></div>
+          <div><dt>Deadline</dt><dd>A per-call timeout that propagates across services.</dd></div>
+          <div><dt>gRPC-Web</dt><dd>A variant that lets browsers talk to gRPC through a proxy.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

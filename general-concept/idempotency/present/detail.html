@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Idempotency · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Idempotency</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Idempotency</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Idempotency</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~9 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A function <code>f</code> is idempotent when <code>f(f(x)) = f(x)</code> for every <code>x</code> in its domain. Applied to a system: running an operation <code>n</code> times, for any <code>n ≥ 1</code>, leaves the system in the same observable state as running it once. The first call may still cause a real side effect — what idempotency forbids is <em>piling up more</em> state change on the calls after that.</p>
+
+        <p>Three near-neighbor ideas get confused with it:</p>
+        <dl class="vocab">
+          <div><dt>Pure / referentially transparent</dt><dd>No side effects at all, and trivially idempotent. Idempotent operations are a bigger set: they may write to a database, send a webhook, or charge a card — as long as repeats converge to the same end state.</dd></div>
+          <div><dt>Stateless</dt><dd>A property of the handler, not the operation. A stateless server forgets between requests; an idempotent operation can still change persistent state.</dd></div>
+          <div><dt>Commutative</dt><dd><code>f(g(x)) = g(f(x))</code> — about reordering <em>different</em> operations. Idempotency is about repeating the <em>same</em> one. The two are independent; neither implies the other.</dd></div>
+        </dl>
+
+        <p>Operations split into two practical groups:</p>
+        <ul>
+          <li><strong>Naturally idempotent.</strong> The semantics carry the property on their own: <code>PUT /users/123</code> ("make the user be this"), <code>DELETE /users/123</code> ("ensure absent"), <code>SET counter = 5</code>, <code>INSERT ... ON CONFLICT DO NOTHING</code>, <code>kubectl apply</code>. These describe a target state, not a delta.</li>
+          <li><strong>Made idempotent with a key.</strong> Delta-shaped operations — <code>POST /payments</code>, <code>INSERT INTO orders</code>, <code>INCREMENT balance</code> — need an outside mechanism to catch duplicates: a client-supplied idempotency key checked against a server-side idempotency store.</li>
+        </ul>
+
+        <p>Idempotency belongs to the family of reliability primitives that exist because networks time out and partition. Its siblings: <strong>retries with backoff</strong> (the cause of duplicate requests), <strong>deduplication</strong> (the fix on the receiving side), <strong>conditional writes / optimistic concurrency</strong> (a tighter guarantee for concurrent edits), and <strong>transactions</strong> (an alternative for atomic multi-step writes inside one trust boundary). Serious production systems layer several of these together; idempotency is the one that crosses trust boundaries.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Idempotency is enforced at the <strong>application layer</strong> — whichever component owns the side effect. It can't be solved at the transport layer: TCP prevents duplicates only within one connection, and the moment a client retries on a fresh connection (a timeout, a load-balancer reset, a process restart), TCP has nothing left to say. That's also why messaging systems land on
+          <span class="term">at-least-once delivery</span>
+          <span class="term__gloss">the realistic guarantee messaging systems give: duplicates happen, and the consumer must handle them</span>:
+          a broker cannot tell "ack lost" from "message lost," so it redelivers, and dedup gets pushed up to the consumer.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["New connection after a timeout"] --> B["Transport layer TCP - no memory across connections"]
+    B --> C["Application layer - the only place that can recognize a repeat"]
+    C --> D[("Idempotency store")]
+          </pre>
+          <figcaption class="diagram__caption">TCP only guards one connection. Once a client reconnects, only the application remembers the earlier attempt.</figcaption>
+        </figure>
+
+        <p>You'll run into it in these places:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">HTTP APIs (RFC 9110)</div><p><code>PUT</code>, <code>DELETE</code>, <code>GET</code>, <code>HEAD</code>, <code>OPTIONS</code>, <code>TRACE</code> are defined idempotent; <code>POST</code> and <code>PATCH</code> are not. The spec is about the server's intended effect, not the response — a retried request may legitimately get a different status code back (say, <code>200</code> then <code>204</code>).</p></div>
+          <div class="card"><div class="card__title">Payment APIs</div><p>Stripe, Adyen, Square, and Braintree all expose an <code>Idempotency-Key</code> header on create-charge endpoints. Stripe stores the response under that key and replays it for at least 24 hours.</p></div>
+          <div class="card"><div class="card__title">Message brokers</div><p>Kafka's <code>enable.idempotence=true</code> (default since 3.0) dedups per-partition on the producer side; consumer-side dedup is still the application's job. SQS, RabbitMQ, NATS, and Pub/Sub all document at-least-once as the real guarantee.</p></div>
+          <div class="card"><div class="card__title">Database upserts</div><p><code>INSERT ... ON CONFLICT</code>, <code>MERGE</code>, <code>REPLACE INTO</code>, and Redis <code>SETNX</code> turn "create or no-op" into one atomic statement.</p></div>
+          <div class="card"><div class="card__title">Kubernetes controllers</div><p>Every <code>Reconcile()</code> must be idempotent — controllers loop and re-run on every event. A non-idempotent reconciler produces drift, duplicate resources, or thrash.</p></div>
+          <div class="card"><div class="card__title">Terraform / Pulumi / CloudFormation</div><p><code>plan</code> and <code>apply</code> run repeatedly against the same desired state. Providers that get idempotency wrong throw "resource already exists" on retry.</p></div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>A client may retry across a network boundary you don't control — browser, mobile app, partner integration.</li>
+              <li>You consume from an at-least-once queue: Kafka, SQS, Pub/Sub, RabbitMQ — essentially all of them.</li>
+              <li>The side effect is user- or money-visible: a charge, refund, email, SMS, inventory change, account creation.</li>
+              <li>You build a webhook receiver — senders retry until they get a 2xx, so duplicates are guaranteed.</li>
+              <li>You run a reconciler against a desired-state model: operators, IaC, GitOps.</li>
+              <li>A human can double-click a submit button.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The operation is already naturally idempotent — adding a key to a true <code>GET</code> or <code>PUT</code> rarely earns its keep.</li>
+              <li>The endpoint is append-only by design (analytics events, audit logs) where every call is supposed to be a new entry.</li>
+              <li>Calls are internal, trusted, synchronous, and bounded — a retry budget and a metric can be cheaper than a dedup store.</li>
+              <li>The dedup window you'd need (months, indefinitely) makes storage cost unreasonable.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>For naturally idempotent operations the mechanism is
+          <span class="term">state convergence</span>
+          <span class="term__gloss">the handler reads the current state, diffs it against the requested state, and applies only the difference</span>:
+          the handler reads the current state, diffs it against the requested state, and applies just the difference — on the second call the diff is empty. <code>kubectl apply</code>, <code>PUT /users/123</code>, and Terraform all work this way.</p>
+
+        <p>For the keyed pattern — <code>POST</code> plus an <code>Idempotency-Key</code> — the lifecycle is a small state machine:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Client generates the key.</span> A UUIDv4 or ULID, created once and reused byte-for-byte on every retry.</li>
+          <li><span class="steps__title">Request arrives.</span> <code>POST /resource</code> with header <code>Idempotency-Key: K</code> and body <code>B</code>.</li>
+          <li><span class="steps__title">Atomic acquisition.</span> <code>INSERT INTO idempotency (key, fingerprint, status='in_flight') ON CONFLICT (key) DO NOTHING</code> — one round trip, one winner. The row now sits
+            <span class="term" data-gloss="the handler is still running for this key — not yet succeeded or failed">in-flight</span>.</li>
+          <li><span class="steps__title">Insert won.</span> Execute the handler. On success, update the row to <code>succeeded</code> with the response cached. On failure, update to <code>failed</code>, also cached.</li>
+          <li><span class="steps__title">Insert conflicted — row already exists.</span> Three outcomes: a fingerprint mismatch returns <code>422 Unprocessable</code>; a still-in-flight row returns <code>409 Conflict</code>; a terminal row replays the cached response.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    A["Client generates key K UUIDv4 or ULID"] --> B["POST resource, header Idempotency-Key K"]
+    B --> C{"INSERT key=K ON CONFLICT DO NOTHING"}
+    C -->|insert succeeded| D[Execute handler]
+    D -->|success| E["status=succeeded, response cached"]
+    D -->|failure| F["status=failed, response cached"]
+    C -->|conflict - fingerprint mismatch| G["422 Unprocessable"]
+    C -->|conflict - still in_flight| H["409 Conflict"]
+    C -->|conflict - terminal row| I["Replay cached response"]
+          </pre>
+          <figcaption class="diagram__caption">One request through the keyed lifecycle. The three conflict branches are what make retries safe instead of silently wrong.</figcaption>
+        </figure>
+
+        <p>Key design points:</p>
+        <ul>
+          <li><strong>Client generates the key.</strong> A server-generated key defeats the purpose — the client needs a stable identifier to resend.</li>
+          <li><strong>Atomic acquisition.</strong> The <code>ON CONFLICT DO NOTHING</code> upsert (or Redis <code>SET key value NX EX ttl</code>) is what stops two concurrent retries from both executing the handler.</li>
+          <li><strong>Request
+            <span class="term">fingerprint</span>
+            <span class="term__gloss">a SHA-256 hash of the canonicalized request body, used to catch a key reused with a different payload</span>.
+            A hash over the canonicalized body (and sometimes method + path) catches "same key, different payload" before it silently replays the wrong result.</li>
+          <li><strong>Persist the response, not just the fact of execution.</strong> A replay must return the byte-identical status and body — including 4xx/5xx — so the client sees the same outcome every time.</li>
+          <li><strong>TTL.</strong> 24 hours is the Stripe default and a reasonable start: long enough to outlast a retry storm, short enough to cap storage. Past the TTL, a retry with the same key is treated as brand new.</li>
+        </ul>
+
+        <p>Conditional writes — <code>If-Match: "&lt;etag&gt;"</code> per RFC 9110 §13, or <code>WHERE version = ?</code> in SQL — are a related but distinct guarantee. They make an <em>update</em> idempotent against a concurrent modification rather than against retried delivery: two retries of the same <code>If-Match</code> request either both succeed (the ETag still matches) or both fail with a repeatable <code>412 Precondition Failed</code>.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">What you gain</th><th scope="col">What you give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Client-supplied key (vs server-supplied)</td><td>Survives a client crash + retry</td><td>Clients can fingerprint-bug their own requests</td></tr>
+              <tr><td>Persistent store (Postgres) vs in-memory (Redis)</td><td>Durability across restarts, transactional with business writes</td><td>Higher latency, more storage cost</td></tr>
+              <tr><td>Long TTL (days) vs short TTL (minutes)</td><td>Catches slow retries, scheduled-job replays</td><td>Larger dedup table, longer "stuck in-flight" risk</td></tr>
+              <tr><td>Synchronous lock during in-flight (409) vs queue + wait</td><td>Simple, no head-of-line blocking</td><td>Client must implement its own wait/retry on 409</td></tr>
+              <tr><td>Fingerprint validation strict vs lax</td><td>Catches client bugs, prevents wrong replay</td><td>Canonical hashing across languages is fiddly</td></tr>
+              <tr><td>Per-resource scope vs global</td><td>Reuse short keys safely</td><td>More complex lookup, scope-leak bugs</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Non-atomic acquisition</p>
+            <p>Two retries both see "key absent" from a separate <code>SELECT</code> then <code>INSERT</code>, both pass, both execute — a classic check-then-act race.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Storing the request before executing</p>
+            <p>A crash between the insert and the handler call leaves a permanent <code>in_flight</code> row; later retries get <code>409</code> forever. Cause: no recovery path for stuck records.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Forgetting to persist 4xx/5xx</p>
+            <p>Replays of a request that originally failed validation execute the handler again. Cause: confusing "idempotent" with "successful."</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">TTL shorter than the longest plausible retry</p>
+            <p>A cron-driven retry after the window closes sees a fresh key and double-processes. Cause: TTL picked by storage cost, not by modeling retry behavior.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Mutable request bodies</p>
+            <p>The client adds a timestamp on retry, the fingerprint mismatches, the server returns 422 and the operation is now stuck. Cause: not freezing the payload at first attempt.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Idempotent at the API edge but not the worker</p>
+            <p>The API dedups, then enqueues; the queue redelivers; the worker double-executes. Cause: treating "the API is idempotent" as enough when the real side effect happens downstream.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Side effects outside the dedup transaction</p>
+            <p>The handler writes to the database inside a transaction but sends an email separately; the transaction retries and the email sends twice. Cause: no transactional outbox.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>A network request has three possible outcomes, not two: success, failure, and <strong>unknown</strong>. A timeout is the third case — the client can't tell "server received and processed it, the ack got lost" from "server never got it at all." The only safe response to "unknown" is to retry; the only safe way to retry a side-effectful operation is to make it tolerant of duplicates. Idempotency is what turns an inherently three-valued outcome into a two-valued one: it worked, or it didn't, and asking again is free.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 190" role="img" aria-labelledby="whyTitle whyDesc" width="560" style="max-width:100%">
+            <title id="whyTitle">Three outcomes of a network call</title>
+            <desc id="whyDesc">A request can succeed, fail, or land in an unknown state after a timeout. Unknown is the dangerous case, because the client cannot tell whether the server actually processed the request.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="22" fill="var(--text-muted)">Client sends a request →</text>
+              <rect x="10"  y="40" width="150" height="52" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="85" y="71" fill="var(--accent)" text-anchor="middle">Success</text>
+              <rect x="196" y="40" width="150" height="52" rx="8" fill="none" stroke="var(--border)"/>
+              <text x="271" y="71" fill="var(--text)" text-anchor="middle">Failure</text>
+              <rect x="382" y="40" width="168" height="52" rx="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="466" y="65" fill="var(--danger)" text-anchor="middle">Unknown</text>
+              <text x="466" y="82" fill="var(--danger)" text-anchor="middle" font-size="11">(timeout — ack lost?)</text>
+              <text x="10" y="128" fill="var(--text)" font-size="13">Only "unknown" forces a decision: the client must retry to find out.</text>
+              <text x="10" y="152" fill="var(--text-faint)" font-size="12">The only safe way to retry a side-effectful call is to make it tolerant of duplicates.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Idempotency is what makes retrying the "unknown" branch safe.</figcaption>
+        </figure>
+
+        <p>This connects to the Two Generals Problem and the FLP impossibility result: no asynchronous protocol can guarantee both delivery and non-duplication at the same time. Given that limit, a system either loses messages (at-most-once) or duplicates them (at-least-once). For anything that matters, the industry picks at-least-once and pushes deduplication up to the application — which is exactly what idempotency provides.</p>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative to a client-supplied key is <strong>server-side fingerprinting</strong> — hash the body and dedup on that. It fails in two real cases:</p>
+        <ul>
+          <li>A client may legitimately want to send the same payload twice — two identical refunds to the same customer for two real purchases — and the server can't tell them apart by content alone.</li>
+          <li>An idle retry with a mutated field (a fresh timestamp header) gets a different fingerprint and executes twice anyway.</li>
+        </ul>
+        <p>A client-generated key sidesteps both problems: it hands the "is this a retry?" decision to the only party that actually knows the answer.</p>
+        <p>The other obvious alternative is a distributed transaction (two-phase commit) between client and server. That works inside one coordinated cluster, but breaks down across organizational and network trust boundaries — it needs both ends to join a coordinator's protocol, holds locks across round-trips, and degrades badly under a partition. An idempotency key is a cheaper, one-sided protocol: only the server holds state, the client just resends.</p>
+
+        <h3>Why it matters now</h3>
+        <ul>
+          <li><strong>Event-driven and serverless architectures.</strong> Lambda retries, SQS redeliveries, EventBridge replays, and Step Functions all assume the handler is idempotent — the default invocation model is at-least-once.</li>
+          <li><strong>LLM-agent orchestration.</strong> Agents retry tool calls, fan out parallel attempts, and replay traces during evaluation. Tools without idempotency keys produce double-bookings and double-emails in agent demos with embarrassing regularity.</li>
+          <li><strong>AI-assisted code generation.</strong> Generated handlers tend to look correct on the happy path and fail open under retries — one of the few correctness properties a human reviewer still has to hold in their head.</li>
+        </ul>
+        <p>The concept itself isn't changing; the surface area where it bites is only getting bigger.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harness Engineer · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Harness Engineer</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Harness Engineer</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Harness Engineer</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A harness is the deterministic software system that wraps a non-deterministic model and turns it into an agent. Formally: given a model <code>M</code> that maps a prompt to a completion, the harness is the program <code>H</code> such that <code>Agent(task) = H(M, task)</code>.</p>
+        <ul>
+          <li><strong>Core idea.</strong> <code>H</code> owns the control loop, tool invocation, context building, persistence, validation, and observability. The model is one stateless function call inside it.</li>
+          <li><strong>The role.</strong> A harness engineer designs, builds, and runs <code>H</code>. It reads as platform engineering applied to LLM runtimes — same posture as SRE/platform work (budgets, traces, retries, idempotency), a different, probabilistic component in the hot path.</li>
+          <li><strong>Family.</strong> Sits inside AI engineering as the runtime-systems specialization, distinct from prompt engineering (input design), model engineering (training/fine-tuning), and RAG engineering (a retrieval component, not a runtime).</li>
+        </ul>
+
+        <h3>The seven building blocks</h3>
+        <p>Every non-trivial harness contains roughly seven subsystems. Most production failures trace back to one that's missing or weak.</p>
+        <dl class="vocab">
+          <div><dt>Orchestration / control loop</dt><dd>The Thought → Action → Observation cycle, often a ReAct variant or a Plan-Execute-Verify phase gate. Owns step counting, stopping conditions, and whether to call the model again, call a tool, hand off, or stop.</dd></div>
+          <div><dt>Tool registry and invocation</dt><dd>A typed catalog of capabilities exposed to the model as JSON schema. Owns schema validation, argument coercion, timeouts, sandbox boundaries, and result formatting. Increasingly federated through the Model Context Protocol (<span class="term" data-gloss="a standard client-to-tool-server contract so the same tool works across Claude, GPT, and Gemini harnesses">MCP</span>).</dd></div>
+          <div><dt>Context window management</dt><dd>Decides what tokens go into each call: a short-term scratchpad, a long-term store (vector index, KV store, or files), and a <span class="term">compaction</span> <span class="term__gloss">a summarization step that runs near the token budget to shrink the scratchpad</span> policy. Anthropic and Cursor both report compaction cutting context by 60–80% on long sessions.</dd></div>
+          <div><dt>State persistence and resumption</dt><dd>Durable <span class="term">checkpoints</span> <span class="term__gloss">saved snapshots of thread state between turns</span> — thread state, intermediate results, pending tool calls. Enables crash recovery, human-in-the-loop pauses, and resuming a multi-hour run on another worker. LangGraph's <code>Checkpointer</code> and Anthropic's git-backed <code>claude-progress.txt</code> are two reference implementations.</dd></div>
+          <div><dt>Validation and guardrails</dt><dd>Pre-call (input policy, PII redaction, prompt-injection screening) and post-call (schema validation on tool args, output classifiers, refusal detection). Layered as preventive (block before execution) plus corrective (detect and self-correct in the loop).</dd></div>
+          <div><dt>Observability and tracing</dt><dd>Structured spans for every model call, tool call, and decision, exported via OpenTelemetry GenAI semantic conventions (stabilized 2025) to Langfuse, Arize Phoenix, Braintrust, or LangSmith. Without this, evals are guesswork.</dd></div>
+          <div><dt>Safety and permissions</dt><dd>Capability scoping per tool, per user, per environment. Approvals for state-mutating actions, rate limits, and budget enforcement (tokens / dollars / wall-clock). Anything that touches money or production state lives behind this layer.</dd></div>
+        </dl>
+        <p>Sibling disciplines outside AI: backend platform engineering (it borrows control planes, idempotency, traces), workflow orchestration (Temporal, Airflow — same lifecycle problems, deterministic workers), and OS kernels — the "model is a CPU, harness is the OS" analogy is structural, not just a turn of phrase.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>The harness sits between the API gateway and the model provider. A typical request: client → gateway/auth → harness process → (model API, tool calls, vector DB, state store) → response. Two deployment shapes dominate:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">In-process library</div><p>Runs inside a backend service — fine for low-concurrency, single-tenant agents. LangChain and LlamaIndex apps usually start here.</p></div>
+          <div class="card"><div class="card__title">Harness-as-a-service</div><p>A dedicated control plane — its own deploy, queue, worker pool, durable checkpointer — that other services call. This is what Claude Code, Cursor, Devin, and Replit Agent run internally, and what LangGraph Platform, OpenAI's AgentKit, and CrewAI Enterprise sell.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    C["Client"] --> GW["Gateway / auth"]
+    GW --> HP["Harness worker"]
+    HP --> LLM["Model API"]
+    HP --> TL["Tool calls"]
+    HP --> VS["Vector DB / state store"]
+    LLM --> RESP["Response"]
+    TL --> RESP
+    VS --> RESP
+          </pre>
+          <figcaption class="diagram__caption">Treat the harness as a stateful, long-running compute boundary — a job scheduler with an unreliable worker, not a request/response API.</figcaption>
+        </figure>
+
+        <p>Where you'll typically encounter it: <strong>Claude Code</strong> and <strong>Codex</strong> (shell, file IO, and git tools), <strong>Cursor</strong> and <strong>Windsurf</strong> (IDE-embedded, heavy on speculative tool calls and KV-cache reuse), <strong>Devin</strong>, Factory, and Cognition (long-running autonomous coding agents), <strong>GitHub Copilot Workspace</strong> (issue-to-PR planning and verification), and customer-support or ops agents at most SaaS vendors, typically on LangGraph or a homegrown loop.</p>
+
+        <p>The ecosystem splits by concern: orchestration (LangGraph, CrewAI, Microsoft AutoGen/AG2, OpenAI Agents SDK, Pydantic AI), tools (MCP, OpenAI function calling, Anthropic tool use, Gemini function calling), memory (pgvector, Qdrant, Weaviate, LanceDB, Mem0, Zep), observability (Langfuse, Arize Phoenix, LangSmith, Braintrust, Helicone, OpenLLMetry), state and durability (LangGraph Checkpointer, Temporal, Inngest, Redis streams), and safety (NeMo Guardrails, Llama Guard, Lakera Guard, Pillar).</p>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>The task is multi-turn and the model needs more than one tool call to finish.</li>
+              <li>Tools mutate state — writes to a database, sending email, calling a payment API — so you now need idempotency, approvals, and traces.</li>
+              <li>You have a cost or latency SLO (a per-task token budget, a p95 wall-clock target) you must enforce, not just measure.</li>
+              <li>Sessions are long-running or resumable — minutes to hours, with humans approving midway.</li>
+              <li>You want eval-driven iteration — you can't improve what you can't replay.</li>
+              <li>You expect to swap models without rewriting application logic.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>A single-turn prompt with no tools solves the task — one chat completion call is enough.</li>
+              <li>The workload is batch classification or embedding — no loop, no agency, nothing to wrap.</li>
+              <li>You're still figuring out whether the task is feasible — prototype in a notebook first.</li>
+              <li>The team is one engineer on an internal use case — a thin script is the right level for weeks, maybe months.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>"Harness engineering" entered common usage in 2025, after OpenAI's "Harness engineering: leveraging Codex in an agent-first world" post, and crystallized in early 2026 with Anthropic's "Effective harnesses for long-running agents" and Martin Fowler's writeup citing Birgitta Böckeler's <strong>Agent = Model + Harness</strong> framing. The motivating observation: as frontier models converged on raw capability (GPT-5 class, Claude 4.x, Gemini 2.5), the variance in agent quality stopped tracking model choice and started tracking the surrounding system. Before 2024, "agent" mostly meant a single ReAct loop in a notebook — AutoGPT and BabyAGI both famously failed in production for harness reasons: no stop conditions, no state, no eval. The name became necessary once teams started hiring people specifically to build that surrounding system.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>One full turn, end to end, in a production harness:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Ingress.</span> The gateway checks auth, applies rate limits, attaches a trace ID, and enqueues the task. A worker picks it up and loads any prior checkpoint for the thread.</li>
+          <li><span class="steps__title">Context assembly.</span> The context builder pulls the system prompt, tool schemas filtered by permission, retrieved long-term memory, the recent scratchpad, and the current message. It checks the token count against the model's window minus a reserved output budget, and triggers compaction if over the threshold.</li>
+          <li><span class="steps__title">Model call.</span> The harness calls the model with its tool list, streaming tokens for the UI but only committing the result once the full message arrives. Transient 5xx/429 errors retry with backoff and jitter; persistent failures fall through to a fallback model or fail the turn cleanly.</li>
+          <li><span class="steps__title">Decision.</span> Parse the response. A final answer gets validated (schema, refusal classifier) and returned. Tool calls get routed to the registry.</li>
+          <li><span class="steps__title">Tool invocation.</span> Each call is schema-validated, scoped to the caller's permissions, run inside a timeout and sandbox, and logged as its own span. Tools are built idempotent — a
+            <span class="term">request ID</span>
+            <span class="term__gloss">an identifier the harness attaches to a call so a retried call coalesces instead of duplicating its side effect</span>
+            from the harness lets a retried call coalesce instead of duplicating its side effect.</li>
+          <li><span class="steps__title">State update.</span> Append the tool results to the scratchpad, save the new checkpoint, and subtract from the token/step/dollar budget. If any budget is spent, move to a graceful-stop branch.</li>
+          <li><span class="steps__title">Loop or terminate.</span> If a stopping condition holds — final answer, budget exhausted, human approval required, max steps — exit. Otherwise, go back to step 2.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Caller
+    participant H as Harness
+    participant M as Model
+    participant T as Tool
+    C->>H: task plus trace id
+    H->>H: load checkpoint, assemble context
+    H->>M: call model with tools, memory, scratchpad
+    M-->>H: response
+    alt final answer
+        H->>H: validate output with guardrails
+        H-->>C: return answer
+    else tool call
+        H->>T: invoke tool - schema check, timeout, request id
+        T-->>H: result
+        H->>H: append result, save checkpoint, spend budget
+        H->>H: loop back to model call unless budget exhausted
+    end
+          </pre>
+          <figcaption class="diagram__caption">One turn through the harness. The model call is one box; everything else on this diagram is harness code.</figcaption>
+        </figure>
+
+        <p>A minimal sketch of the loop — illustrative only, the runnable version lives in <a href="../code/">the code folder</a>:</p>
+        <pre><code>def run_turn(thread_id, user_msg, budget):
+    state = checkpointer.load(thread_id)
+    state.append({"role": "user", "content": user_msg})
+
+    for step in range(budget.max_steps):
+        ctx = context_builder.assemble(state, budget.tokens_left)
+        resp = call_model_with_retry(ctx, tools=registry.schemas())
+        state.append(resp.message)
+
+        if not resp.tool_calls:
+            guardrails.validate_output(resp.message)
+            checkpointer.save(thread_id, state)
+            return resp.message
+
+        for call in resp.tool_calls:
+            guardrails.validate_call(call)
+            result = registry.invoke(
+                call.name, call.args,
+                request_id=f"{thread_id}:{step}:{call.id}",
+                timeout=budget.tool_timeout,
+            )
+            state.append({"role": "tool", "id": call.id, "content": result})
+
+        budget.spend(resp.usage)
+        checkpointer.save(thread_id, state)
+        if budget.exhausted():
+            return graceful_stop(state)
+
+    return graceful_stop(state)</code></pre>
+
+        <p><strong>Evals close the loop.</strong> Every trace is replayable. A regression suite of "golden traces" reruns nightly against the current model and harness; the metrics are task success, step count, token spend, and tool-call validity. Prompt or tool changes ship only when the eval deltas are positive.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>In-process loop vs. durable workflow engine</td><td>Simplicity, low latency</td><td>No crash recovery, no resumability</td></tr>
+              <tr><td>Big single agent vs. multi-subagent</td><td>Easier to reason about</td><td>One context window, less parallelism</td></tr>
+              <tr><td>Strict JSON tool schemas vs. free-form</td><td>Determinism, validation</td><td>Model expressiveness on edge cases</td></tr>
+              <tr><td>Aggressive compaction vs. raw history</td><td>Fits long sessions</td><td>Lossy — facts get dropped (~60% fact retention measured under naive summarization)</td></tr>
+              <tr><td>MCP-federated tools vs. in-tree</td><td>Reuse, vendor portability</td><td>Extra hop, schema drift across servers</td></tr>
+              <tr><td>Framework (LangGraph) vs. hand-rolled</td><td>Free observability, checkpointing</td><td>Coupling to the framework's state model</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Infinite loop</p>
+            <p>The model keeps calling the same tool. Cause: no step cap, or no check that observations are actually making progress.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Context overflow</p>
+            <p>The token limit is hit mid-run. Cause: an unbounded scratchpad with no compaction policy.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Sycophantic confirmation</p>
+            <p>The model claims "done" before the work is done. Cause: no verification phase or external success criterion.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Tool sprawl</p>
+            <p>50+ tools confuse the model. Cause: no progressive disclosure — everything sits in the system prompt at once.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Silent fact destruction during compaction</p>
+            <p>The summary drops a critical constraint. Cause: an unstructured "summarize this" instead of templated state.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Double-execution</p>
+            <p>A retry sends two payments. Cause: non-idempotent tools with no request-ID deduplication.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Prompt injection via tool output</p>
+            <p>A fetched web page contains "ignore previous instructions." Cause: tool results treated as trusted text instead of untrusted input.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Trace blindness</p>
+            <p>A bug can't be reproduced. Cause: logs without span IDs or input/output payloads.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Models are stateless probability distributions over tokens. Production software needs state, retries, transactions, audits, budgets, and approvals. The harness is the boundary that turns a probabilistic component into a system you can run, debug, bill, and trust — it exists for the same reason an operating system exists around a CPU: the compute element is not where most of the engineering lives.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 200" role="img" aria-labelledby="budgetTitle budgetDesc" width="560" style="max-width:100%">
+            <title id="budgetTitle">An unbounded loop versus a hard step cap</title>
+            <desc id="budgetDesc">Two rows of steps. Without a harness the loop keeps calling the model past nine steps with no stop, ending in a runaway-cost warning. With a harness the same loop is capped at six steps and stops gracefully.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="24" fill="var(--text-muted)">No harness — nothing stops the loop</text>
+              <g>
+                <circle cx="30"  cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <circle cx="76"  cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <circle cx="122" cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <circle cx="168" cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <circle cx="214" cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <circle cx="260" cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <circle cx="306" cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <circle cx="352" cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <circle cx="398" cy="60" r="12" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <text x="425" y="66" fill="var(--text-faint)" font-size="18">…</text>
+                <rect x="460" y="45" width="80" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <text x="500" y="65" fill="var(--danger)" text-anchor="middle" font-size="11">runaway cost</text>
+              </g>
+              <text x="10" y="124" fill="var(--text-muted)">With harness — max_steps = 6</text>
+              <g>
+                <circle cx="30"  cy="160" r="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <circle cx="76"  cy="160" r="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <circle cx="122" cy="160" r="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <circle cx="168" cy="160" r="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <circle cx="214" cy="160" r="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <circle cx="260" cy="160" r="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="300" y="145" width="120" height="30" rx="6" fill="var(--bg-elev-2)" stroke="var(--success)"/>
+                <text x="360" y="165" fill="var(--success)" text-anchor="middle" font-size="11">graceful stop</text>
+              </g>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Without a cap, a stuck loop keeps calling the model — and paying for it. A harness enforces <code>max_steps</code>, <code>max_tokens</code>, <code>max_wall_clock</code>, and <code>max_dollars_per_task</code> as hard stops inside the loop, not just numbers on a dashboard.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>Two design choices recur across every serious harness:</p>
+        <ul>
+          <li><strong>Why a loop and not a graph?</strong> A pure DAG (Airflow-style) can't express "the agent decides what to do next." A pure free-form loop (AutoGPT-style) can't be debugged. The industry settled on constrained graphs with loops (LangGraph) or typed phase machines (Plan-Execute-Verify) because they keep agent autonomy inside a structure a human can read and bound.</li>
+          <li><strong>Why standardize tools with MCP instead of each app defining its own?</strong> Tool sprawl is the dominant ongoing cost, and every team was reinventing the same shell, filesystem, and HTTP tool. A shared protocol makes tools a market rather than something every team rebuilds — the same logic as LSP for editors. The trade-off, judged worth it, is one extra network hop and a schema-versioning problem.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, the strongest empirical claim in the field is that harness quality dominates model choice for most agent tasks. Anthropic's three-agent harness post, Cursor's published architecture, and Augment Code's coding-agent guides all make this case with numbers. The major labs now agree the harness is the product — they only disagree on pricing. For a working engineer that means most of the payoff sits in the harness: the role commands a 10–20% premium over an equivalent backend role, and the discipline maps cleanly onto skills any solid platform engineer already has.</p>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Questions worth verifying before you ship</p>
+            <ul>
+              <li>What is the actual step-count distribution of your task? If p95 is 3 steps, you don't need durable checkpoints; if it's 50, you do.</li>
+              <li>Where does compaction lose information on your real traces? Run a "constraint recall" eval before and after.</li>
+              <li>Are your tools genuinely idempotent? Force a duplicate request ID and confirm there's no double side-effect.</li>
+              <li>Does your stopping condition fire on "the model believes it's done" or on "an external verifier says it's done"? Only the second is safe.</li>
+              <li>What's the cost per successful task, not per call? Token cost without a success rate is meaningless.</li>
+              <li>Can a new engineer replay any production trace locally in under five minutes? If not, the observability is for show.</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

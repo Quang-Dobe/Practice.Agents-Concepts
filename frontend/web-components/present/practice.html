@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Components · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Web Components</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Web Components</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Web Components</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>The most common production home is a <strong>cross-framework design system</strong>: a platform team ships <code>acme-button</code>, <code>acme-modal</code>, <code>acme-datepicker</code> once, and a React app, an Angular admin, a Vue site, and a legacy Rails partial all consume the same tag. You'll rarely reach for a Web Component to build a whole single-page app — the sweet spot is leaf-level, high-reuse UI, not routing or global state.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Cross-framework design system</div><p>Adobe Spectrum, Microsoft Fluent, SAP UI5, GitHub Primer, Shoelace, and Ionic all follow this shape.</p></div>
+          <div class="card"><div class="card__title">Embeddable widget</div><p>Chat bubbles, checkout drop-ins, consent banners living inside an unknown host page's CSS. Shadow DOM protects them without paying for an iframe.</p></div>
+          <div class="card"><div class="card__title">Micro-frontends</div><p>Salesforce LWC is the enterprise poster child — each team ships a bundle exposing tags; the shell composes them by tag name and <code>CustomEvent</code>, not shared framework state.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Do DOM work in <code>connectedCallback</code>, not the constructor</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Reserve the constructor for <code>super()</code>, class-field init, and <code>attachShadow</code>. Stamp the template, wire listeners, and read attributes in <code>connectedCallback</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The spec forbids child mutation in the constructor and browsers throw <code>NotSupportedError</code>. It also keeps SSR and Declarative Shadow DOM parsing clean, and lets elements be <code>document.createElement</code>'d without side effects.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Calling <code>innerHTML =</code>, <code>appendChild</code>, or <code>fetch</code> in the constructor because "it works in Chrome."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Reflect properties to attributes for anything that belongs in HTML</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For state a user might set in markup (<code>disabled</code>, <code>open</code>, <code>variant="primary"</code>), pair a getter/setter with <code>attributeChangedCallback</code> and mirror the value both ways. Attribute presence should mean boolean true, matching built-in HTML.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Server-rendered pages, view-source debugging, framework attribute binding, and CSS selectors like <code>[disabled]</code> all rely on the attribute being real. Without reflection you get silent drift between DOM and JS state.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Storing state only on the class instance and expecting outside observers or CSS to see it.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Declare <code>observedAttributes</code> explicitly and keep the list small</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>List only the attributes that are part of your public API. Reach for a <code>MutationObserver</code> only if you truly need dynamic keys.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The browser skips <code>attributeChangedCallback</code> for anything not observed, as a performance optimization. A missing entry is the top reason "my attribute update does nothing." A bloated list turns every <code>class="…"</code> toggle into a callback.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Listing every attribute blindly, or forgetting to add a new one when the API grows.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Dispatch typed, composed <code>CustomEvent</code>s — never call parent methods</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>this.dispatchEvent(new CustomEvent('acme-change', { detail: { value }, bubbles: true, composed: true }))</code>. Prefix event names, use <code>detail</code> for payload, and document them.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>composed: true</code> is what lets the event cross the
+              <span class="term" data-gloss="the edge of the shadow tree — DOM queries and CSS don't cross it, but a composed event does">shadow boundary</span>
+              — without it the host page sees nothing. Prefixing avoids collisions with future native events. Calling parent methods ties a component to one specific parent and breaks reuse.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Un-prefixed generic names like <code>change</code> — it collides with native form events — or forgetting <code>composed</code>.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    E["Event fired inside the shadow tree"] --> C{"composed: true set?"}
+    C -- yes --> R["Retargets to the host, crosses the shadow boundary"]
+    R --> B["Bubbles up through the light DOM"]
+    B --> D["document-level listener receives it"]
+    C -- no --> X["Stops at the shadow boundary — never reaches document"]
+          </pre>
+          <figcaption class="diagram__caption"><code>composed: true</code> is the one flag that decides whether an event ever leaves the component.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Clean up everything in <code>disconnectedCallback</code></h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Remove listeners added to <code>window</code>/<code>document</code>, disconnect any <code>ResizeObserver</code> / <code>MutationObserver</code> / <code>IntersectionObserver</code>, cancel <code>AbortController</code>s, clear timers. Pass one shared <code>AbortSignal</code> to every <code>addEventListener</code> for one-line teardown.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Custom elements are re-inserted during framework re-renders and route changes. Leaked listeners survive across navigations in SPA hosts, causing a slow memory leak and duplicated handlers.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming garbage collection handles it because "the element is gone" — a listener on <code>window</code> still holds a hard reference.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Share stylesheets with adopted stylesheets</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Build one <code>CSSStyleSheet</code> per component class, reuse it across every instance via
+              <span class="term">adopted stylesheets</span>
+              <span class="term__gloss">one parsed CSSStyleSheet object attached to many shadow roots via shadowRoot.adoptedStyleSheets, instead of cloning a style tag into each one</span>
+              (<code>shadowRoot.adoptedStyleSheets = [sheet]</code>). Lit does this for you already.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Cloning a <code>style</code> tag into 500 shadow roots costs 500 parses and 500 style engines. Adopted sheets share one parsed rule set — a measurable render-time win on component-heavy pages.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Setting <code>shadowRoot.innerHTML</code> with a large inline stylesheet on high-count components.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Theme through custom properties and <code>::part</code>, never through piercing selectors</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Expose design tokens as <code>--acme-color-primary</code>; expose stylable internals via <code>part="trigger"</code>. Document both as a public API.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Custom properties inherit through shadow boundaries by spec; <code>::part</code> gives consumers an explicit hook. Anything else — deep selectors, <code>!important</code> hacks — breaks the moment internals get refactored, and they will.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Encouraging consumers to reach into <code>shadowRoot</code> with piercing-combinator shims. That's a public-API breach waiting for a bug report.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Use <code>ElementInternals</code> for
+            <span class="term">form-associated</span>
+            <span class="term__gloss">a custom element that participates in an ancestor form element the same way a native input does</span>
+            components</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Add <code>static formAssociated = true</code> and call <code>this.attachInternals()</code>. Use <code>setFormValue()</code>, <code>setValidity()</code>, and the ARIA reflection setters (<code>ariaLabel</code>, <code>role</code>).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without form association your input is invisible to <code>form</code> submission, <code>FormData</code>, native validation, and reset. ARIA reflection avoids the classic "custom element with no accessible name" bug (WebKit shipped this in Safari 16.4, Firefox in 126).</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Faking form participation with a hidden proxy <code>input</code> — it duplicates state and breaks with server-rendered forms.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Guard first paint against FOUC and upgrade flashes</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Ship <code>:not(:defined) { visibility: hidden }</code> in a global stylesheet, or use Declarative Shadow DOM so first paint is already encapsulated. Gate JS that assumes upgrade with <code>customElements.whenDefined('acme-button')</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Undefined elements render as inline boxes of unstyled content — a jarring flash on cold loads and layout thrash on hydration.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Blocking rendering behind a top-of-body script — that costs more time-to-first-byte than the flash ever cost you.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Ship as
+            <span class="term" data-gloss="ECMAScript Modules — the native browser import/export module format">ESM</span>,
+            side-effect free per import, with a guarded <code>define()</code></h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Export the class and provide a separate <code>define.js</code>, or wrap the call in <code>if (!customElements.get(...)) customElements.define(...)</code>. Publish <code>"type": "module"</code>, mark <code>"sideEffects": false</code>, and version the tag name (<code>acme-button-v2</code>) for breaking changes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Two copies of your library on one page — a half-rolled-out upgrade, a micro-frontend collision — throw on the second <code>define()</code> and crash the host. Tag names are one global namespace; treat them like it.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>UMD bundles that eagerly <code>define()</code> on import, or unconditional <code>define()</code> calls with no guard.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Test with a runner that understands Shadow DOM</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>@web/test-runner</code> plus <code>@open-wc/testing</code> for unit tests, Playwright for end-to-end. Playwright's locators pierce open shadow roots automatically — use <code>getByRole</code> / <code>getByText</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Jest with jsdom has historically had broken or partial custom-element support — you'll chase phantom failures. Real-browser runners exercise the actual upgrade and reaction queue.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Chaining <code>querySelector</code> through nested <code>shadowRoot.shadowRoot</code> lookups in tests — it encodes implementation details and breaks on refactor.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Match the framework interop story to your consumer list</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For React below version 19, ship a wrapper generated by <code>@lit/react</code>. For Vue, document the <code>.prop</code> modifier and set <code>compilerOptions.isCustomElement</code>. For Angular, add <code>CUSTOM_ELEMENTS_SCHEMA</code> and rely on <code>[prop]</code> / <code>(event)</code> bindings.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>React 18 stringifies unknown props into attributes, silently mangling booleans and objects. React 19 fixed most of it, but object-typed properties without an existing setter can still coerce. Angular's schema is required or the compiler throws.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming "it's just a tag" — every framework has at least one edge case, and your users will find it before you do.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Shadow DOM as a security boundary</p>
+            <p>Assuming a closed root protects secrets. It only hides from same-page JS with a reference — anyone can intercept <code>attachShadow</code> before your script runs, and the shadow tree shares the same JS realm. Use an iframe with <code>sandbox</code> for real isolation.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Constructor-heavy elements</p>
+            <p>Template stamping, network calls, or observer setup in the constructor. Every <code>document.createElement</code> call — including speculative ones from framework diffing — pays that cost. Move it to <code>connectedCallback</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Slot-blind global CSS</p>
+            <p>Forgetting slotted content stays in the light DOM. A rule like <code>slot &gt; *</code> written inside the shadow tree loses to host-page styles, and everyone blames Shadow DOM. Use design tokens plus <code>::slotted(*)</code> instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Attribute-only APIs for complex data</p>
+            <p>Serializing a JSON object into an attribute so an older React can pass it in. Every re-render re-parses it. Use properties, wrap for React, and reserve attributes for HTML-native primitives.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Nested shadow root fractals</p>
+            <p>Ten-deep shadow trees to "componentize everything." Event retargeting becomes untraceable, <code>::part</code> doesn't forward past one level without explicit <code>exportparts</code>, and DevTools inspection turns miserable. Flat is better.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Global <code>define()</code> in a shared library entry point</p>
+            <p>A design system whose single import calls <code>define()</code> for 40 tags on first load. A second copy of the library throws; consumers pay for all 40 tags whether they use one or all. Ship per-component entry points with a guarded <code>define()</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Framework re-render blast radius</p>
+            <p>React remounting a chart component on every parent render because a prop identity changed. Each cycle runs disconnect, reconnect, and re-init — visible flashing. Memoize props at the boundary or wrap with <code>@lit/react</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Custom element as the whole SPA root</p>
+            <p>Turning one element into a mini-framework with routing and stores inside a shadow root. You lose SSR and DevTools ergonomics and re-invent a framework badly. Use a real framework for the app shell; custom elements for reusable widgets.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Enterprise design system, polyglot teams</div>
+            <p>A financial services company runs React, Angular, and legacy JSP portals. The platform team ships ~60 Lit-based custom elements plus per-framework wrappers. <em>Lesson:</em> the wrappers are as much of the product as the elements — dropping <code>@lit/react</code> too early broke tabular-data props for pre-React-19 consumers for six months.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Embeddable checkout widget</div>
+            <p>A payments provider replaces an iframe drop-in with a Shadow DOM widget for better accessibility and first paint. <em>Lesson:</em> customers still demanded visual matching, so <code>--pay-radius</code> and <code>--pay-font</code> custom properties became the actual theming product surface.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">CMS island architecture</div>
+            <p>A marketing site is 95% static HTML with a handful of interactive islands — a price calculator, a video hero, a map locator — each a single ESM file. <em>Lesson:</em> standardizing on Declarative Shadow DOM for the hero let Lighthouse measure the real painted content instead of a post-hydration flash, recovering 8 points.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Salesforce LWC-style platform</div>
+            <p>An internal app platform composes line-of-business "apps" as bundles of custom elements. <em>Lesson:</em> they version tag names (<code>acme-grid-v3</code>) rather than assume semver, because two versions of the same tag can't coexist under one global registry.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">GitHub-style progressive enhancement</div>
+            <p>Server-rendered pages sprinkle in tiny, dependency-free tags like <code>clipboard-copy</code> and <code>relative-time</code>. <em>Lesson:</em> "works before JS loads, better after" keeps the site usable on slow connections and inside search-engine renderers that time out on heavy hydration.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> is time-to-<code>whenDefined</code> for critical tags tracked in real-user monitoring? A regression here shows up as a subtle LCP drop before anyone sees FOUC.</li>
+              <li><strong>Failure handling:</strong> if <code>customElements.define()</code> throws on a duplicate registration, does the app degrade or crash? Has loading two library versions on one page been tested?</li>
+              <li><strong>Framework interop:</strong> is there a snapshot test per supported framework version exercising boolean, object, and event bindings?</li>
+              <li><strong>Accessibility:</strong> for every form-associated element, is <code>ElementInternals</code> wired for <code>role</code>, <code>ariaLabel</code>, and validity? Has a real screen reader gone through the shadow tree?</li>
+              <li><strong>Security:</strong> does anything render untrusted content via <code>innerHTML</code>? Shadow DOM is not XSS protection — sanitize the same way you would in light DOM.</li>
+              <li><strong>Cost / performance:</strong> are adopted stylesheets used for high-count components? Has upgrade cost been measured at the realistic max element count?</li>
+              <li><strong>Bundling:</strong> is the package <code>"type": "module"</code>, marked <code>"sideEffects": false</code>, with an independent entry per component?</li>
+              <li><strong>Distribution:</strong> is the tag namespaced (<code>acme-*</code>), with the major version in the tag name if breaking changes are expected?</li>
+              <li><strong>Onboarding:</strong> can a new engineer find the "define once, guard the double-define" convention in under five minutes?</li>
+              <li><strong>SSR:</strong> if Declarative Shadow DOM ships, is there a fallback for older Firefox still in the analytics tail, and is hydration mismatch detected somehow?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">One component.</span> A widget has to work in two framework contexts, or survive an unknown host page. Someone writes it in vanilla <code>HTMLElement</code> in an afternoon and it goes live. It works.</li>
+          <li><span class="steps__title">Proliferation, then Lit.</span> Six months later there are five such components in five different styles. Pure vanilla scales badly past roughly ten components — change detection, templating, and typed props get re-implemented in each one — so the team standardizes on Lit.</li>
+          <li><span class="steps__title">Framework interop debt.</span> React attribute-stringification bugs pile up; the team wraps everything with <code>@lit/react</code> or pins to React 19. SSR becomes a requirement around the same time, forcing state to be serializable into attributes and an API redesign for older components.</li>
+          <li><span class="steps__title">v1 → v2 migration.</span> Because tag names are global, two majors can't ship under the same name. Teams version the tag (<code>acme-button-v2</code>), rename the package, or wait for scoped Custom Element Registries — still not universally shipped in 2026. Whichever path is chosen, planning for it before the first <code>customElements.define('acme-button', ...)</code> ships saves months later.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://lit.dev/docs/" rel="noopener">Lit documentation</a> — the canonical modern authoring library; its guides double as the best "how to build a component" reference for any framework.</li>
+          <li><a href="https://custom-elements-everywhere.com/" rel="noopener">custom-elements-everywhere.com</a> — the automated interop test matrix; check before promising support for a framework version.</li>
+          <li><a href="https://open-wc.org/guides/" rel="noopener">Open Web Components recommendations</a> — testing, publishing, and linting conventions most production teams converge on.</li>
+          <li><a href="https://web.dev/articles/declarative-shadow-dom" rel="noopener">Google web.dev — Declarative Shadow DOM</a> — the definitive walkthrough of DSD, hydration, and the polyfill story.</li>
+          <li><a href="https://justinfagnani.com/" rel="noopener">Justin Fagnani — writing on Lit and custom elements</a> — pragmatic performance notes from a Lit maintainer on upgrade cost and stylesheet strategy.</li>
+          <li><a href="https://html.spec.whatwg.org/multipage/custom-elements.html" rel="noopener">WHATWG HTML §4.13 Custom Elements</a> — read the reactions-queue section once; it explains half the "why does my callback fire twice" questions.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

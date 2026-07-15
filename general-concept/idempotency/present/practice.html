@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Idempotency · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Idempotency</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Idempotency</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Idempotency</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical SaaS backend, idempotency sits between the public API and the side-effect layer — the charge, the email send, the row insert. The reverse proxy retries on 502, the mobile client retries on timeout, the partner integration retries on a stale connection, and every one of those retries lands on the handler with the original key. In an event-driven system, it's non-optional: at-least-once delivery is the realistic guarantee on every major broker, "exactly-once" claims included — the consumer <em>will</em> see duplicates, and the only question is whether anyone noticed.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS backend</div><p>Between the HTTP client and every third party you can't fully trust: payment gateway, SMS provider, identity provider, LLM endpoint.</p></div>
+          <div class="card"><div class="card__title">Event-driven consumer</div><p>Kafka, SQS, EventBridge, or a Lambda trigger — at-least-once is the default invocation model, duplicates are guaranteed.</p></div>
+          <div class="card"><div class="card__title">Infrastructure code</div><p>Terraform, Pulumi, Kubernetes operators, Ansible. <code>Reconcile()</code> runs on every event, sometimes hundreds of times per deploy.</p></div>
+          <div class="card"><div class="card__title">Webhook receiver</div><p>The partner keeps retrying until it sees a 2xx — duplicates are guaranteed by design, not by accident.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Make the client generate the key, and freeze it at first attempt</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Generate a UUIDv4 or ULID client-side before the first request, and reuse it byte-for-byte across every retry of that logical operation. Persist it locally if the operation might outlive a process restart.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Server-generated keys are useless — the server can't recognize a retry it never saw. Regenerating per attempt defeats the whole mechanism.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Letting an SDK auto-generate a fresh key on each retry, or deriving the key from fields that legitimately change (timestamps, nonces).</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Acquire the key atomically — never check-then-act</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>INSERT ... ON CONFLICT DO NOTHING</code> (Postgres), <code>SET NX EX &lt;ttl&gt;</code> (Redis), or <code>PutItem</code> with <code>attribute_not_exists</code> (DynamoDB) — one round trip, one winner.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Two concurrent retries during a network blip both see "key absent" from a separate <code>SELECT</code> then <code>INSERT</code>, both pass, both execute. This is the single most common cause of "we have an idempotency table and still double-charged."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A <code>SELECT</code> followed by an <code>INSERT</code> in the same handler — even inside a transaction at READ COMMITTED. The gap is the bug.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Store a request fingerprint, not just the key</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Hash the canonicalized body (and ideally method + path) with SHA-256 and store it beside the key. On replay, compare fingerprints and reject a mismatch with <code>422</code> (IETF draft) or <code>400</code> (Stripe).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without this, a client bug that reuses a key with a different payload silently returns the <strong>wrong</strong> cached response — invisible until a customer notices they got someone else's refund.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using the body hash <em>as</em> the key itself — that breaks legitimate retries that carry a fresh timestamp or trace id.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Persist the full response, including failures</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Cache status code, headers, and body on success <strong>and</strong> on 4xx. Replay byte-identically.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Clients tell "permanently rejected" apart from "transient, retry" by status code. If a replayed validation failure suddenly returns 201 because the handler ran again, the client can't reason about anything.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Caching only on 2xx. A retry loop on a 422 will hammer the handler repeatedly and can eventually succeed against a transient condition that should have stayed rejected.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Pick a TTL longer than the slowest legitimate retry source</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default to 24 hours (Stripe's well-tested choice). Stretch to 7 days for cron-driven replays or human-operated retry tools. Index the TTL column and sweep it with a background job.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Too short and a delayed retry re-executes; too long and the dedup table grows unbounded, hurting insert latency on a hot index.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>5-minute TTLs (catch a websocket blip, miss everything else) and "forever" — a Postgres table nobody prunes for two years that ends up blocking every deploy.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Make the dedup write transactional with the business write</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For a database side effect, insert the idempotency row and the business row in the <strong>same transaction</strong>. For an external side effect (email, payment, webhook), use a
+              <span class="term">transactional outbox</span>
+              <span class="term__gloss">write the idempotency row and an outbox row atomically, then let a separate publisher deliver the outbox row with its own dedup</span>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A handler that commits the business row, then crashes before writing the idempotency row, double-executes on retry. The outbox is the only sane way to keep "we did it" and "we told the world" in sync.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"Best-effort" dedup writes after the side effect — they lose exactly the race that matters.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Model the key as a state machine, not a boolean</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Track <code>in_flight</code>, <code>succeeded</code>, <code>failed</code> explicitly with timestamps. Return <code>409</code> while <code>in_flight</code>; replay the cached response on terminal states; sweep <code>in_flight</code> rows older than a safety window (e.g. 2× the handler timeout) back into a recoverable state.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A handler crash mid-execution leaves an <code>in_flight</code> row forever. Without a sweeper that key is permanently bricked and the client gets <code>409</code> until the heat death of the universe.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single "exists" boolean — it can't tell "still running" apart from "finished" apart from "crashed."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Prefer naturally idempotent operations when you can choose</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Model APIs as <code>PUT /resources/{client-supplied-id}</code> instead of <code>POST /resources</code>. Use <code>INSERT ... ON CONFLICT DO NOTHING</code> for "create or no-op." Use <code>kubectl apply</code>-style reconciliation for infrastructure.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>No dedup store, no fingerprinting, no TTL — the data model itself absorbs the duplicate. Less code, fewer failure modes.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Bolting an idempotency-key system onto an endpoint that should have been a <code>PUT</code> in the first place. The complexity compounds.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Natural["Naturally idempotent"]
+      N1["PUT /resources/id - describes target state"]
+      N2["INSERT ... ON CONFLICT DO NOTHING"]
+      N3["No dedup store, no TTL, no fingerprint"]
+    end
+    subgraph Keyed["Keyed idempotency"]
+      K1["POST + Idempotency-Key header"]
+      K2["Dedup store: key, fingerprint, status, TTL"]
+      K3["Extra code path for every delta-shaped write"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Two ways to earn the same guarantee. Prefer the left column whenever the API shape allows it.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Use conditional writes for entity-level idempotency</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For updates, use <code>If-Match: "&lt;etag&gt;"</code> (HTTP) or <code>WHERE version = ?</code> (SQL) to make the update idempotent against a concurrent modification.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Two retries of the same <code>If-Match</code> request either both match (succeed identically) or both miss (fail with a repeatable <code>412 Precondition Failed</code>) — meaningful without a dedup table.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Last-write-wins on retries — the second attempt clobbering an unrelated concurrent edit is silent data loss.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Dedup on the consumer, not just the producer</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In a Kafka/SQS consumer, derive a dedup key from the message (event id, business primary key, offset + partition) and check it against an idempotency store before applying side effects. Commit the offset only after the side effect is recorded.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Kafka's idempotent producer stops duplicates from one producer session into one partition — it does <strong>not</strong> stop consumer-side duplicates from rebalances, replays, or an offset reset. SQS FIFO
+              <span class="term" data-gloss="the window a broker uses to spot repeated messages before treating one as new">dedup windows</span>
+              are 5 minutes — nothing for a slow consumer.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting "exactly-once" claims at the broker layer and skipping consumer-side dedup entirely.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">"Every POST is idempotent because we use UUIDs"</p>
+            <p>A UUID in the body isn't an idempotency key unless the server actively dedups on it. Fix: an explicit <code>Idempotency-Key</code> header with server-side enforcement.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Hashing the body as the dedup key</p>
+            <p>Breaks retries that mutate auxiliary fields (timestamps, trace headers) and conflates two legitimately identical requests into one. Fix: a client-supplied opaque key, plus a body fingerprint used only for validation.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Different status code on replay</p>
+            <p>Returning <code>201</code> then <code>409</code> because "this already exists" makes the client treat a normal replay as an error. Fix: replay the exact original response.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Idempotency at the edge, not the worker</p>
+            <p>The API dedups, enqueues a job, the queue redelivers, and the worker executes twice. Fix: dedup at the layer that owns the side effect — usually the worker, sometimes both.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The Stripe-style key-reuse trap</p>
+            <p>Same key, different params — the server returns the cached original response. A customer meant to wire $500, was charged $50, and never knew. Fix: store a fingerprint, reject mismatches with <code>422</code>/<code>400</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Bricked in-flight rows</p>
+            <p>The handler crashes mid-execution, the row is stuck <code>in_flight</code>, and every retry gets <code>409</code> forever. Fix: a sweeper that resets rows older than <code>max_handler_runtime × 2</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Side effects outside the dedup transaction</p>
+            <p>The transaction retries and an email sends twice. Fix: the transactional outbox pattern, or move the side effect inside the transaction where possible.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">TTL too short for the retry source</p>
+            <p>A cron retries 26 hours later, sees a fresh key, and double-processes. Fix: model the retry distribution and set the TTL to the 99.9th percentile.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Payment processors (Stripe, Adyen, Square)</div>
+            <p>A merchant calls <code>POST /v1/charges</code> with <code>Idempotency-Key: &lt;client-uuid&gt;</code>. The server stores the key with the response under a 24-hour TTL; replays return the exact same response, failures included. Reusing the key with different params returns <code>400</code> — protecting the client from its own bugs. <em>Lesson:</em> the cached response is part of the contract. Redesign the response shape without rotating keys, and you can replay a stale schema to a client that no longer understands it.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Kafka consumers in a financial ledger</div>
+            <p>A consumer reads <code>payment.requested</code> events, writes to a ledger, and commits the offset. Duplicates arrive on rebalance. The handler computes a dedup key as <code>event.id</code> and does <code>INSERT INTO ledger (event_id, ...) ON CONFLICT (event_id) DO NOTHING RETURNING *</code>; no returned row means skip the downstream side effects. <em>Lesson:</em> the dedup <em>is</em> the business write — a separate check-then-insert is the same race in a different costume.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Kubernetes controller reconciling external resources</div>
+            <p>A controller watches a <code>DatabaseInstance</code> CRD and provisions an RDS database. <code>Reconcile()</code> runs on every event — possibly hundreds of times during a deploy. It always checks RDS for an instance tagged <code>k8s-uid=&lt;crd-uid&gt;</code> before creating one. <em>Lesson:</em> the cloud provider's tag is the idempotency store — no separate database needed.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Webhook receiver for a payments partner</div>
+            <p>The partner retries until it sees <code>2xx</code>. The receiver dedups on <code>(partner_id, webhook_event_id)</code> in Postgres with a 30-day TTL, and returns <code>200</code> immediately after persisting the event to an inbox table — actual processing happens async. <em>Lesson:</em> the inbox pattern decouples "did we receive it" from "did we process it."</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> a dashboard for <code>idempotency_hit_rate</code> (replays / total requests), <code>in_flight_age_seconds</code> (p99), <code>fingerprint_mismatch_count</code> (should sit near zero), and dedup table row-count growth.</li>
+              <li><strong>Failure handling:</strong> is there a sweeper for <code>in_flight</code> rows older than 2× the handler timeout, tested by killing a handler mid-execution in staging?</li>
+              <li><strong>Failure handling:</strong> when the dedup store is down, does the API fail closed (reject) or fail open (process without dedup)? Document the choice — both are defensible, silence isn't.</li>
+              <li><strong>Security:</strong> are keys opaque and unguessable across trust boundaries, and are lookups scoped by tenant so one tenant can't replay another's response?</li>
+              <li><strong>Cost:</strong> dedup-table size × storage cost + index maintenance. A 1KB row × 10M requests/day × a 7-day TTL is 70 GB of hot data — plan the index and sweeper for it.</li>
+              <li><strong>Onboarding:</strong> can a new engineer point to the exact line that performs the atomic acquisition?</li>
+              <li><strong>Testing:</strong> is there an integration test that fires two concurrent requests with the same key and asserts exactly one side effect occurred?</li>
+              <li><strong>Schema evolution:</strong> is the cached response schema versioned, so a replay after a deploy doesn't return a shape the client no longer parses?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Zero idempotency, then the first incident.</span> A few <code>POST</code> handlers, no dedup, "we'll add it when it's a problem." It becomes a problem the first time a payment double-charges, a welcome email fires three times, or a partner's webhook fires a duplicate downstream.</li>
+          <li><span class="steps__title">Per-endpoint, in-memory dedup.</span> A Redis <code>SETNX</code> with a short TTL wired into a single handler. Works until a second handler needs it, the logic gets copy-pasted, and the in-memory store loses keys on restart.</li>
+          <li><span class="steps__title">Migration to a shared, durable layer.</span> Extract a middleware, pick a real store (Postgres for transactional co-location, Redis with a Postgres backstop for the hot path), define the state machine, build the sweeper. A multi-week project — it touches every write endpoint and every cached-response schema.</li>
+          <li><span class="steps__title">End state.</span> A shared library (or sidecar/middleware) enforces the contract uniformly, consumer-side dedup runs in every queue worker, and new endpoints default to naturally idempotent shapes — <code>PUT</code> with client-supplied ids. Idempotency is cheaper to design in than to retrofit; the retrofit cost grows faster than the endpoint count.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://stripe.com/blog/idempotency" rel="noopener">Stripe — Designing predictable APIs with idempotency</a> — the canonical engineering blog post; the lifecycle, the response cache, and the conflict semantics with production scars showing.</li>
+          <li><a href="https://docs.stripe.com/api/idempotent_requests" rel="noopener">Stripe API Reference — Idempotent requests</a> — the exact wire format and error behavior, useful as a spec when building your own.</li>
+          <li><a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07" rel="noopener">IETF draft-ietf-httpapi-idempotency-key-header-07</a> — the current standardization effort; defines <code>422</code> for a fingerprint mismatch and <code>409</code> for an in-flight conflict.</li>
+          <li><a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-idempotent-methods" rel="noopener">RFC 9110 §9.2.2 — Idempotent Methods</a> — the authoritative HTTP definition; clarifies that idempotency is about server-side effect, not the response.</li>
+          <li><a href="https://microservices.io/patterns/data/transactional-outbox.html" rel="noopener">Microservices.io — Transactional Outbox pattern</a> — the standard fix for "side effect outside the dedup transaction."</li>
+          <li><a href="https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/" rel="noopener">Confluent — Exactly-Once Semantics in Kafka</a> — what Kafka's transactional API actually guarantees, and what it doesn't (consumer-side dedup is still your job).</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

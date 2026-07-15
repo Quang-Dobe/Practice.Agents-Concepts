@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tokenization · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Tokenization</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Tokenization</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Tokenization</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A neural network cannot read the string "unhappiness". It can only multiply numbers.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Tokenization is the fixed, repeatable step that sits between your text and the model. It splits a string into pieces (say <code>["un", "happiness"]</code>), looks each piece up in a fixed list called the
+              <span class="term">vocabulary</span>
+              <span class="term__gloss">the fixed list of every possible token, usually 30k–256k entries</span>,
+              and hands the model a list of integers — one
+              <span class="term">token</span>
+              <span class="term__gloss">one entry in the vocabulary; the atomic unit the model sees</span>
+              per integer. Every modern LLM — GPT-4, Llama 3, Gemma, Claude — runs this step before any "thinking" happens. It matters to engineers because tokens are what you get billed for, what fills up the context window, and the root cause of a surprising number of bugs: bad math on numbers, mangled non-English text, odd behavior on emoji.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a tokenizer as a phrasebook for a tourist who only knows a fixed list of syllables. You can say anything, but you have to build it from syllables already in the book:</p>
+        <ul>
+          <li>Common pieces — <code>" the"</code>, <code>" of"</code>, <code>"ing"</code> — get their own entry. One lookup, done.</li>
+          <li>Rare words aren't in the book, so the tourist stitches them from smaller pieces: <code>"antidisestablishmentarianism"</code> becomes <code>"anti" + "disestablish" + "ment" + "arian" + "ism"</code>.</li>
+          <li>A truly unfamiliar sequence — an obscure emoji, a Cyrillic name — falls back to raw bytes, the most granular page in the book.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    A["Common word: the"] --> A2[One token, one lookup]
+    B["Rare word: antidisestablishmentarianism"] --> B2["Stitched from pieces: anti / disestablish / ment / arian / ism"]
+    C[Text with no matching piece at all] --> C2[Falls back to raw bytes]
+          </pre>
+          <figcaption class="diagram__caption">Frequent stuff is one token; rare stuff is many; nothing is ever truly unrepresentable.</figcaption>
+        </figure>
+
+        <p>The phrasebook is built once, before training, by reading a giant pile of text and asking: which pairs of characters keep showing up together? Promote them to a single entry. That greedy merging is the heart of
+          <span class="term">BPE</span>
+          <span class="term__gloss">Byte Pair Encoding — the greedy merge-based algorithm behind GPT-4's tiktoken and Llama 3</span>,
+          the algorithm behind GPT-4's <code>tiktoken</code> and Llama 3. Other algorithms — WordPiece (BERT), Unigram (Gemma, T5) — build the same kind of phrasebook with different statistical recipes, but from the outside they behave almost the same way: frequent stuff is one token, rare stuff is several.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not word splitting.</strong> <code>"tokenizing"</code> is three tokens in GPT-4, not one.</li>
+              <li><strong>Not embeddings.</strong> Tokenization produces integer IDs; embeddings turn those IDs into vectors. A different, later step.</li>
+              <li><strong>Not parsing.</strong> The tokenizer has no idea what a noun or a function call is. It is pure string statistics.</li>
+              <li><strong>Not language-specific.</strong> Modern tokenizers (SentencePiece, byte-level BPE) work on raw bytes, so they handle Japanese, code, and emoji with the same machinery.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Estimating cost or context usage before sending a prompt to an API.</li>
+              <li>Debugging why a model miscounts characters, fails at arithmetic, or mangles a non-English phrase.</li>
+              <li>Training or fine-tuning a model and choosing — or extending — a vocabulary.</li>
+              <li>Designing a RAG pipeline where chunk size is measured in tokens, not characters.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You just need to count words for a UI — use a word splitter, not a tokenizer.</li>
+              <li>You want semantic similarity — that's embeddings, a step downstream of tokenization.</li>
+              <li>You're doing classical string processing (search, regex, diff) — tokens are the wrong unit.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Token</dt><dd>One entry in the vocabulary; the atomic unit the model sees.</dd></div>
+          <div><dt>Vocabulary</dt><dd>The fixed list of all possible tokens, usually 30k–256k entries.</dd></div>
+          <div><dt>Subword</dt><dd>A token smaller than a word but larger than a character — the sweet spot.</dd></div>
+          <div><dt>BPE (Byte Pair Encoding)</dt><dd>Greedy merge-based algorithm; the de facto standard.</dd></div>
+          <div><dt>WordPiece</dt><dd>BERT's variant; merges by likelihood gain instead of raw frequency.</dd></div>
+          <div><dt>Unigram</dt><dd>Top-down algorithm that starts huge and prunes; used by SentencePiece and Gemma.</dd></div>
+          <div><dt>SentencePiece</dt><dd>A library, not an algorithm — wraps BPE or Unigram, treats input as raw bytes.</dd></div>
+          <div><dt>Byte-level</dt><dd>Tokenizer operates on UTF-8 bytes, so nothing is ever truly "unknown".</dd></div>
+          <div><dt>Special tokens</dt><dd>Reserved IDs like <code>&lt;|endoftext|&gt;</code> or <code>&lt;|im_start|&gt;</code> that carry structural meaning.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

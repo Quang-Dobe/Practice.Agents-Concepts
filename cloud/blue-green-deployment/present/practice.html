@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blue-Green Deployment · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Blue-Green Deployment</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Blue-Green Deployment</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Blue-Green Deployment</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical SaaS backend, blue-green is the strategy a platform team picks for the customer-facing API tier — the one whose error budget is most visible. It's wired into CI/CD as a two-step pipeline: deploy to the idle color runs automatically; cutover is a gated button a release manager clicks.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS API tier</div><p>The user-data store stays single-tenant and shared; only the stateless compute fleet doubles up during a release.</p></div>
+          <div class="card"><div class="card__title">E-commerce checkout</div><p>A 30-second outage is a measurable revenue dent. Catalog and search often use rolling or canary; checkout uses blue-green because the rollback button matters more than the bake time.</p></div>
+          <div class="card"><div class="card__title">Opinionated platforms</div><p>Lambda aliases, ECS native blue/green, Cloud Run revisions, Azure slots, Heroku <code>preboot</code>. Nobody there calls it "blue-green" — they call it "the deploy."</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Gate the cutover on real health, not on HTTP 200</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Make the readiness check exercise the DB pool, the cache, the message broker, and at least one downstream call. Run a
+              <span class="term">synthetic transaction</span>
+              <span class="term__gloss">a scripted real action — e.g. log in, fetch profile, write an event — run against the idle color to prove it actually works</span>
+              against the idle color via a separate test listener before the switch.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A <code>/healthz</code> that returns 200 unconditionally lies. The classic failure is green coming up with an empty DB connection pool or a stale secret — the cutover happens, the pool fills with dead connections, and the whole fleet 5xxs in unison.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A health endpoint that only confirms the process is running.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Warm caches and JITs before flipping</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Replay a few minutes of mirrored traffic, hit the top-N hot endpoints, or run a startup probe that primes the in-process cache and triggers JIT compilation. Only then mark the targets healthy.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A cold green fleet hitting full production traffic spikes p99, blows out downstream connection pools, and looks like a regression that "only happens after deploy." It's not the new code — it's the cold start.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Treating "container started" as "ready to serve."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Size the drain window to your actual p99, not the default</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Measure the slowest legitimate request — file uploads, report exports, long polls. Set the ALB deregistration delay, Kubernetes <code>terminationGracePeriodSeconds</code>, and your app's SIGTERM handler all to the same value, roughly 20% above that p99.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The 300-second AWS default fits a typical API but not a 10-minute CSV export. Mismatched timeouts give you 502s at the edge while the user watches a progress bar.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving the default and hoping. Worse: setting <code>terminationGracePeriodSeconds</code> longer than the drain window — the pod dies before the load balancer stops sending to it.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Practice expand-contract for every schema change</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Split each schema migration into three deploys: expand (add the new column or table, dual-write, both code versions tolerate it), migrate (backfill and switch reads), contract (drop the old column in a later release).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Blue and green share one database. A <code>DROP COLUMN</code> or a <code>NOT NULL</code> rename run at cutover time crashes whichever color reads the old shape — usually blue, mid-drain, in front of real users.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Bundling the migration into the same deploy as the code that needs it.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["1 - Expand: add column/table, dual-write, both versions tolerate it"] --> B["2 - Migrate: backfill, switch reads"]
+    B --> C["3 - Contract: drop the old column in a later release"]
+          </pre>
+          <figcaption class="diagram__caption">Three separate deploys, each independently blue-green-safe — never bundle the migration with the code that needs it.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Treat feature flags as the complement, not the substitute</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Ship risky business logic dark behind a flag and use blue-green for the binary swap. Flip the flag separately, after the cutover settles.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Blue-green gives you instant infrastructure rollback; flags give you instant behavior rollback without redeploying. You want both.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using blue-green as the only rollback knob for behavior changes — you end up reverting an entire release to undo one bad copy change.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Push session and stateful work out of the app tier</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Sessions in Redis or a JWT, idempotency keys in DynamoDB or Postgres, WebSocket fan-out via a broker. Background workers should use
+              <span class="term">leader election</span>
+              <span class="term__gloss">a lock (a Redis lock or a Kubernetes Lease) that makes sure only one running instance does a piece of work</span>
+              so only one color runs the cron.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Sticky-cookie sessions collapse the moment blue's tasks deregister; in-process WebSocket state evaporates; both colors will happily run the nightly billing job twice.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Sticky sessions as the primary state mechanism. They're a useful fallback for routing affinity, not a session store.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Keep the old color warm only as long as rollback is cheap</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default bake window: 1 hour for high-traffic APIs, up to 24 hours for low-traffic critical paths. Automate teardown — don't leave it to a human ticket.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>After about an hour, "rollback to blue" stops being safe anyway — new writes have landed in the shared database and old code may not understand them. You're paying double infra for an option you can't actually use.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving the idle color running indefinitely "just in case."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Build observability that survives the flip</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Tag every metric, log, and trace span with <code>deploy_color</code> and <code>version</code>. Build one dashboard with both colors side by side: request rate, 5xx rate, p50/p95/p99, downstream error rate. Alert on post-cutover green versus pre-cutover blue baseline, not a fixed threshold.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without the split view, a regression on green looks like a global degradation and on-call rolls back things it shouldn't. With it, "green's p99 is 2x blue's at the same RPS" is a one-glance diagnosis.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Alerts that fire on every cutover just because traffic momentarily routes to two backends. They get muted — and then real incidents get muted with them.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Automate the rollback button, then test it on a Wednesday</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>A single command re-flips the listener and rewinds the bake timer. Run a quarterly game-day: deploy a known-broken build, verify rollback completes in under 60 seconds.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Untested rollback paths bit-rot. An IAM permission expires, a script references a renamed target group, the new engineer doesn't know the command — you find out during a real incident.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We can roll back if needed" as a verbal claim with no runbook.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Mind the singletons: crons, consumers, migrations</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pin background workers to one color. For Kafka consumers, use one <code>group.id</code> and let the broker partition — don't run two groups in parallel.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>During the bake window both colors are alive. A naive setup double-processes events, double-sends emails, or races on a shared lock — the customer sees two charge confirmations.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming the load balancer is the only traffic source. Crons and message consumers don't go through it.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Schema migration inside the cutover</p>
+            <p>Running a migration as a pre-cutover hook. It breaks blue mid-drain because blue's binary doesn't know the new shape. Use expand-contract and run migrations between deploys, not during them.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">"Deploy once and forget" blue-green</p>
+            <p>The bake window runs forever because nobody wired up teardown. The bill doubles silently and the idle fleet drifts out of date until rollback is no longer possible. Automate the scale-to-zero.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Blue-green on a stateful service</p>
+            <p>Running it in front of a database, a stateful stream-processing app, or a per-node in-memory game server. The "second environment" can't share state cheaply, so the cutover loses sessions or duplicates work. Use rolling with surge for stateful tiers.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Blue-green as a substitute for canary on a high-risk change</p>
+            <p>Atomic 100% cutover means a bad release hits every user at once. For ML model rollouts, pricing changes, or auth-flow rewrites, run a 1%/5%/25% canary first. Blue-green is for the swap, not for the validation.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">DNS-based switch with a 300-second TTL</p>
+            <p>Route 53 weighted records are fine for region failover, terrible for app deploys — client resolvers cache aggressively and the cutover smears over minutes. Use an L7 load balancer with a real atomic listener change.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Health check that calls itself</p>
+            <p><code>/healthz</code> returns 200 from a handler that does nothing. The deploy passes every gate and then breaks on the first real request. The probe must touch the dependencies the request path touches.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Sticky sessions doing the heavy lifting</p>
+            <p>Affinity cookies are a routing optimization, not a state store. The instant blue's targets deregister, the affinity is meaningless and the session is gone.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Payments API — ECS Fargate, expand-contract</div>
+            <p>A fintech runs card-auth as a 12-task ECS service with native blue/green, a 1-hour bake, and a rollback alarm on 5xx &gt; 0.5% sustained 60s. <em>Lesson:</em> the hardest bug wasn't the cutover — it was a background idempotency-key cleaner running on both colors during bake, deleting keys the other color needed. Fixed with a leader-election lock keyed on the active task set.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">B2B SaaS — Argo Rollouts with previewService</div>
+            <p>A Kubernetes shop gates cutover on SLO metrics and auto-rolls-back on burn-rate alerts within the bake window. <em>Lesson:</em> the synthetic tests had to authenticate as a real tenant, so the test tenant's data shape ended up constraining what the team could ship.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Public API — AWS Lambda weighted aliases</div>
+            <p>A mobile backend shifts traffic 10% → 50% → 100% over 10 minutes via <code>RoutingConfig</code> — technically canary, but the old version stays attached for instant rollback. <em>Lesson:</em> cold-start latency spiked p99 even at 10% traffic; the fix was
+              <span class="term" data-gloss="pre-warmed Lambda execution environments kept ready so the first requests don't pay a cold-start penalty">provisioned concurrency</span>
+              before shifting any traffic.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Internal tool — Azure App Service slot swap</div>
+            <p>Slot swap is one click; rollback is the same click in reverse. <em>Lesson:</em> settings marked "deployment slot setting" stay with the slot during swap — learned the hard way when a connection-string swap pointed production at staging for about 3 minutes.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li>Is <code>deploy_color</code> and <code>version</code> on every metric, log, and trace? Can you draw a dashboard that overlays blue vs. green for RPS, p99, and 5xx?</li>
+              <li>Does your readiness probe touch the DB, cache, and at least one downstream — not just return 200?</li>
+              <li>Is the drain timeout at least 1.2x your measured p99? Is the app's SIGTERM handler aware of it?</li>
+              <li>Is every schema change in the last 90 days expand-contract? Could the previous release run cleanly against today's schema?</li>
+              <li>Is there a single rollback command, owned by on-call, tested last quarter on a deliberately broken deploy?</li>
+              <li>Do background workers, crons, and message consumers have a defined owner color during bake? Is the leader-election mechanism real?</li>
+              <li>Is the idle color torn down automatically after the bake window, or does it linger — and what does that linger cost per month?</li>
+              <li>Does your alert config suppress flap during the cutover window without suppressing real regressions on green?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How this topic typically evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Rolling by default.</span> Teams start with rolling deploys on a single fleet — the out-of-the-box option in ECS, Kubernetes, and most PaaS.</li>
+          <li><span class="steps__title">First outage, hand-rolled fix.</span> Blue-green arrives after a deploy causes an outage a fast rollback would have prevented — often a year or two in. The first version is hand-rolled: a second target group, a script that flips the listener.</li>
+          <li><span class="steps__title">The schema wake-up call.</span> The database becomes too entangled for naive deploys. Teams discover they were only getting away with breaking migrations because rolling deploys were slow enough that old code drained out before the new schema mattered. Every PR with a migration now needs an expand-contract review — a culture change that takes months to land.</li>
+          <li><span class="steps__title">Method per service tier.</span> Mature teams layer canary on top of blue-green for the highest-risk changes (auth, billing, ML inference), keep blue-green for routine releases, and use rolling for stateless edge tiers where the cost saving matters. The choice moves from someone's head into the service catalog.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://martinfowler.com/bliki/BlueGreenDeployment.html" rel="noopener">Martin Fowler — BlueGreenDeployment (2010)</a> — the canonical short essay that named the pattern.</li>
+          <li>Jez Humble &amp; David Farley, <em>Continuous Delivery</em> (Addison-Wesley, 2010) — chapter 10 covers the original case for the pattern alongside expand-contract migrations.</li>
+          <li><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-bluegreen.html" rel="noopener">AWS — Amazon ECS native blue/green deployments (GA July 2025)</a> — current reference for the listener-flip mechanics and bake timer.</li>
+          <li><a href="https://argo-rollouts.readthedocs.io/en/stable/features/bluegreen/" rel="noopener">Argo Rollouts — Blue-Green Strategy</a> — the Kubernetes reference implementation, including <code>previewService</code> and analysis templates.</li>
+          <li><a href="https://github.blog/2016-08-01-gh-ost-github-s-online-schema-migration-tool-for-mysql/" rel="noopener">GitHub Engineering — gh-ost, GitHub's online schema migration tool</a> — why online schema change is the non-obvious half of any blue-green strategy.</li>
+          <li><a href="https://charity.wtf/2017/07/06/test-in-production-or-you-will/" rel="noopener">Charity Majors — Test in production</a> — the case for observability as a cutover gate; reframes "is it healthy?" as "can you tell?"</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

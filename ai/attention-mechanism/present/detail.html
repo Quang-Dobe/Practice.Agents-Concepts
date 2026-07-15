@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attention Mechanism · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Attention Mechanism</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Attention Mechanism</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Attention Mechanism</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Attention is a differentiable, content-based addressing operation. Given a query matrix <code>Q</code> (shape <code>n_q × d_k</code>), a key matrix <code>K</code> (<code>n_k × d_k</code>), and a value matrix <code>V</code> (<code>n_k × d_v</code>), <strong>scaled dot-product attention</strong> computes:</p>
+        <pre><code>Attention(Q, K, V) = softmax( Q K^T / sqrt(d_k) ) V</code></pre>
+        <p>The output has shape <code>n_q × d_v</code>. Each output row is a weighted blend of the rows of <code>V</code>, where the weights come from how well the matching query row fits every key row. Walked through by shape:</p>
+        <ul>
+          <li><strong><code>Q Kᵀ</code></strong> has shape <code>n_q × n_k</code> — one similarity score per query/key pair.</li>
+          <li><strong>Softmax</strong> runs row-wise, turning each row of scores into a probability distribution over the <code>n_k</code> keys. Each row sums to 1.</li>
+          <li><strong>Multiplying</strong> that weight matrix by <code>V</code> produces the final <code>n_q × d_v</code> output.</li>
+        </ul>
+        <p>The <code>1 / √d_k</code> factor is not decoration. If the entries of <code>Q</code> and <code>K</code> are independent with mean 0 and variance 1, the dot product <code>q · k</code> has variance <code>d_k</code>. Without scaling, as <code>d_k</code> grows the values fed into softmax grow too, softmax collapses toward a near one-hot output, and the gradient on every entry but the largest goes to zero — training stalls. Dividing by <code>√d_k</code> keeps the logit variance near 1 no matter the head size, so gradients stay healthy.</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Linear projections W_Q, W_K, W_V</dt><dd>Learned matrices that map input embeddings into query, key, and value subspaces — the only learnable parameters in the attention operation itself.</dd></div>
+          <div><dt>Score matrix Q Kᵀ</dt><dd>The raw compatibility table between queries and keys.</dd></div>
+          <div><dt>Softmax normalizer</dt><dd>Converts each row of scores into a probability distribution.</dd></div>
+          <div><dt>Value aggregator</dt><dd>The second matrix multiply, mixing value vectors by the attention weights.</dd></div>
+          <div><dt>Mask (optional)</dt><dd>An additive tensor of 0s and −∞s applied before softmax to forbid certain attendances — causal, padding, or document boundaries.</dd></div>
+          <div><dt>Output projection W_O</dt><dd>For multi-head attention, mixes the concatenated head outputs back into the model dimension.</dd></div>
+        </dl>
+        <p>The original spec is Vaswani et al., <em>Attention Is All You Need</em> (NeurIPS 2017). Attention leads the <strong>content-based sequence mixing</strong> family. Its siblings are RNNs/LSTMs (state passed step by step), CNNs (fixed local filters), and state-space models like S4/Mamba (a learned but largely input-independent dynamical system). Attention is the only one that recomputes its mixing weights from the data at every layer.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Attention is a layer <strong>inside a transformer block</strong>, run on accelerators (GPU/TPU) because its two matrix multiplies map cleanly onto tensor cores. A standard pre-norm block wraps it like this:</p>
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    X["x"] --> LN1["LayerNorm"]
+    LN1 --> At["Attention"]
+    At --> R1["+ residual (x)"]
+    R1 --> LN2["LayerNorm"]
+    LN2 --> FF["Feed-forward network"]
+    FF --> R2["+ residual"]
+    R2 --> Y["Output"]
+          </pre>
+          <figcaption class="diagram__caption">A standard pre-norm transformer block. Attention is one layer among several — not the whole architecture.</figcaption>
+        </figure>
+
+        <p>Three architectural placements matter:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Encoder self-attention</div><p>Bidirectional, no mask — every token attends to every token. Used by BERT and ViT.</p></div>
+          <div class="card"><div class="card__title">Decoder self-attention</div><p>Causal mask — position <code>i</code> cannot attend to positions <code>&gt; i</code>. Used by GPT and Llama.</p></div>
+          <div class="card"><div class="card__title">Cross-attention</div><p><code>Q</code> comes from the decoder, <code>K</code> and <code>V</code> from the encoder output. Used by T5, the original transformer, and vision-language models.</p></div>
+        </div>
+
+        <p>You'll meet attention in LLMs (GPT, Claude, Llama, DeepSeek-V3, Mistral), encoder models (BERT, RoBERTa, ModernBERT), vision (ViT, DINOv2, SAM), speech (Whisper, Conformer), and multimodal systems (CLIP, Gemini and Claude's vision pathways).</p>
+
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Fused kernels</div><p>FlashAttention-2/3, xFormers, and PyTorch's <code>scaled_dot_product_attention</code> (auto-dispatched since 2.0+).</p></div>
+          <div class="card"><div class="card__title">KV-cache serving</div><p>vLLM (PagedAttention), TensorRT-LLM, SGLang.</p></div>
+          <div class="card"><div class="card__title">Long-context variants</div><p>Longformer (sliding window), BigBird (sparse), Linformer (low-rank), Performer (random features), Mamba/Mamba-2 (state-space hybrid).</p></div>
+          <div class="card"><div class="card__title">Position injection</div><p>Sinusoidal (original), learned absolute (GPT-2/BERT), RoPE (Llama, Qwen), ALiBi (Bloom, MPT).</p></div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Token-level interactions carry the task signal — translation, summarization, QA, code, music.</li>
+              <li>You need parallel training across the sequence — attention runs every position through two matrix multiplies; an RNN cannot.</li>
+              <li>The relevant context is content-defined, not position-defined — anaphora, function-call resolution, retrieval.</li>
+              <li>You can afford <code>O(n² · d)</code> time and <code>O(n²)</code> activation memory at your sequence length, or you're willing to use FlashAttention or a sliding-window variant.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Sequences run past 100k tokens and the quadratic cost is intolerable — consider sliding-window attention, SSMs (Mamba-2), or hybrid stacks.</li>
+              <li>The task is strictly local (small image patches, fixed-size signals) — a CNN is cheaper and better biased for the job.</li>
+              <li>Training data is tiny — attention layers are over-parameterized and overfit without regularization or pretraining.</li>
+              <li>The latency budget is sub-millisecond on CPU for short inputs — a small GRU can dominate on wall-clock.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Bahdanau et al. added attention to RNN translation models in 2014 to fix a concrete failure: BLEU scores collapsed on sentences over ~30 words because everything had to compress into one fixed-size context vector. The 2017 transformer dropped the RNN entirely and showed attention alone was enough. By 2018 (BERT, GPT-1) it had taken over NLP; by 2020 (ViT) it took vision; by 2022 (Whisper, AlphaFold) it had spread across modalities.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>For a single self-attention layer with input <code>X</code> (shape <code>n × d_model</code>):</p>
+        <ol class="steps">
+          <li><span class="steps__title">Project.</span> Compute <code>Q = X W_Q</code>, <code>K = X W_K</code>, <code>V = X W_V</code>.</li>
+          <li><span class="steps__title">Reshape.</span> Split each into <code>h</code> heads of dimension <code>d_k = d_model / h</code>.</li>
+          <li><span class="steps__title">Score.</span> Compute <code>S = Q Kᵀ / √d_k</code>, shape <code>(batch, h, n, n)</code>.</li>
+          <li><span class="steps__title">Mask (decoder only).</span> Add a strictly upper-triangular <code>−∞</code> matrix so position <code>i</code> can't see <code>j &gt; i</code>.</li>
+          <li><span class="steps__title">Normalize.</span> <code>A = softmax(S)</code> row-wise.</li>
+          <li><span class="steps__title">Aggregate.</span> <code>O = A V</code>.</li>
+          <li><span class="steps__title">Merge heads.</span> Concatenate along the head axis back to <code>(batch, n, d_model)</code>.</li>
+          <li><span class="steps__title">Output projection.</span> <code>Y = O W_O</code>.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    X["Input X (n tokens × d_model)"] --> Pr["Project: Q = XW_Q, K = XW_K, V = XW_V"]
+    Pr --> Rs["Reshape into h heads of size d_k"]
+    Rs --> Sc["Score: S = QKᵀ / √d_k"]
+    Sc --> Dc{"Decoder self-attention?"}
+    Dc -- yes --> Mk["Add causal mask: −∞ where j > i"]
+    Dc -- no --> Sm["softmax(S), row-wise"]
+    Mk --> Sm
+    Sm --> Ag["Aggregate: O = A · V"]
+    Ag --> Mg["Merge the h heads back together"]
+    Mg --> Y["Output projection: Y = O · W_O"]
+          </pre>
+          <figcaption class="diagram__caption">One pass through a self-attention layer, from raw input to the projected output.</figcaption>
+        </figure>
+
+        <p>Minimal pseudocode for the core op, single head, no batch dimension:</p>
+        <pre><code>def attention(Q, K, V, mask=None):
+    d_k = Q.size(-1)
+    scores = Q @ K.transpose(-2, -1) / d_k ** 0.5
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, float("-inf"))
+    weights = softmax(scores, dim=-1)
+    return weights @ V</code></pre>
+
+        <p>Multi-head attention runs <code>h</code> of these in parallel on slices of the projected tensors. The point of multiple heads isn't extra capacity — it's <strong>specialization</strong>: one head might track syntactic dependency, another coreference, another positional offset. GPT-3 uses <code>h=96</code>, <code>d_k=128</code>; Llama-3-8B uses 32 query heads at <code>d_k=128</code> with only 8 KV heads (<span class="term">GQA</span><span class="term__gloss">grouped-query attention — several query heads share one key/value head, shrinking the cache</span>).</p>
+
+        <p>Attention is permutation-equivariant — shuffle the input rows and the output rows shuffle identically, so word order is lost by default. <span class="term" data-gloss="rotates Q and K in 2D subspaces by an angle proportional to token position">RoPE</span> (Rotary Position Embedding) puts it back by rotating <code>Q</code> and <code>K</code> so the dot product <code>q_i · k_j</code> becomes a function of <code>i − j</code> — position 2026's default over the original sinusoidal or learned-absolute schemes. ALiBi instead adds a linear penalty <code>−m · |i − j|</code> straight into the scores.</p>
+
+        <p>Causal masking is what makes a decoder autoregressive: token <code>i+1</code> can never peek at itself during training, and the same forward pass yields <code>n</code> parallel next-token predictions. At inference this same masking justifies the <span class="term">KV-cache</span><span class="term__gloss">stored keys and values for past tokens, reused instead of recomputed each step</span>: once a token's <code>K</code> and <code>V</code> are computed they never change, so only the new token's <code>Q</code> runs against the growing cache. Cache size scales as <code>2 · n_layers · n_kv_heads · d_k · seq_len · batch · dtype_bytes</code> and is usually the dominant memory cost during generation — the reason GQA and MQA (multi-query attention) exist. Llama-2-70B's 8 KV groups for 64 query heads shrink the cache 8×.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Full self-attention</td><td>Every token sees every other token; maximum expressiveness</td><td><code>O(n²)</code> time and memory</td></tr>
+              <tr><td>Multi-head split</td><td>Specialized relations per head, better optimization</td><td>Each head sees only <code>d_model / h</code> dimensions</td></tr>
+              <tr><td>Causal mask</td><td>Enables autoregressive training in one pass</td><td>Half the score matrix is wasted compute</td></tr>
+              <tr><td>GQA / MQA</td><td>KV-cache shrinks, decode throughput rises</td><td>Small quality drop vs. full multi-head attention</td></tr>
+              <tr><td>Sliding-window attention</td><td>Linear cost in <code>n</code></td><td>Loses long-range dependencies unless stacked deep</td></tr>
+              <tr><td>RoPE positions</td><td>Relative-position semantics, decent length extrapolation</td><td>Couples position to head-dimension geometry</td></tr>
+              <tr><td>FlashAttention kernel</td><td>2–4× faster, much lower HBM traffic, exact result</td><td>Implementation locked to specific GPU architectures</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Softmax saturation when scaling is wrong</p>
+            <p>Forgetting <code>/ √d_k</code>, or applying it in the wrong place, collapses gradients on day one of training.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Attention sink on token 0</p>
+            <p>In long-context models, the first (BOS) token absorbs a disproportionate share of attention mass — this breaks naive cache-eviction strategies.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">OOM on long context</p>
+            <p><code>n²</code> activation memory blows past accelerator memory around 8k–32k tokens for naive implementations. FlashAttention is the fix.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">KV-cache memory wall during serving</p>
+            <p>Long conversations eat tens of GB of cache per request. PagedAttention (vLLM) addresses this.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Position extrapolation failure</p>
+            <p>A model trained at 4k tokens with sinusoidal or learned absolute positions degrades sharply past that length. RoPE with NTK-aware scaling or YaRN extends usable length.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Numerical overflow in fp16</p>
+            <p>Large logits before scaling can overflow fp16. Stable implementations subtract the row max inside softmax first.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Causal-mask leak in custom kernels</p>
+            <p>An off-by-one in the mask leaks one future token — invisible in loss curves, catastrophic for autoregressive sampling.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Attention solves the <strong>information bottleneck</strong> in sequence modeling. RNNs had to squeeze a variable-length past into a fixed-size vector and update it one step at a time — lossy, and unfriendly to parallel hardware. Attention removes the bottleneck by letting every output position pull directly from any input position, and removes the serial dependency by computing all positions in two matrix multiplies that map cleanly onto GPU tensor cores. It solved a modeling problem (long-range dependency) and a systems problem (parallel training) at the same time, which is why it took over so fast.</p>
+
+        <p>Below, 5 tokens under full attention need 25 pairwise scores — every pair, at every layer. A recurrent model instead passes one state through 5 steps in sequence, with no direct link between distant tokens:</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 235" role="img" aria-labelledby="qkTitle qkDesc" width="560" style="max-width:100%">
+            <title id="qkTitle">Quadratic attention cost versus linear recurrence</title>
+            <desc id="qkDesc">A five by five grid represents all twenty-five pairwise attention scores among five tokens, growing with the square of sequence length. A chain of five connected circles represents a recurrent model's linear one-token-at-a-time state, which never links distant tokens directly.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="24" fill="var(--text-muted)">Full attention — n² pairwise scores</text>
+              <g>
+                <rect x="20"  y="40" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="51"  y="40" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="82"  y="40" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="113" y="40" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="144" y="40" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="20"  y="71" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="51"  y="71" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="82"  y="71" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="113" y="71" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="144" y="71" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="20"  y="102" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="51"  y="102" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="82"  y="102" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="113" y="102" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="144" y="102" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="20"  y="133" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="51"  y="133" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="82"  y="133" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="113" y="133" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="144" y="133" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="20"  y="164" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="51"  y="164" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="82"  y="164" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="113" y="164" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="144" y="164" width="28" height="28" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              </g>
+              <text x="20" y="216" fill="var(--text)">5 tokens → 25 scores (n²), every pair, every layer</text>
+
+              <text x="300" y="24" fill="var(--text-muted)">Recurrent state — O(n) sequential</text>
+              <line x1="316" y1="115" x2="356" y2="115" stroke="var(--border)"/>
+              <line x1="361" y1="115" x2="401" y2="115" stroke="var(--border)"/>
+              <line x1="406" y1="115" x2="446" y2="115" stroke="var(--border)"/>
+              <line x1="451" y1="115" x2="491" y2="115" stroke="var(--border)"/>
+              <circle cx="300" cy="115" r="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <circle cx="345" cy="115" r="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <circle cx="390" cy="115" r="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <circle cx="435" cy="115" r="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <circle cx="480" cy="115" r="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="300" y="216" fill="var(--text)">5 states, one after another — no shortcut between them</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The trade-off attention makes on purpose: pay quadratic cost to get every token a direct line to every other token.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The non-obvious design choice is <strong>content-based weighting via dot products</strong>, not learned per-position weights. A per-position weight matrix would need <code>O(n²)</code> parameters, wouldn't generalize across sequence lengths, and wouldn't be permutation-equivariant. Dot products between projected queries and keys give a learned similarity function with <strong>zero per-position parameters</strong> — the same <code>W_Q, W_K</code> work at any length, on any sequence. Softmax is the smallest differentiable stand-in for "pick the best key" that still lets gradients reach every position. The <code>√d_k</code> scaling is the smallest correction that keeps softmax useful as <code>d_k</code> grows.</p>
+        <p>The obvious alternative — Bahdanau's additive attention (concatenate <code>q</code> and <code>k</code>, push through a small MLP, output one scalar) — is roughly as good at small <code>d_k</code> but can't be expressed as a single matmul. Dot-product attention won because two big matmuls are the most GPU-friendly primitive there is.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, attention is still the load-bearing primitive in every frontier LLM, every leading vision encoder, and most multimodal systems. The movement isn't away from attention — pure state-space models underperform on associative recall and few-shot tasks — but toward <strong>hybrids</strong> (Jamba, Zamba, Granite-4) that interleave attention layers with SSM or sliding-window layers, capping quadratic cost while keeping attention's recall behavior. Understanding attention's exact mechanics is the prerequisite for understanding what's shipping now: GQA, Multi-head Latent Attention (DeepSeek-V3), PagedAttention, FlashAttention-3, and the whole long-context optimization literature.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

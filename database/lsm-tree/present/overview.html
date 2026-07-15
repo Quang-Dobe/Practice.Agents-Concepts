@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LSM Tree · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">LSM Tree</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">LSM Tree</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">LSM Tree</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Databases that take a firehose of writes — Cassandra, RocksDB, LevelDB, ScyllaDB — sit on top of an LSM tree. Its core trick: don't find a record on disk and overwrite it. Buffer changes in memory, then flush them to disk in big sequential batches.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Reads get a little harder — you may have to check several places for the latest value — and a background job called <em>compaction</em> constantly merges those batches to keep things tidy. You reach for this when you have a firehose of writes and disks that hate scattered, random I/O.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a busy chef during a dinner rush. Orders come in faster than anyone can file them neatly. So the chef scribbles each order on a sticky note and slaps it on a board — instant, no searching. The board is
+          <span class="term">memtable</span>
+          <span class="term__gloss">the in-memory, sorted buffer where new writes land first</span>.</p>
+
+        <p>When the board fills up, the chef doesn't throw the notes away. They grab the whole stack, sort it, staple it into a labeled binder, and start a fresh board. Each binder is an
+          <span class="term">SSTable</span>
+          <span class="term__gloss">Sorted String Table — an immutable file on disk, written once and never edited</span>
+          — a file on disk, written once, never edited again.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[New order] --> B["Sticky note on the board (memtable)"]
+    B -- board fills up --> C["Staple into a binder (flush to SSTable)"]
+    C --> D[Shelf of binders, newest on top]
+    D -- looking up an order --> E[Check newest binder first, older ones next]
+    E -- overnight helper --> F["Compaction: merge binders, drop cancelled orders"]
+    F --> D
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: scribble, staple, stack, check newest-first, and let a helper tidy the shelf overnight.</figcaption>
+        </figure>
+
+        <p>Over a night you build up many binders. To find "table 7's current order" you check the newest binder first, then older ones, stopping at the first match — the latest note always wins. A delete is just a sticky note that says "table 7, cancelled" — a
+          <span class="term">tombstone</span>
+          <span class="term__gloss">a marker recording that a key was deleted</span>.
+          Periodically, a helper merges several binders into one cleaner binder, dropping cancelled and replaced orders — that merging is
+          <span class="term">compaction</span>
+          <span class="term__gloss">the background job that merges files, drops stale data, and keeps the shelf small</span>.</p>
+
+        <p>That's the whole shape: fast append-only writes up front, sorted immutable files on disk, newest-wins lookups, and continuous background cleanup.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a B-tree / B+-tree.</strong> Those update records in place and optimize for reads; an LSM tree optimizes for writes.</li>
+              <li><strong>Not a write-ahead log.</strong> A WAL is the crash-recovery journal an LSM tree uses alongside memory; the LSM tree is the whole indexed structure, not just the journal.</li>
+              <li><strong>Not a cache.</strong> The data here is the durable source of truth, not a throwaway speed layer.</li>
+              <li><strong>Not a query language or a database itself.</strong> It's the storage engine underneath one.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>The workload is write-heavy: time-series, event logs, metrics, IoT ingestion.</li>
+              <li>Sequential disk throughput matters more than single-record read latency.</li>
+              <li>You need high insert/update rates with good on-disk compression.</li>
+              <li>You're picking a database (Cassandra, ScyllaDB, RocksDB-backed stores) for ingestion-first use cases.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Read latency is critical and a B-tree's single-seek read would win.</li>
+              <li>The workload does heavy in-place updates — compaction burns CPU and I/O for little gain.</li>
+              <li>The dataset is small enough to fit a simpler indexed structure.</li>
+              <li>The system can't tolerate the occasional compaction-induced stall.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Memtable</dt><dd>The in-memory, sorted buffer where new writes land first.</dd></div>
+          <div><dt>WAL (write-ahead log)</dt><dd>An append-only crash-recovery log written before a write is acknowledged.</dd></div>
+          <div><dt>SSTable</dt><dd>Sorted String Table — an immutable, sorted file on disk (a "binder").</dd></div>
+          <div><dt>Flush</dt><dd>Moving a full memtable out to disk as a new SSTable.</dd></div>
+          <div><dt>Compaction</dt><dd>Merging SSTables to drop stale or deleted data and reduce how many files a read must check.</dd></div>
+          <div><dt>Tombstone</dt><dd>A marker recording that a key was deleted.</dd></div>
+          <div><dt>Write amplification</dt><dd>Extra bytes physically written, via compaction, per logical write.</dd></div>
+          <div><dt>Read amplification</dt><dd>Extra files checked to answer one read.</dd></div>
+          <div><dt>Bloom filter</dt><dd>A probabilistic index that skips SSTables that definitely lack a key.</dd></div>
+        </dl>
+
+        <!-- WHAT'S NEXT -->
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

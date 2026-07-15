@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gRPC · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">gRPC</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">gRPC</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">gRPC</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a polyglot backend, gRPC is the wire between internal services — a Go ingest pipeline calling a C# pricing service, a Python model scorer fronting a Java order service. Any team that said "we'll just use JSON for now" and then watched p99 climb tends to reach for it next quarter. In Kubernetes-native infrastructure it's already there whether a team picked it or not: the <code>kubelet</code> talks CRI over gRPC, CSI/CNI plugins are gRPC servers, and OpenTelemetry collectors accept OTLP/gRPC.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Polyglot backend</div><p>Different languages, one shared contract, all generated from the same <code>.proto</code> files.</p></div>
+          <div class="card"><div class="card__title">Kubernetes-native infra</div><p>CRI, CSI, CNI, the Envoy control plane, OpenTelemetry collectors — all gRPC whether the team chose it or not.</p></div>
+          <div class="card"><div class="card__title">ML serving &amp; platform tools</div><p>TensorFlow Serving, NVIDIA Triton, Temporal, etcd, Dapr — application teams meet gRPC as a client before they run a server of their own.</p></div>
+          <div class="card"><div class="card__title">Product code</div><p>gRPC internally, plus a thin REST/JSON facade (grpc-gateway, JSON transcoding, or a hand-written BFF) at the edge for browsers and partners.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Treat the <code>.proto</code> repo as a product, not a side artifact</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Store <code>.proto</code> files in a dedicated repo or top-level <code>/proto</code> tree, lint with <code>buf lint</code>, run <code>buf breaking</code> against the main branch in CI, and publish generated stubs as versioned packages (NuGet, npm, Go module).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Schemas are the contract between teams that ship on different cadences. If proto changes land via copy-paste, client and server quietly disagree on field numbers — the single worst class of gRPC bug, because it deserializes successfully but into the wrong field.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hand-copying <code>.proto</code> files into each service repo "for convenience."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Evolve schemas additively, and <code>reserved</code> everything you remove</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Add new fields with new numbers. When deleting one, replace it with <code>reserved 7; reserved "old_field_name";</code>. Never change a field number or type.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Protobuf identity is the field number. Reusing number 7 for a new meaning silently corrupts old clients' data — the bytes decode fine, just into the wrong slot. The bug surfaces as ghost values weeks later.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We're the only client, it's fine to renumber." There is always one stale pod, one cached binary, one old mobile app you forgot.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Set a deadline on every outbound call, and propagate the inbound one</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Configure a per-call deadline in client code. In a server handler, derive outbound deadlines from the inbound one so the time budget shrinks down the call graph.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without a deadline, a slow downstream pins server threads or goroutines forever. One stuck dependency takes the whole fleet to its connection limit in minutes.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Relying on TCP timeouts or "the load balancer will kill it." Neither one knows your RPC's semantics.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Pick a retry strategy explicitly, and only retry idempotent methods</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Configure retries in gRPC's service config with explicit retryable codes — typically <code>UNAVAILABLE</code>, sometimes <code>RESOURCE_EXHAUSTED</code> — using exponential backoff with jitter. Mark mutating methods non-retryable, or require an
+              <span class="term">idempotency key</span>
+              <span class="term__gloss">a client-generated ID that lets a retried write be recognized and deduplicated</span>
+              in the request.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Auto-retrying a <code>CreateOrder</code> on <code>UNAVAILABLE</code> after the server already committed — but before the trailer arrived — creates duplicate orders. A retry token bucket exists to stop retries from turning a brownout into a full outage.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A blanket 5-attempt retry policy on every method. That's how brownouts become full outages.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Use client-side load balancing with a real resolver, not a plain <code>ClusterIP</code></h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In Kubernetes, expose the gRPC server as a
+              <span class="term">headless service</span>
+              <span class="term__gloss">a Kubernetes Service with no ClusterIP, so DNS returns every pod's address for the client to load-balance across</span>,
+              use a <code>dns://</code> resolver, and enable round-robin on the channel. Or front the service with an L7-aware proxy (Envoy, Linkerd, Istio).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A normal <code>ClusterIP</code> load-balances at L4. gRPC opens one HTTP/2 connection and multiplexes thousands of streams over it — so 100% of one client's traffic lands on one pod. Adding replicas does nothing. This is the single most common gRPC-on-Kubernetes surprise.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming "Kubernetes load-balances for me." It does — just at the wrong layer for HTTP/2.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Use canonical status codes, and rich error detail when you need it</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Map domain errors to the 16 non-OK codes: <code>INVALID_ARGUMENT</code> for validation, <code>FAILED_PRECONDITION</code> for state-machine errors, <code>ABORTED</code> for concurrency conflicts, <code>UNAVAILABLE</code> only for "try again." Attach structured detail (<code>BadRequest</code>, <code>RetryInfo</code>, <code>ErrorInfo</code>) when a client needs more than a code.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Retries, breakers, and dashboards all key off the code. <code>INTERNAL</code> for everything destroys observability and makes safe retries impossible.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Throwing raw exceptions and letting the framework map them all to <code>UNKNOWN</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Wrap every call in interceptors for auth, tracing, and metrics</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Install one chain: an auth interceptor (validate the token or mTLS identity), an OpenTelemetry interceptor (propagate <code>traceparent</code>, record status), and a metrics interceptor (rate, errors, duration per method).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Per-method observability is the difference between "one RPC is slow" and "we have no idea." Interceptors are the only place to add it once and cover unary plus all three streaming shapes consistently.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Logging inside each handler. You'll forget half of them and double-log the rest.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Enforce TLS, prefer mTLS between services</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Terminate TLS at the server or its sidecar, using ALPN's <code>h2</code>. For service-to-service traffic, use mTLS — a mesh, or SPIFFE/SPIRE-issued short-lived identities. Disable cleartext <code>h2c</code> outside localhost.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>gRPC metadata routinely carries bearer tokens and tenant IDs. Cleartext between pods is a compliance failure and a credential-leak vector. mTLS makes "who called me" a property of the connection, not a header you have to trust.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A hand-rolled "shared secret in metadata" scheme. That's reinventing auth, badly.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Disable server reflection in production</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Register the reflection service only behind an env flag or an internal-only port. Keep it on in dev so <code>grpcurl</code> / <code>grpcui</code> / Postman work with no <code>.proto</code> files on hand.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Reflection lets anyone with network reach enumerate every service, method, and message shape — your full API surface, no auth required. That's the recon step you don't want to make free.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Shipping the same chart from dev to prod with reflection always on.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Cap message size, and stream anything that could grow</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Keep the default 4 MiB inbound limit. If a payload could exceed roughly 1 MiB, switch the RPC to a server- or client-streaming shape that emits chunks. For genuinely huge blobs, hand out a presigned URL to object storage instead.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A single 200 MiB message blocks one stream's flow-control window for the duration, holds a contiguous buffer in memory on both ends, and makes deadlines nearly meaningless.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Raising the max message size to 100 MiB to "just make it work." That's papering over a design issue.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Handle streaming backpressure and half-close explicitly</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>On a server-stream, check write-readiness before each send. On a bidi stream, treat the client's half-close as a normal signal, not an error. Bound any in-memory queue between business logic and the stream writer.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A fast producer with a slow consumer and an unbounded queue is an out-of-memory crash waiting to happen. Forgetting half-close semantics leads to streams that hang until the deadline fires, every time.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Writing to a stream in a tight loop with no flow control. Looks fine in tests, melts under load.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Keep one channel per target, not one per call</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Construct one channel per target service, reuse it for the process lifetime, and let it manage subchannels. Configure a keepalive of roughly 30–60s so idle connections survive NAT and load-balancer timeouts.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Channel construction is expensive — TLS handshake, name resolution, HTTP/2 settings exchange. Creating one per call defeats every benefit of HTTP/2 and can quadruple p99 latency.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Opening a fresh channel inside a request handler.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph L4["L4 load balancer / plain ClusterIP — wrong for gRPC"]
+      A1["One HTTP/2 connection pinned"]
+      A2["100% of traffic -> one pod"]
+    end
+    subgraph L7["Headless DNS + client-side LB, or an L7 mesh — right for gRPC"]
+      B1["dns:// resolver, round robin"]
+      B2["Traffic spread across all pods"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">The most common gRPC-on-Kubernetes surprise: an L4 balancer pins one connection to one pod, so more replicas change nothing.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">gRPC as a public API</p>
+            <p>Exposing raw gRPC to third-party developers. Browsers can't call it natively, SDKs lag, and you lose the <code>curl</code>-able debuggability REST gives free. Use REST/OpenAPI or grpc-gateway/Connect at the edge instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Renumbering a field "because it's cleaner"</p>
+            <p>Moving <code>customer_id</code> from field 3 to field 4. Compiles fine, passes tests, silently writes customer IDs into the wrong slot for any client still on the old schema. Always additive; always <code>reserved</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Catch-all <code>INTERNAL</code> errors</p>
+            <p>Every server exception becomes <code>Status.Internal("something went wrong")</code>. Clients can't tell retryable from permanent; dashboards go flat. Map to specific codes; use rich details for context.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">L4 load balancer in front of HTTP/2</p>
+            <p>A cloud load balancer routing gRPC at L4. One TCP connection means one backend pod gets everything. Use headless DNS with client-side LB, or an L7 mesh.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Reflection enabled in production</p>
+            <p>Convenient for <code>grpcurl</code>, but it hands attackers your schema for free. Toggle via env flag; never default-on.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Deadlines set only at the edge</p>
+            <p>The API gateway has a 30s deadline; downstream services have none. The first hung dependency exhausts the call stack. Propagate the inbound deadline into every outbound call.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Streaming used as "long-lived RPC" with no keepalive</p>
+            <p>A bidi stream the load balancer silently drops after 60s idle, and neither side notices for hours. Configure HTTP/2 ping keepalive and treat stream errors as recoverable.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">One giant <code>.proto</code> file with every service</p>
+            <p>Works fine at 3 services, agony at 30. Split by bounded context; version with <code>package foo.v1</code>; add <code>foo.v2</code> rather than mutating <code>v1</code>.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Internal mesh, mid-size SaaS</div>
+            <p>50–200 services across Go, .NET, and Python. gRPC handles sync calls; Kafka handles events. Proto files live in a monorepo with <code>buf</code> for lint and breaking-change CI. <em>Lesson:</em> the CI breaking-change check is what makes "additive only" real instead of a guideline nobody enforces.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">ML inference platform</div>
+            <p>Triton or a custom TF Serving fork; clients send tensors, the server streams back batched results. Max message size is intentionally bumped to ~32 MiB. <em>Lesson:</em> isolate the inference service behind its own channel and retry policy — don't inherit settings tuned for 1 KiB CRUD calls.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Kubernetes-native control plane</div>
+            <p>Envoy xDS or an internal operator streams config over a long-lived bidi gRPC stream to data-plane sidecars. <em>Lesson:</em> streaming gRPC at infra scale is mostly about reconnect logic, not the happy path — pod churn kills streams constantly.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Mobile-first product with a BFF</div>
+            <p>Native apps speak gRPC to a backend-for-frontend, which fans out to internal gRPC services. Deadline budget is 2s at the BFF, down to 1.2s by the slowest downstream. <em>Lesson:</em> a strict per-hop deadline budget is cheap, effective tail-latency control.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Browser SPA via Connect-RPC / gRPC-Web</div>
+            <p>Frontend calls a Connect-RPC server that also speaks native gRPC internally — no Envoy hop needed. <em>Lesson:</em> Connect avoids the proxy tax if you're starting fresh, but its ecosystem is smaller than mainline gRPC's.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Metrics:</strong> per-method RPS, error rate by <code>grpc-status</code>, p50/p95/p99 latency, in-flight stream count, channel state — exported by an interceptor, not hand-rolled per handler.</li>
+              <li><strong>Tracing:</strong> does <code>traceparent</code> propagate via metadata across every hop, including streams?</li>
+              <li><strong>Deadlines:</strong> is there a default at the channel level, and does it propagate through handlers into outbound calls?</li>
+              <li><strong>Retries:</strong> which methods are retryable, is the policy in service config (not buried in client code), and are mutating RPCs excluded?</li>
+              <li><strong>Schema CI:</strong> does <code>buf breaking</code> run on every pull request and block merges?</li>
+              <li><strong>Load balancing:</strong> is the Kubernetes service headless, or fronted by an L7 mesh — verified under real load, not just by reading config?</li>
+              <li><strong>TLS:</strong> is <code>h2c</code> disabled outside localhost? Are certs rotated, and who issues identities for mTLS?</li>
+              <li><strong>Reflection:</strong> gated behind an env flag or an internal-only listener in production?</li>
+              <li><strong>Message size:</strong> what's the configured max, what's the p99 actual size, and is anything close to the limit a candidate for streaming?</li>
+              <li><strong>Onboarding:</strong> can a new engineer call a service with <code>grpcurl</code> in under 5 minutes, and do they know which interceptors run by default?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Tutorial stack.</span> One <code>.proto</code> file in the same repo as the first service, hand-copied into the client. No <code>buf</code>, no breaking-change CI, deadlines optional, the Kubernetes service is a plain <code>ClusterIP</code>. Fine with two services and four engineers.</li>
+          <li><span class="steps__title">First painful migration, around 10 services.</span> The proto file has fanned out into copies that no longer match, a renamed field has caused a quiet production bug, and someone notices that adding pods doesn't spread the load. The fix: a proto monorepo with <code>buf</code>, published generated packages, and either a mesh or headless services with client-side load balancing. This migration takes a quarter and is always underestimated.</li>
+          <li><span class="steps__title">Mature shape, a year or two later.</span> A proto registry, generated stubs as versioned packages, mesh-issued mTLS, deadlines and retries codified in service config, OpenTelemetry interceptors as a shared library, and a clear <code>v1</code>/<code>v2</code> versioning convention. The hard problem stops being "does gRPC work" and becomes "how do we deprecate <code>v1</code> without paging the on-call."</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://grpc.io/docs/guides/" rel="noopener">gRPC official docs — guides section</a> — the canonical source for retries, deadlines, load balancing, and OpenTelemetry metrics.</li>
+          <li><a href="https://github.com/grpc/proposal" rel="noopener">grpc/proposal — gRFCs on GitHub</a> — the design docs behind retries, health checking, and xDS.</li>
+          <li><a href="https://www.datadoghq.com/blog/grpc-at-datadog/" rel="noopener">Lessons learned from running a large gRPC mesh at Datadog</a> — production stories on connection management, load balancing, and observability at scale.</li>
+          <li><a href="https://buf.build/docs" rel="noopener">Buf docs — schema management and breaking-change detection</a> — the de facto modern toolchain for replacing ad-hoc <code>protoc</code> workflows.</li>
+          <li><a href="https://learn.microsoft.com/en-us/aspnet/core/grpc/" rel="noopener">Microsoft Learn — gRPC for .NET in production</a> — versioning, retries, performance, and JSON transcoding from the ASP.NET side.</li>
+          <li><a href="https://kmcd.dev/posts/breaking-grpc/" rel="noopener">"Breaking gRPC" by kmcd.dev</a> — a focused walkthrough of field-number compatibility and what actually breaks on the wire.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

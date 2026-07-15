@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rate Limiting — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Rate Limiting</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Rate Limiting</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>backend</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Rate Limiting</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">backend</span>
+            <span class="badge">traffic management</span>
+            <span class="badge">admission control</span>
+          </div>
+          <h1 class="hero__title">Rate Limiting</h1>
+          <p class="hero__tagline">The doorman of your API: it counts how often each caller knocks and turns them away once they knock too fast.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">429</div><div class="stat__label">"Too Many Requests" HTTP status</div></div>
+          <div class="stat"><div class="stat__num">1996</div><div class="stat__label">GCRA specified by the ATM Forum</div></div>
+          <div class="stat"><div class="stat__num">2012</div><div class="stat__label">RFC 6585 standardizes 429</div></div>
+          <div class="stat"><div class="stat__num">5,000/hr</div><div class="stat__label">GitHub's authenticated API ceiling</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED): the core loop -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[Request arrives] --> B["Extract key: user, IP, or API key"]
+    B --> C{Enough tokens in the bucket?}
+    C -- yes --> D["Allow it, spend one token"]
+    C -- no --> E["Reject it: 429 + Retry-After"]
+    D --> F[Bucket refills steadily over time]
+    E --> F
+    F --> C
+          </pre>
+          <figcaption class="diagram__caption">The whole pattern in one loop: check the bucket, allow or reject, and let it refill at a steady rate.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the nightclub-bouncer mental model, and what rate limiting is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: what it is, where it lives across the stack, when to use it, how a token-bucket check runs against Redis, and why it exists.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Ten best practices with the Do/Why/Avoid triad, anti-patterns, real case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail for the algorithms and trade-offs, or Practice for the tuning rules.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CAP Theorem · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CAP Theorem</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CAP Theorem</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CAP Theorem</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Every design review for a multi-region service eventually walks into the CAP question, even when nobody names it: <em>during a partition, do we refuse the request or risk diverging?</em> That one question shapes the database choice, the API contract, the on-call runbook, and the post-mortem template.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Store selection</div><p>Picking the database behind a payments ledger, or deciding whether a cart accepts writes from a region that's lost the primary.</p></div>
+          <div class="card"><div class="card__title">Vendor conversations</div><p>Arguing with a vendor about what "strongly consistent" actually means on their box.</p></div>
+          <div class="card"><div class="card__title">Incident response</div><p>An inter-AZ link flaps for 90 seconds and the dashboards light up.</p></div>
+          <div class="card"><div class="card__title">API design</div><p>Deciding, per endpoint, whether a stale read is acceptable or must be refused.</p></div>
+        </div>
+        <p>The trap is treating CAP as a one-time static decision ("we're a CP shop"). In real systems the trade-off is made per endpoint, per table, sometimes per request — and the pain comes from endpoints whose consistency contract was never written down.</p>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Frame every replicated endpoint with an explicit partition contract</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Decide, per endpoint, what happens during a partition — serve stale, queue and acknowledge, or refuse with a typed error. Write it in the API doc next to the request schema.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without this, behavior under partition is whatever the driver's defaults are, which surprises everyone at 3am. A typed <code>409 PartitionedWrite</code> is a feature; an HTTP 500 followed by a silent retry is an incident.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We'll deal with it when it happens." You will, and badly.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Make the consistency level visible at the API boundary</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Surface read consistency in the request — e.g. <code>?consistency=strong</code> on a critical balance read, eventual by default elsewhere. DynamoDB models this with <code>ConsistentRead</code> per request; MongoDB with <code>readConcern: "majority"</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Callers downstream make correctness assumptions. If the consistency choice is buried three config layers down, nobody knows whether the balance they just read is authoritative.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single global default that quietly forces every read through the slowest, costliest path — or the cheapest, stalest one.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Use leader-based CP for anything that resembles a ledger or a lock</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Reach for etcd, ZooKeeper, Spanner, CockroachDB, or a Raft-backed service for leader election, configuration, distributed locks, financial state, and inventory decrement.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>These workloads need a single source of truth at write time. "We sold the same seat twice" is not an acceptable eventual-convergence outcome. A majority round-trip is the price of correctness.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hand-rolling a "leader" on top of Redis pub/sub or a Postgres advisory lock and hoping the partition behavior works out. Redlock's correctness has well-documented debates — treat it accordingly.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Default to LOCAL_QUORUM for multi-region Dynamo-style stores</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In Cassandra, ScyllaDB, or DynamoDB Global Tables, default reads and writes to
+              <span class="term" data-gloss="a quorum satisfied using only replicas inside one region, not across regions">LOCAL_QUORUM</span>.
+              Reserve cross-region <code>EACH_QUORUM</code> for the few operations that truly need it.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Cross-region quorum buys little on a healthy network and turns one regional brownout into a global outage. Cassandra's <code>cqlsh</code> default is <code>ONE</code> — AP-leaning and usually the wrong choice for application code.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving driver defaults in place and discovering on incident day that "quorum" meant "any one replica."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Pick conflict resolution on purpose</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For AP write paths, decide between last-write-wins, vector clocks,
+              <span class="term">CRDTs</span>
+              <span class="term__gloss">conflict-free replicated data types — structures that merge concurrent updates without conflicts</span>,
+              or a domain-specific merge function before shipping. Document which writes can converge by merge and which cannot.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Last-write-wins is a decision, not a default — it silently loses data on concurrent writes, and clock skew makes "last" a fiction. "My cart item vanished" bugs are almost always this.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Adopting Cassandra or DynamoDB and assuming concurrent writes "just work." They merge by timestamp — last-write-wins under a friendlier name.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Use idempotency keys end-to-end on any AP write path</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Every mutating request carries a client-generated
+              <span class="term">idempotency key</span>
+              <span class="term__gloss">a client-supplied ID the server uses to recognize and collapse a repeated request</span>;
+              the server stores <code>(key → result)</code> long enough to cover a reasonable retry window (Stripe uses 24h).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>AP systems encourage clients to retry on timeout. Without an idempotency key, retries during a partition produce duplicate charges, orders, or emails.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Relying on the database's own dedup. It usually doesn't exist at the granularity you need.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Design degradation modes, not just success paths</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For each user-facing flow, pre-decide one behavior when the store is partitioned: serve stale data with a freshness header, accept into a durable queue and ack "pending," or refuse with a clear error. Test all three.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Partition-state engineering is what separates a 4-nines service from a 2-nines one. Teams that haven't pre-decided default to "5xx everything."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Generic retries with exponential backoff as your only partition strategy. They mask the problem until the queue collapses.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Test partition behavior on purpose</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run Jepsen-style fault injection, or at minimum <code>tc netem</code> / Toxiproxy in CI, dropping inter-AZ traffic for 30–120 seconds. Verify writes either succeed and stick, fail cleanly, or roll back as documented.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every major distributed database has been embarrassed by Jepsen at some point. Your application code's behavior under partition is almost certainly worse than the database's.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting vendor consistency claims without testing them yourself.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Reason in PACELC, not just CAP, for steady-state decisions</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>When picking between two CP systems or two AP systems, use PACELC's <em>else</em> half — else, latency or consistency? — because partitions are rare and steady-state latency is a daily cost.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>CAP's binary buckets group Spanner and ZooKeeper together; PACELC distinguishes them on the dimension that matters at p99 every minute of the day.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Picking a strongly-consistent global store for a workload that could tolerate causal consistency, then complaining about the cross-region write latency you signed up for.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Match the data to the trade — money to CP, social feeds to AP</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Ledgers, inventory, seat reservations, leader election, config → CP. Shopping carts, social feeds, presence, view counters, recommendation state → AP, ideally CRDT-friendly.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A cart that 5xx's during a partition loses revenue and trust; a transient inventory inconsistency that oversells one SKU is a refund and an apology. Pick the failure mode whose cost is lower.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>The reverse: AP for money (silent overdrafts), CP for newsfeeds (down on every regional blip).</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM: the mature hybrid architecture -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Client((Client))
+    subgraph CPcore["CP core — identity, billing, leader election"]
+      CP1[Strongly consistent store]
+    end
+    subgraph APbody["AP body — events, content, social state"]
+      AP1[Dynamo-style store]
+    end
+    subgraph CRDTlayer["Thin CRDT / merge layer"]
+      CR1[Offline-tolerant collaboration data]
+    end
+    Client --> CPcore
+    Client --> APbody
+    Client --> CRDTlayer
+          </pre>
+          <figcaption class="diagram__caption">The mature state most teams land on: a small CP core, a large AP body, and a thin CRDT layer for data that genuinely needs offline-tolerant collaboration.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">"We're a CA system"</p>
+            <p>The team decided partitions don't happen on their network. They still happen — the system just degrades in undefined ways. Pick CP or AP explicitly and own the degradation.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Conflating CAP-C with ACID-C</p>
+            <p>A team argues a single-node Postgres is "CP because ACID." ACID-C means constraints hold; CAP-C means linearizability across replicas. Keep the two vocabularies separate.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">"Eventually consistent" used as a synonym for "consistent"</p>
+            <p>A claim that papers over reads returning arbitrarily stale data. Name the actual model: read-your-writes, monotonic reads, causal, or linearizable.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Read-modify-write on Cassandra without a lightweight transaction</p>
+            <p>Reading a counter, incrementing in app code, writing back. Concurrent writers silently overwrite each other. Use Cassandra's lightweight transactions (Paxos on the AP path) or a counter type that converges under merge.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Treating CAP as the only design dimension</p>
+            <p>Ignoring the steady-state latency-vs-consistency trade (PACELC's else-half), which is where most of the operating cost actually lives. Write the consistency contract and the p99 latency target on the same page.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Bolting strong consistency onto an AP system at the app layer</p>
+            <p>Hand-rolled locks in DynamoDB via conditional writes across multiple items, or "two-phase commit" implemented over an eventual store. These break under partition in subtle ways. Put the strongly-consistent slice on a CP store instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Misreading defaults</p>
+            <p>Assuming DynamoDB reads are strongly consistent (they default to eventual, at half the cost) or that MongoDB writes are durable across the replica set (<code>writeConcern: 1</code> only waits for the primary). Pin consistency settings explicitly and code-review them.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting wall-clock timestamps for ordering</p>
+            <p>Last-write-wins with NTP-synchronized clocks looks fine until a leap second or 200ms of skew silently drops a user's write. Use hybrid logical clocks, vector clocks, or a CP store for ordering-sensitive data.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Multi-region SaaS: CP control plane, AP data plane</div>
+            <p>Config, tenant metadata, and feature flags on etcd or CockroachDB (CP); the per-tenant event stream on Cassandra or DynamoDB at <code>LOCAL_QUORUM</code> (AP). <em>Lesson:</em> the CP control plane becomes the limiting factor for region failover — Raft leader election time is the real RTO floor, often 5–15 seconds.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Spanner-backed financial ledger</div>
+            <p>Core ledger on Spanner, using TrueTime for external consistency across regions; bulk analytics use bounded stale reads (<code>read_timestamp = now - 10s</code>) to skip the leader. <em>Lesson:</em> most reads don't need to be linearizable — routing them to stale reads can cut p99 latency by an order of magnitude.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Collaborative editor with CRDTs</div>
+            <p>A Figma-style document editor uses CRDTs (Yjs or Automerge) for the document body and a CP store (Postgres, strict serializable) for permissions and billing. <em>Lesson:</em> even in a "fully local-first" product, the boundary between CRDT-land and CP-land is where most bugs live — permission revocation racing an in-flight edit is the canonical example.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">E-commerce: Cassandra plus lightweight transactions</div>
+            <p>Cart contents and catalog in Cassandra at <code>LOCAL_QUORUM</code> (fast, AP-leaning); inventory decrement at checkout uses Cassandra's Paxos-backed lightweight transactions. <em>Lesson:</em> lightweight transactions run at roughly 4x the latency of a normal write — using them everywhere defeats the point of Cassandra, using them nowhere oversells stock during a flash sale.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Kafka as a durable buffer in front of an AP store</div>
+            <p>A telemetry pipeline writes with <code>acks=all</code> and <code>min.insync.replicas=2</code> (CP-like durability), then fans out into Cassandra. <em>Lesson:</em> <code>unclean.leader.election.enable=true</code> silently flips this from CP to AP and can lose committed offsets — verify it's off in production.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> do you alert on partition signatures — inter-AZ packet loss, leader election rate, replica lag, hinted-handoff queue depth?</li>
+              <li><strong>Failure handling:</strong> for each replicated endpoint, is the documented partition behavior actually tested with fault injection in CI?</li>
+              <li><strong>Idempotency:</strong> does every mutating endpoint accept a client-generated idempotency key, with a dedup window long enough for your retry strategy?</li>
+              <li><strong>Consistency defaults:</strong> are the client's consistency / read-concern / write-concern settings pinned explicitly in code, not left to driver defaults?</li>
+              <li><strong>Split-brain protection:</strong> for CP systems, is N odd, are leases longer than your worst-case GC pause, and is unclean leader election off?</li>
+              <li><strong>Conflict resolution:</strong> for AP writes, is the merge strategy documented per data type, avoiding silent last-write-wins where it matters?</li>
+              <li><strong>Cost:</strong> are you paying for strong reads or cross-region quorum on endpoints that don't need them?</li>
+              <li><strong>Security foot-gun:</strong> is authorization data — a revoked permission — read on a strong-read code path, not a stale one?</li>
+              <li><strong>Runbook:</strong> does the on-call runbook say what to do if the store reports "no quorum" — fail over, wait, or page someone?</li>
+              <li><strong>Onboarding:</strong> can a new engineer answer "what happens to a write to endpoint X if us-east-1 is isolated?" on day one?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Single region, no CAP thinking.</span> A managed Postgres with read replicas. The first CAP-shaped bug appears when app code reads from a lagging replica and gets data the user just wrote — fixed with sticky sessions or route-primary-after-write, often without naming it.</li>
+          <li><span class="steps__title">Multi-region forces a real choice.</span> Either run a CP global store (Spanner, CockroachDB) and pay the write-latency tax, or shard data by region and accept eventual cross-region reads. Most teams pick sharding because it's cheaper, then spend two years handling the cases where data crosses regional boundaries.</li>
+          <li><span class="steps__title">Mature hybrid state.</span> A small CP core (identity, billing, leader election) on a strongly-consistent store; a large AP body (events, content, social state) on a Dynamo-style store with documented per-endpoint contracts; a thin CRDT or merge layer for offline-tolerant collaboration. Teams that reach this stage wish they'd written the partition contract down on day one.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://martin.kleppmann.com/2015/05/11/please-stop-calling-databases-cp-or-ap.html" rel="noopener">Please stop calling databases CP or AP — Martin Kleppmann</a> — why the static labels mislead, from the author of <em>Designing Data-Intensive Applications</em>.</li>
+          <li><a href="https://jepsen.io/analyses" rel="noopener">Jepsen analyses</a> — Kyle Kingsbury's empirical takedowns of distributed databases under partition.</li>
+          <li><a href="https://cloud.google.com/blog/products/databases/inside-cloud-spanner-and-the-cap-theorem" rel="noopener">Inside Cloud Spanner and the CAP Theorem — Eric Brewer</a> — Brewer himself on why Spanner is "effectively CA" in practice, with honest caveats.</li>
+          <li><a href="https://www.cs.umd.edu/~abadi/papers/abadi-pacelc.pdf" rel="noopener">Consistency Tradeoffs in Modern Distributed Database System Design (PACELC) — Daniel Abadi</a> — the paper that adds the missing latency-vs-consistency axis CAP omits.</li>
+          <li><a href="https://dataintensive.net/" rel="noopener">Designing Data-Intensive Applications — Martin Kleppmann</a> — Chapters 5 (Replication) and 9 (Consistency and Consensus) are the canonical practitioner's reference.</li>
+          <li><a href="https://arxiv.org/abs/1509.05393" rel="noopener">A Critique of the CAP Theorem — Martin Kleppmann</a> — the case that CAP is too coarse to be a design tool on its own, and what to use instead.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

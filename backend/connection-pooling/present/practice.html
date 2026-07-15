@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connection Pooling · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Connection Pooling</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Connection Pooling</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Connection Pooling</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>The pool sits at the exact seam between "stateless request handlers" and "one shared, stateful, expensive database cluster." It's the shock absorber that decides whether a traffic spike shows up as slower responses or as a database that stops accepting new sessions.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS backend</div><p>Between your handlers and one shared Postgres cluster — the thing that decides whether a spike is "slower" or "down."</p></div>
+          <div class="card"><div class="card__title">Kubernetes-hosted service</div><p>Its config silently multiplies with every replica: <code>MaxPoolSize=20</code> looks fine until the autoscaler goes from 4 pods to 40 and the DB sees 800 connections.</p></div>
+          <div class="card"><div class="card__title">Serverless functions</div><p>The thing you <em>don't</em> have — which is why RDS Proxy or Supavisor exists as a substitute.</p></div>
+          <div class="card"><div class="card__title">Data-heavy internal tools</div><p>What stops a runaway CSV export from starving the transactional workload of connections, via <code>acquireTimeout</code>, statement timeouts, and separate pools per workload.</p></div>
+        </div>
+        <p>A flat P99 latency graph that suddenly goes vertical for 90 seconds is very often a saturated pool.</p>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Size the pool from Little's Law, not from your thread count</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Compute <code>MaxPoolSize ≈ peak QPS × avg query seconds</code> — the <span class="term" data-gloss="concurrency = arrival rate × average time in the system">Little's Law</span> relationship — then sanity-check against the DB's real capacity. HikariCP's rule of thumb — <code>connections = (core_count × 2) + effective_spindle_count</code> per DB instance — is a ceiling, not a target.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Sizing to thread count (200 threads → 200 connections) turns your pool into an unbounded amplifier that kills the DB before any back-pressure reaches the client.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Copy-pasting <code>MaxPoolSize=100</code> from a Stack Overflow answer and never revisiting it.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Budget for all your app replicas, not one</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Track <code>replicas × MaxPoolSize + external-pooler reserve</code> against the DB's <code>max_connections</code> (minus admin and replication slots) as a first-class SLO. Recompute it whenever the autoscaler's max changes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The real failure mode isn't "my pool is too big" — it's "my pool times autoscaler-max is too big," and it only fires during the incident that already scaled you out.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Letting the autoscaler config and the pool config live in different repos owned by different teams with no shared budget.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Always set an acquire timeout — shorter than upstream</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set <code>connectionTimeout</code> (HikariCP) / <code>Timeout</code> (Npgsql) / <code>pool_timeout</code> (SQLAlchemy) to 2–5 seconds — strictly less than your HTTP request timeout and any upstream retry budget.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without it, a slow query drains the pool and every later request hangs indefinitely, holding threads, memory, and load-balancer slots. With it, you fail fast, shed load, and the load balancer routes around you.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>The library default of "wait forever" — the single most common cause of "the app is up but nothing works" incidents.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Set a statement timeout on the connection itself</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Configure <code>statement_timeout</code> (Postgres) or <code>command_timeout</code> (Npgsql/asyncpg) at pool init, with a shorter one for read-only paths. Make it tighter than your acquire timeout.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A pool-exhaustion incident almost always starts with one query that never returns. The statement timeout caps the blast radius from a bad plan or a missing index.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting the ORM's default (usually none) and hoping the app-level HTTP timeout will save you — it won't; the connection is still held.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Keep <code>maxLifetime</code> shorter than any network idle timeout in the path</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set <code>maxLifetime</code> to 20–30 minutes on cloud environments (HikariCP defaults to 30 min; Npgsql's <code>Connection Lifetime</code> defaults to 0 — set it explicitly). Keep it under the DB's <code>idle_in_transaction_session_timeout</code>, an AWS NLB's 350-second idle timeout, and any firewall's connection reaper.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Long-lived TCP sockets get silently reset by NAT gateways and load balancers. Without lifetime rotation, the first query after a quiet period returns "connection reset by peer" and blows up a request.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>maxLifetime=0</code> ("forever"). That worked on a bare-metal LAN in 2010. It doesn't work behind three layers of cloud networking.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Warm the pool at startup — don't cold-start into a stampede</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set <code>MinimumIdle</code> / <code>min_size</code> to a non-zero value — often 25–50% of <code>MaxPoolSize</code> — so cold pods finish their TLS handshakes before traffic arrives. Pair it with a readiness probe that runs one <code>SELECT 1</code> through the pool.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>After a rolling deploy or a scale-up, the first burst of traffic hits an empty pool and every request pays the 30–100ms handshake cost at once — P99 latency triples for 60 seconds and paging goes off.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>MinimumIdle=0</code> on any service that ever autoscales. It optimizes for idle cost at the expense of every scaling event.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Know your PgBouncer / RDS Proxy mode before you deploy behind it</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In <span class="term">transaction mode</span><span class="term__gloss">the pooler mode where a client holds a server connection only for one transaction, not the whole session</span>, verify: the driver uses protocol-level prepared statements, not <code>PREPARE ... EXECUTE</code>; and the app doesn't rely on <code>LISTEN/NOTIFY</code>, session advisory locks, session-level <code>SET</code> (use <code>SET LOCAL</code>), temp tables outside a transaction, or <code>WITH HOLD</code> cursors. On RDS Proxy, watch <code>DatabaseConnectionsCurrentlySessionPinned</code> — non-zero at steady state means multiplexing is being defeated.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Transaction pooling silently breaks the assumption "the connection I used last statement is the one I'm using now." The bugs only show up under load, never in staging.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Turning on PgBouncer as a "just add it, what could go wrong" migration. It's a semantic change, not a transparent proxy.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Right-size the app pool smaller when using an external pooler</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>With PgBouncer/RDS Proxy in the path, size the in-app pool to app concurrency, not DB capacity — often <code>MaxPoolSize=10–20</code> per pod is enough. The external pooler owns the DB-side ceiling.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Doubling up big pools defeats the point of the external pooler and turns it into an idle-connection warehouse.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving the app pool at 100 "just in case" while PgBouncer sits in front with <code>default_pool_size=25</code>. You pay for both and get the smaller of the two.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Instrument acquire latency, saturation, and wait-queue depth</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Export active, idle, and pending-waiter counts, plus a histogram of acquire time. Alert when acquire p99 exceeds 50ms for more than 5 minutes, and on sustained waiters. Micrometer's <code>hikaricp.*</code> metrics or Npgsql's pool counters give you this for free.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Query latency alone hides pool contention — a fast query that waited 900ms for a connection looks like a slow query. Separating "waiting for a connection" from "running the query" is the difference between fixing the DB and fixing the pool.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Monitoring only DB-side activity views. They tell you what happened once queries reached the DB, and nothing about what queued in the app.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Use separate pools for separate workloads</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run a small dedicated pool for background jobs, migrations, or long analytical queries, distinct from the request-serving pool — a second connection string in .NET, a second <code>DataSource</code> in Java.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>One 30-second analytical query on the shared pool holds a precious request-serving connection. With separate pools, the worker's saturation is invisible to the API.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"One pool for everything" — simple on day one, and it wrecks you the first time a report job runs at 9am.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Retire connections on rotating credentials and failovers</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>With IAM DB auth, rotate the token and set <code>maxLifetime</code> well under the token TTL (15 min for RDS). On failover, rely on <code>maxLifetime</code> churn or explicitly drain-and-reopen — most drivers only detect a failover after a query round trip fails.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>After a failover, half the pool holds sockets to a node that was promoted then demoted. Without lifetime rotation, error rates hover at 5% for hours "for no reason."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming the load balancer or DNS TTL will save you. The pool holds the socket, not the hostname.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Pool per request</p>
+            <p>Constructing a new pool object inside a request handler. Every request pays the pool-init cost plus a fresh TLS handshake — you have "connection pooling" that pools nothing. Build the pool once at app startup and inject it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Sharing a pool across forked processes</p>
+            <p>Creating the pool before <code>fork()</code> (Gunicorn preload mode, non-lazy uWSGI). Child processes inherit sockets and race on them, producing protocol de-sync errors. Initialize the pool after fork, in a post-fork hook.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Pool size equals thread count</p>
+            <p>Sizing so every worker thread can hold a connection at once. You lose all back-pressure and turn the DB into the bottleneck. Size the pool to DB capacity; let threads queue on it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Ignoring TLS handshake cost in the metric budget</p>
+            <p>Reporting "P50 = 8ms" from a benchmark with a pre-warmed pool, then being surprised when production P99 is 120ms. The handshake cost lives in the tail — measure with cold pods too.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Wrapping the wrong object in a using / Dispose</p>
+            <p>In .NET, wrapping the connection but forgetting the reader — the reader holds the connection, so leaking the reader leaks the connection. Same story with a JDBC result set.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>SET</code> at session scope through a transaction pooler</p>
+            <p><code>SET application_name = 'reports'</code> on every acquire, behind PgBouncer transaction mode. The setting either leaks to the next tenant or, on RDS Proxy, pins the connection and silently collapses multiplexing. Use <code>SET LOCAL</code> inside a transaction instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Health check on every acquire</p>
+            <p>Running <code>SELECT 1</code> on every checkout doubles round trips for sub-ms queries. Use a built-in liveness check like JDBC4's <code>isValid()</code> or Npgsql's keepalives, and reserve validation for connections idle longer than a threshold.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Retry-on-failure that re-acquires without releasing</p>
+            <p>A retry loop that catches an exception and calls acquire again while the failing connection is still held in a local variable. Two acquires per failed request drains the pool in seconds under load.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">High-traffic B2C API on Kubernetes</div>
+            <p>40 pods, HikariCP <code>MaxPoolSize=15</code> each, RDS Proxy in front with <code>MaxConnectionsPercent=80</code>. App-visible total = 600 connections, <span class="term" data-gloss="many client connections sharing a smaller set of physical backend connections">multiplexed</span> down to ~120 on the DB side. <em>Lesson:</em> the app pool sizes to per-pod concurrency, not to the DB — the proxy is what makes the total safe.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multi-tenant SaaS, per-tenant schemas</div>
+            <p>Used <code>SET search_path</code> per request, then migrated to PgBouncer transaction mode and immediately saw cross-tenant data leaks in staging. Fix: schema-qualified queries, or wrap every request in a transaction with <code>SET LOCAL</code>. <em>Lesson:</em> session-scoped state and transaction pooling are actively hostile to each other.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Analytics ingest worker</div>
+            <p>Long-running Kafka consumer, deliberately small <code>MaxPoolSize=4</code>, <code>maxLifetime=15min</code>, batches 500 rows per transaction. <em>Lesson:</em> pool size for a worker is a throttle, not a throughput dial — sometimes smaller is the right answer.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Serverless image-processing Lambdas</div>
+            <p>Can't hold a pool; each function uses one connection through RDS Proxy. A burst of 2,000 concurrent invocations borrows ~50 backend connections. <em>Lesson:</em> without the proxy, 2,000 concurrent Lambdas would open 2,000 direct connections and exhaust the DB instantly.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multi-region read-replica routing</div>
+            <p>Two separate pools per app — primary for writes, replica for reads — each with its own <code>maxLifetime</code> and health check, and separate acquire-time histograms. <em>Lesson:</em> never share a pool across endpoints; a replica failure shouldn't poison the primary pool.</p>
+          </div>
+        </div>
+
+        <!-- COMPARISON DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Solo["In-app pool only"]
+      S1["App pool: 15 connections"]
+      S1 --> SD[("Postgres")]
+    end
+    subgraph Fronted["App pool + external pooler"]
+      F1["App pools: 15 x 40 pods = 600 visible"]
+      F1 --> F2["PgBouncer transaction mode"]
+      F2 --> FD[("Postgres: about 120 backend sessions")]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Same 40-pod fleet, two shapes. Alone, the app pool's total is the DB's real load; fronted by a pooler, hundreds of app-visible connections collapse to a much smaller backend footprint.</figcaption>
+        </figure>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Total connections:</strong> is <code>MaxPoolSize × replicas</code> (plus any external-pooler reserve) under the DB's <code>max_connections</code>, with headroom for admin and replication?</li>
+              <li><strong>Acquire timeout:</strong> does every pool have a finite acquire timeout, tighter than the caller's HTTP timeout?</li>
+              <li><strong>Statement timeout:</strong> is one set on every connection at pool init, per workload?</li>
+              <li><strong><code>maxLifetime</code>:</strong> is it shorter than the shortest idle timeout in the network path (load balancer, NAT, firewall) and any credential TTL?</li>
+              <li><strong>Metrics:</strong> are active, idle, waiters, and an acquire-time histogram (p50/p95/p99) exported?</li>
+              <li><strong>Alerts:</strong> do they fire on a sustained non-zero waiter count and on acquire p99 over 50ms?</li>
+              <li><strong>Load test:</strong> has one actually driven the pool to saturation in staging, and was the failure mode verified as a fast reject, not a hang?</li>
+              <li><strong>Pooler audit:</strong> if behind PgBouncer/RDS Proxy — is the pooling mode confirmed, the driver's prepared-statement mode known, and the pinned-connections metric near zero at steady state?</li>
+              <li><strong>Construction:</strong> is the pool built once at app startup (or post-fork), never per request?</li>
+              <li><strong>Runbook:</strong> does one exist for "the DB is at its connection limit," including how to find which app is holding sessions?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Library defaults.</span> A bare connection string, no explicit pool config, everything pooled per-connection-string by accident. Fine up to about 50 requests/sec on one pod.</li>
+          <li><span class="steps__title">Config sprawl.</span> A second replica ships and Postgres suddenly sees 200 connections — the team learns pool size is per-process, not global. <code>MaxPoolSize</code>, <code>MinimumIdle</code>, timeouts, and health checks get added ad-hoc, usually mid-incident. Around 20–100 replicas, teams hit the "add PgBouncer or RDS Proxy" cliff, often because <code>max_connections</code> is being raised for the third time and RAM turns out to be the real bottleneck.</li>
+          <li><span class="steps__title">Workload separation.</span> Read replicas get their own pool, background jobs get a smaller dedicated one, migrations run through a direct connection that bypasses the pooler entirely. This is also where teams discover that transaction-mode pooling broke <code>LISTEN/NOTIFY</code> two years ago and nobody noticed — auditing every <code>SET</code>, prepared statement, and long-lived cursor to make the codebase pool-safe is the painful part, not adding the pooler itself.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing" rel="noopener">About Pool Sizing — HikariCP wiki</a> — the canonical short essay on why small pools beat large ones.</li>
+          <li><a href="https://www.pgbouncer.org/faq.html" rel="noopener">PgBouncer FAQ</a> — the "what breaks in transaction mode" list to re-read before any migration.</li>
+          <li><a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html" rel="noopener">Amazon RDS Proxy — managing pinning</a> — the definitive list of SQL patterns that defeat multiplexing on RDS Proxy.</li>
+          <li><a href="https://www.npgsql.org/doc/connection-string-parameters.html" rel="noopener">Npgsql connection string parameters</a> — the actual .NET pooling defaults, including the subtle ones (max pool size defaults to 100, connection lifetime to 0).</li>
+          <li><a href="https://www.percona.com/blog/" rel="noopener">Percona blog — Little's Law for database performance</a> — practical framing of concurrency = throughput × latency for sizing pools.</li>
+          <li><a href="https://vladmihalcea.com/the-anatomy-of-connection-pooling/" rel="noopener">The Anatomy of Connection Pooling — Vlad Mihalcea</a> — long-form, JVM-flavored but broadly applicable.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

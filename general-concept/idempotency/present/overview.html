@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Idempotency · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Idempotency</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Idempotency</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Idempotency</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Networks lie. Clients retry. Queues redeliver the same message more than once. If a "charge $50" call runs three times because of one flaky connection, the customer just lost $150, not $50.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Idempotency is the discipline of designing an operation so repeating it is safe: the second and third calls act as a no-op, not a second charge. It touches HTTP API design, message queues, payment systems, and database migrations all at once — which is why almost every senior engineer ends up learning it the hard way.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a light switch with two positions: up and down. Flick it up once and the light is on. Flick it up four more times and the light is still just on — nothing new happens. The action describes a <strong>destination</strong>, not a step.</p>
+
+        <p>Now picture a turnstile counter. Push it once and the count is 1. Push it four more times and the count is 5. Every push adds a new mark — the action describes a <strong>step</strong>, not a destination.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 160" role="img" aria-labelledby="mmTitle mmDesc" width="560" style="max-width:100%">
+            <title id="mmTitle">Switch versus turnstile</title>
+            <desc id="mmDesc">Flicking a light switch up five times leaves it in one final state, on. Pushing a turnstile five times produces a running count of five separate marks.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">Idempotent: light switch</text>
+              <rect x="10" y="34" width="130" height="56" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="75" y="68" fill="var(--accent)" text-anchor="middle" font-size="15">UP (on)</text>
+              <text x="10" y="112" fill="var(--text-faint)" font-size="12">flick, flick, flick, flick, flick →</text>
+              <text x="10" y="132" fill="var(--text)" font-size="13">still just: on</text>
+
+              <text x="300" y="20" fill="var(--text-muted)">Not idempotent: turnstile</text>
+              <rect x="300" y="34" width="46" height="46" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="323" y="62" fill="var(--danger)" text-anchor="middle">1</text>
+              <rect x="352" y="34" width="46" height="46" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="375" y="62" fill="var(--danger)" text-anchor="middle">2</text>
+              <rect x="404" y="34" width="46" height="46" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="427" y="62" fill="var(--danger)" text-anchor="middle">3</text>
+              <rect x="456" y="34" width="46" height="46" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="479" y="62" fill="var(--danger)" text-anchor="middle">4</text>
+              <rect x="508" y="34" width="46" height="46" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="531" y="62" fill="var(--danger)" text-anchor="middle">5</text>
+              <text x="300" y="112" fill="var(--text-faint)" font-size="12">push, push, push, push, push →</text>
+              <text x="300" y="132" fill="var(--text)" font-size="13">five separate marks</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Idempotent operations describe a destination. Non-idempotent operations describe a step.</figcaption>
+        </figure>
+
+        <p>A real example: <code>PUT /users/123 {"name": "Alice"}</code> says "make user 123's name be Alice." Run it once or a thousand times — same end state. But <code>POST /payments {"amount": 50}</code> says "create a new payment of $50." Run it twice and there are two payments. That is why payment APIs hand you an
+          <span class="term">idempotency key</span>
+          <span class="term__gloss">a unique token the client attaches to a request so the server can recognize a repeat instead of doing the work again</span>:
+          a token the client generates once so the server can say "I have seen this exact request before — here is the answer I gave last time" instead of charging the card again.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not the same as
+                <span class="term" data-gloss="the server keeps no session between requests">stateless</span>.
+                </strong> An idempotent operation can absolutely change server state — it just has to converge to the same state on retry.</li>
+              <li><strong>Not the same as
+                <span class="term" data-gloss="same output for the same input, with no side effects at all">pure</span>.
+                </strong> A pure function has no side effects. Idempotent operations are allowed side effects; they just must not pile up more of them on repeat.</li>
+              <li><strong>Not the same as
+                <span class="term" data-gloss="a method that doesn't change state at all, like GET">safe</span>.
+                </strong> Safe methods don't touch state. Idempotent methods can — they just do so in a repeat-tolerant way.</li>
+              <li><strong>Not automatic.</strong> Calling something <code>PUT</code> does not make it idempotent. Someone has to design the handler that way.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Any API endpoint a client might retry after a timeout or a 5xx.</li>
+              <li>Payment, billing, or "send email" operations where double-execution is user-visible damage.</li>
+              <li>Message-queue consumers, where duplicates are guaranteed eventually.</li>
+              <li>Database migrations and infra scripts you want to run repeatedly without breaking.</li>
+              <li>Webhook receivers — the sender retries until it gets a 2xx.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Pure read endpoints — <code>GET</code> is already idempotent by definition.</li>
+              <li>One-off scripts a human runs and watches complete.</li>
+              <li>Append-only event logs where every call is meant to be a new entry (analytics events, for instance).</li>
+              <li>Internal trusted callers where retries can't happen and the extra machinery buys nothing.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Idempotent operation</dt><dd>Repeating it yields the same end state as running it once.</dd></div>
+          <div><dt>Idempotency key</dt><dd>A unique, client-supplied token used to deduplicate retried requests.</dd></div>
+          <div><dt>At-least-once delivery</dt><dd>A messaging guarantee where duplicates are expected; idempotent consumers are the fix.</dd></div>
+          <div><dt>Exactly-once semantics</dt><dd>The illusion of one-time processing — usually at-least-once delivery plus idempotency.</dd></div>
+          <div><dt>Safe method</dt><dd>An HTTP method that doesn't modify state at all: GET, HEAD, OPTIONS.</dd></div>
+          <div><dt>Side effect</dt><dd>Any change to state outside the function: a DB row, an email, a charge, a log entry.</dd></div>
+          <div><dt>Replay</dt><dd>Re-running the same request, intentionally or otherwise.</dd></div>
+          <div><dt>Deduplication window</dt><dd>The time span the server remembers a key has already been seen.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

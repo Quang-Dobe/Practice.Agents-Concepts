@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hydration — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Hydration</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Hydration</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>frontend</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Hydration</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">frontend</span>
+            <span class="badge">rendering strategy</span>
+            <span class="badge">SSR</span>
+          </div>
+          <h1 class="hero__title">Hydration</h1>
+          <p class="hero__tagline">Waking up server-rendered HTML in the browser by attaching JS listeners and state so the page becomes interactive.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">2017</div><div class="stat__label"><code>ReactDOM.hydrate</code> named in React 16</div></div>
+          <div class="stat"><div class="stat__num">2022</div><div class="stat__label">React 18 ships <code>hydrateRoot</code> + streaming SSR</div></div>
+          <div class="stat"><div class="stat__num">~1.5s</div><div class="stat__label">target mobile First Contentful Paint for content sites</div></div>
+          <div class="stat"><div class="stat__num">~50 routes</div><div class="stat__label">where the hydration tax usually forces a rethink</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED): the mental model -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["Server renders HTML"] --> B["Browser paints — FCP\n(page looks done, nothing works)"]
+    B --> C["JS bundle loads"]
+    C --> D["hydrateRoot walks the same tree"]
+    D --> E["Listeners attached — TTI\n(page is now interactive)"]
+          </pre>
+          <figcaption class="diagram__caption">The whole idea in one line: paint fast from the server, then adopt that same DOM with a client-side walk instead of rebuilding it.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the unfurnished-house mental model, and what hydration is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: what it is, where it runs, when to reach for it, how React's reconciler walks the tree, and why the design looks this way.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Ten best practices with the Do/Why/Avoid triad, anti-patterns, real case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail for the reconciliation walk and the trade-off table, or Practice for the checklist.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event Sourcing · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Event Sourcing</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Event Sourcing</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Event Sourcing</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical fintech back-end, event sourcing is the persistence layer behind whatever owns money movement — wallet, ledger, payouts, settlement. Everything else (notifications, statements, fraud, reporting) lives downstream as a projection off that one log. In e-commerce and logistics, it shows up on the order or shipment aggregate: the thing with a long lifecycle and many outside actors. In claims, policy, and health records, it's the thing compliance eventually forces on you if you don't pick it on day one.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Fintech ledger</div><p>Wallet, payouts, settlement. "What did the balance look like at 14:02?" is answered by <code>replay until timestamp</code>, not a forensic SQL hunt.</p></div>
+          <div class="card"><div class="card__title">Order / shipment workflow</div><p>A long-lived aggregate mutated asynchronously by warehouses, carriers, and support — the order is a story, not a row.</p></div>
+          <div class="card"><div class="card__title">Claims, policy, EHR</div><p>Anywhere "who knew what, when" is legally load-bearing, you end up with an append-only log — designed for, or bolted on.</p></div>
+          <div class="card"><div class="card__title">Everywhere else — a red flag</div><p>Admin panels, settings, CMS. If event sourcing shows up here, someone has overreached.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Pick the aggregates that justify the cost, not the service</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Event-source the 1–3 aggregates where history is the business — Order, Wallet, Policy. Keep <code>User</code>, <code>Settings</code>, <code>ProductCatalog</code> as boring CRUD in the same service.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The complexity tax — projections,
+              <span class="term" data-gloss="the read model can briefly lag behind the events that produced it, instead of updating in the same instant">eventual consistency</span>,
+              schema evolution — compounds per aggregate. Spending it on a <code>UserPreferences</code> aggregate pays nothing back and slows every feature.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We're an event-sourced shop" — making every entity a stream just because the team adopted the pattern.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Name events as past-tense business facts, not state diffs</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Emit <code>OrderShipped</code>, <code>PaymentCaptured</code>, <code>AddressCorrected</code>. The name should make sense to a domain expert with no code context.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Generic events like <code>OrderUpdated { fields }</code> are CRUD in disguise — they carry no intent, so projections can't react meaningfully and the history reads like a diff log.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>EntityCreated</code>, <code>EntityUpdated</code>, <code>EntityDeleted</code>. If your event names look like HTTP verbs, you've audited CRUD, not sourced events.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Decide event granularity around invariants and consumers</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use one event per business decision. If shipping requires picking a carrier, allocating stock, and printing a label, pick one <code>OrderShipped</code> event or three based on which consumer needs to react to which step.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Too fine, and every command becomes a 10-event burst that forces projections to reassemble state. Too coarse, and you can't add a new consumer without re-deriving from payloads.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Splitting events to mirror UI form fields. The form is not the domain.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Make every projection and integration handler idempotent</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Store the last processed global position per projection in the same transaction as the update. Use upserts keyed on event id for side effects.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Subscriptions are at-least-once. A pod restart mid-batch redelivers the last events. Without idempotency, you double-charge cards or double-send emails — and only find out from customers.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting "we haven't seen a duplicate yet." The next deploy will give you one.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Treat snapshots as a cache, never a source of truth</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Snapshot on a measurable trigger — say, every 200 events, or when warm-load p95 exceeds 50ms. Version the snapshot schema. Be able to delete every snapshot and have the system still work.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A snapshot written by yesterday's aggregate code, replayed against today's invariants, produces silently wrong state. If snapshots are load-bearing, an aggregate refactor becomes a data migration.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Snapshotting by default from day one. Most aggregates never get long enough to need it.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Pick a schema-evolution strategy before your second deploy</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default to additive changes. Add upcasters when a shape changes. Reserve copy-and-transform for last-resort renames. Chain upcasters — <code>V1 → V2 → V3</code>, never <code>V1 → V3</code> directly.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Events are forever. Six months in, you'll have 50 million events across three event versions in the wild, and "just run a migration" stops being an option.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Mutating old events in place. The moment you do this you've lost the one property the whole pattern is built on.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Plan for GDPR / "right to be forgotten" before accepting PII</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Either keep PII out of the event entirely — store a <code>customerId</code> and look up the name from a deletable side-table, the
+              <span class="term">forgettable payload</span>
+              <span class="term__gloss">keeping personal data out of events, referenced only by id from a table you can actually delete from</span>
+              pattern — or encrypt PII per-subject with a key you can shred. Decide which, per aggregate, in design review.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Once an email or address is sprayed across 8 streams and 40,000 events, a single deletion request becomes an engineering project. Note: EU regulators have argued encrypted personal data is still personal data, so
+              <span class="term" data-gloss="encrypting PII per-subject with a key you can destroy, so the data becomes unrecoverable without being physically deleted">crypto-shredding</span>
+              is defensible practice, not a guaranteed legal shield — talk to your DPO.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Putting full customer profiles into event payloads "because it makes projections easier."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Project asynchronously, monitor lag, but design the UX for it</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default to async projections. Expose projection lag, in events and seconds, as a first-class metric. Where a user expects to see their own change immediately, return the new state from the command handler or use an optimistic UI update.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Eventual consistency is fine for analytics, terrible for "I just placed an order and the order list is empty." The lag is rarely the problem — the surprise is.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Forcing inline projections everywhere to dodge the UX problem. You lose the scale-out story and recreate distributed-transaction pain.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Choose the store that matches your operational reality</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For .NET teams already on Postgres, Marten is the boring-and-correct default — same database, inline projections available, no new ops surface. For polyglot orgs or very high write throughput on long streams, KurrentDB earns its keep with built-in subscriptions and cluster semantics.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A dedicated event store you don't operate well is worse than a Postgres you already operate well. The bottleneck in practice is the team's ability to debug at 3 a.m., not the store's max appends per second.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using Kafka as the event store. Kafka is transport with retention; it has no per-aggregate optimistic concurrency and no <code>readStream(streamId)</code> primitive. You'll reinvent both, badly.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Marten["Marten on Postgres"]
+      M1["Same database as the app"]
+      M2["Inline projections available"]
+    end
+    subgraph Kurrent["KurrentDB — dedicated store"]
+      K1["Built-in subscriptions"]
+      K2["Cluster semantics, polyglot"]
+    end
+    subgraph Kafka["Kafka — not a store"]
+      X1["Transport with retention"]
+      X2["No per-aggregate concurrency"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Three answers to "where do events live" — pick the one your team can operate at 3 a.m., not the one with the best README.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Version your projections by name and own their rebuild</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Name projection tables with a version suffix (<code>orders_read_v3</code>). To change one, deploy v4 alongside v3, rebuild v4 from position 0, cut reads over, drop v3.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Mutating a live projection schema in place means your read model briefly disagrees with your events — and "briefly" tends to mean "until someone notices in production."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Reusing the same projection name across breaking changes. There's no good way to tell partially-rebuilt data from fully-rebuilt data after the fact.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Measure cold rebuild time of your biggest projection, on real hardware</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run it. Write the number down. Re-measure quarterly. Parallelize by stream-id partition once it climbs past your deploy-window tolerance.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Teams discover their rebuild takes 14 hours during the incident that requires the rebuild. That is the worst possible time to find out.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Estimating rebuild time from event count alone — projection cost per event varies by two orders of magnitude.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">CRUD-in-disguise events</p>
+            <p>Events named <code>XUpdated</code> with a full state payload. The log carries no semantics, so nothing downstream can do anything useful with it. Rename to business facts and re-derive payloads from intent.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Event-sourcing the whole service</p>
+            <p>Every entity gets a stream "for consistency." The complexity tax bankrupts feature velocity — keep event sourcing scoped to the aggregates whose history is the product.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">No versioning plan</p>
+            <p>The first event-schema change ships as a breaking edit to the existing event type. Old events deserialize wrong forever. Introduce versioned types and upcasters before the second schema change, not the tenth.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Eager inline projections everywhere</p>
+            <p>Every command transactionally updates six read models. Writes get slow and brittle, and coupling returns through the back door. Push everything except read-your-write critical views to async subscriptions.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Fat events</p>
+            <p>Embedding the full customer record, product, and address into every event "so projections don't need joins." Schema evolution becomes immovable and PII is everywhere — carry ids, denormalize in the projection instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Snapshots as truth</p>
+            <p>A snapshot gets hand-edited to fix a bug. Now events and state disagree silently, forever. Snapshots must be rebuildable from events, full stop.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Replay cliff</p>
+            <p>No checkpointing, no partitioned projection workers, no idea how long a rebuild takes. The day you need a rebuild is the day you discover it takes 11 hours. Measure and parallelize before then.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Broker-as-store</p>
+            <p>A Kafka topic with 7-day retention treated as the source of truth. After day 8, history is gone. The event store and the broker are different jobs — run both.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Fintech ledger, ~500 TPS</div>
+            <p>A wallet service per user, each wallet a stream, events like <code>FundsCredited</code>, <code>HoldPlaced</code>, <code>HoldReleased</code>. Balance and statements are projections; nightly reconciliation replays the day against a sealed prior snapshot. <em>Lesson:</em> storing the running balance <em>inside</em> the event sounds redundant but pinpoints the first event where a reconciliation drift began.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Retail order workflow, multi-region</div>
+            <p><code>Order</code> is event-sourced; everything else is CRUD. Events drive shipping, billing, fraud, and email as independent subscriptions. Checkout uses optimistic UI to mask a 200–800ms projection lag. <em>Lesson:</em> a team that tried to make the order list strongly consistent ended up with a distributed transaction across two databases, then rolled back to async-plus-optimistic-UI six months later.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Insurance claims, decade-long retention</div>
+            <p>Every claim is a stream that may stay open for years. Snapshots fire every 50 events. PII lives in a separate vault keyed by claimant id; events carry only the id. <em>Lesson:</em> a "new" actuarial report was satisfied by replaying history since 2018 — no warehouse migration, no ETL, just replay from 0.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multiplayer game state</div>
+            <p>Each match is a stream; events are player actions; the server replays to reconcile clients. Streams are deleted wholesale 30 days after match end. <em>Lesson:</em> short-lived streams flip several defaults — no snapshots needed, GDPR is easy (delete the stream), but hot-stream concurrency is brutal, so the aggregate boundary is "match," not "player."</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> per-projection lag (events and seconds behind), append latency p99, optimistic-concurrency-conflict rate per stream, subscription checkpoint age.</li>
+              <li><strong>Failure handling:</strong> is there a runbook for "projection X is corrupt — rebuild it," executed in staging this quarter?</li>
+              <li><strong>Idempotency:</strong> every subscription handler tested with a deliberately replayed event batch.</li>
+              <li><strong>Schema evolution:</strong> versioning convention documented, at least one upcaster shipped, an integration test that loads streams with every historical event version.</li>
+              <li><strong>PII / GDPR:</strong> a decision recorded per aggregate (forgettable payload vs. crypto-shredding vs. no PII), deletion path tested end-to-end.</li>
+              <li><strong>Snapshots:</strong> trigger documented; "delete all snapshots, system still works" verified in CI.</li>
+              <li><strong>Rebuild cost:</strong> cold rebuild time of the largest projection measured on production-sized data, within deploy-window tolerance.</li>
+              <li><strong>Store choice:</strong> backup, restore, and point-in-time recovery rehearsed for the actual event store — not assumed because "it's just Postgres."</li>
+              <li><strong>Onboarding:</strong> a new engineer can find an ADR explaining which aggregates are event-sourced and why, run a local replay, and knows the difference between a domain event and an integration event in this codebase.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Day one.</span> One event-sourced aggregate, hand-rolled on Postgres with an <code>events</code> table and a unique <code>(stream_id, version)</code> index. Projections are inline SQL views. Life is good for 3–6 months.</li>
+          <li><span class="steps__title">First schema change.</span> Someone adds a field to an event payload, deploys, and old events deserialize wrong. This forces a versioning convention and the first upcaster.</li>
+          <li><span class="steps__title">Read model gets slow.</span> The team builds its first async subscription with a checkpoint table. Eventual consistency starts showing up in QA tickets, and the team retrofits idempotency and a rebuild runbook.</li>
+          <li><span class="steps__title">The painful migration, 12–24 months in.</span> An event needs renaming or splitting, a GDPR request lands with PII everywhere, or a cold rebuild is needed in production and nobody knows how long it takes. Teams that planned for versioning, forgettable payloads, and partitioned rebuilds glide through. Teams that didn't roll back to CRUD for that aggregate, or spend a quarter on a copy-and-transform migration — after which they take event design seriously and the pattern starts paying back.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.youtube.com/watch?v=LDW0QWie21s" rel="noopener">Greg Young — "A Decade of DDD, CQRS, Event Sourcing"</a> — the originator's retrospective; calibrates expectations on what the pattern is actually good at.</li>
+          <li><a href="https://verraes.net/2019/05/eventsourcing-patterns-throw-away-the-key/" rel="noopener">Mathias Verraes — "Eventsourcing Patterns: Crypto-Shredding"</a> — short, precise treatment of the canonical GDPR mitigation.</li>
+          <li><a href="https://event-driven.io/en/gdpr_in_event_driven_architecture/" rel="noopener">Oskar Dudycz — "How to deal with privacy and GDPR in event-driven systems"</a> — the most balanced write-up on forgettable payloads vs. crypto-shredding, including the legal caveats.</li>
+          <li><a href="https://martendb.io/events/learning.html" rel="noopener">Marten documentation — Event Store and Projections</a> — even outside Marten, the clearest reference on inline vs. async projection trade-offs on Postgres.</li>
+          <li><a href="https://medium.com/@eulerfx/scaling-event-sourcing-at-jet-9c873cac33b8" rel="noopener">"Scaling Event Sourcing at Jet"</a> — concrete numbers and design choices from a real high-volume system, especially good on partitioning projections.</li>
+          <li><a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing" rel="noopener">Microsoft — Event Sourcing pattern (Azure Architecture Center)</a> — a neutral, framework-agnostic reference.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

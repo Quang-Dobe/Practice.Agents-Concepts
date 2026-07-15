@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CDN Edge Caching · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CDN Edge Caching</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CDN Edge Caching</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CDN Edge Caching</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A CDN (Content Delivery Network) is a fleet of servers spread across the globe. Edge caching is what makes it useful: each server keeps a local copy of your content so users get served from a machine near them instead of your one origin server.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Copies of your HTML, images, JS bundles, video chunks — sometimes even API responses — sit on servers near the user. That gives lower latency for them and much less traffic hitting your backend. It's why a website in Sydney can feel just as snappy as one in San Francisco.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a popular cookbook. The
+          <span class="term">origin</span>
+          <span class="term__gloss">your actual backend server, the source of truth</span>
+          is the one author who wrote it, living in a single city. Without a CDN, every reader in the world has to fly to that city, knock on the author's door, and ask for a photocopy. Slow, and the author burns out fast.</p>
+
+        <p>A CDN puts a library branch — an
+          <span class="term">edge / POP</span>
+          <span class="term__gloss">Point of Presence: a CDN server in a specific geographic location</span>
+          — in every major city. The first reader in Tokyo who asks for chapter 3 triggers a flight to the author (a
+          <span class="term">cache miss</span>
+          <span class="term__gloss">the edge had to ask the origin first</span>),
+          but the librarian photocopies the chapter and shelves it. Every later Tokyo reader gets it instantly from the local shelf (a
+          <span class="term">cache hit</span>
+          <span class="term__gloss">the edge already had the content; the user gets it fast</span>).
+          The author only sees one request per city per chapter, instead of millions.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["Reader in Tokyo asks for chapter 3"] --> B{Is it on the local shelf?}
+    B -- no, cache miss --> C["Fly to the author, photocopy, shelve it"]
+    B -- yes, cache hit --> D["Hand over the copy instantly"]
+    C --> D
+    D --> E["Next Tokyo reader asks again"]
+    E --> B
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: check the local shelf first, only bother the author once per city per chapter.</figcaption>
+        </figure>
+
+        <p>The librarian needs a rule for how long a shelved copy stays valid before checking back with the author. That rule is the
+          <span class="term">TTL</span>
+          <span class="term__gloss">time-to-live: how long a cached object is considered fresh</span>,
+          and you set it — usually through an HTTP header like <code>Cache-Control: max-age=86400</code> on the response from your origin. Short TTL means fresher content but more origin trips; long TTL means faster delivery but staler content. The whole craft of edge caching is dialing that knob per content type.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a load balancer.</strong> A load balancer spreads traffic across <em>your</em> servers. A CDN keeps traffic from ever reaching them.</li>
+              <li><strong>Not edge compute.</strong> Edge functions (Cloudflare Workers, Lambda@Edge) run code at the edge; edge caching just serves stored bytes. They often live in the same product but are different tools.</li>
+              <li><strong>Not browser caching.</strong> The browser cache lives on one user's laptop. The edge cache is shared across every user routed to that POP.</li>
+              <li><strong>Not a database replica.</strong> A CDN does not run queries — it serves opaque HTTP responses it was told it could keep.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You serve static assets — images, video, CSS, JS, fonts — to users in more than one region.</li>
+              <li>Your origin is getting hammered by repeated identical requests.</li>
+              <li>You want faster page loads without rewriting your app.</li>
+              <li>You need to absorb traffic spikes — launches, viral moments, DDoS-ish bursts — without scaling the origin.</li>
+              <li>You serve large files (installers, video segments) where bandwidth from origin would be expensive.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The response is unique per user on every request (personalized dashboards, authenticated API calls) — hit ratio will be near zero.</li>
+              <li>Strong real-time consistency is mandatory (live trading prices, checkout inventory).</li>
+              <li>Your audience is geographically tiny and your origin already sits next door to them.</li>
+              <li>Content is so rarely requested the cache evicts it between hits — you pay the miss cost every time.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Origin</dt><dd>Your actual backend server, the source of truth.</dd></div>
+          <div><dt>Edge / POP</dt><dd>A CDN server in a specific geographic location.</dd></div>
+          <div><dt>Cache hit</dt><dd>The edge had the content; user gets it fast.</dd></div>
+          <div><dt>Cache miss</dt><dd>The edge had to ask the origin first.</dd></div>
+          <div><dt>TTL</dt><dd>How long a cached object is considered fresh.</dd></div>
+          <div><dt>Cache-Control</dt><dd>The HTTP header your origin uses to tell the edge what it may cache and for how long.</dd></div>
+          <div><dt>Cache key</dt><dd>The identifier — usually URL plus a few headers — the edge uses to decide whether two requests want the same content.</dd></div>
+          <div><dt>Static content</dt><dd>Bytes that are identical for every user; caches beautifully.</dd></div>
+          <div><dt>Dynamic content</dt><dd>Bytes that depend on the user or moment; caches poorly without extra work.</dd></div>
+          <div><dt>Hit ratio</dt><dd>The percentage of requests served from cache. 95%+ is healthy for static-heavy sites.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

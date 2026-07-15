@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Virtual DOM · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Virtual DOM</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Virtual DOM</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Virtual DOM</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">The browser's DOM is a live tree, and touching it — creating nodes, setting attributes, reading layout — is slow. Naive UI code touches it constantly.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>A Virtual DOM describes what the UI <em>should</em> look like as plain JS objects — a
+              <span class="term">vnode</span>
+              <span class="term__gloss">a plain JS object describing one element: its type, props, and children</span>
+              tree. The framework compares the new description to the old one and only then writes the difference to the real DOM. React popularized the idea in 2013; Vue, Preact, Inferno, and Snabbdom use the same shape of trick.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a teacher standing at a whiteboard full of equations. A student walks up every few seconds and says "here is what the board should look like now," holding out a fresh photo. The teacher has two choices:</p>
+        <ul>
+          <li><strong>The lazy choice.</strong> Erase the whole board and copy the new photo from scratch. Correct, but slow, and the class watches it flicker the whole time.</li>
+          <li><strong>The smart choice.</strong> Hold the old photo next to the new one, spot the parts that actually differ, and erase-and-rewrite only those. Most of the board stays untouched.</li>
+        </ul>
+        <p>The Virtual DOM is the photo: cheap to make (just objects in memory), cheap to compare (just walking two trees), and the one expensive step — touching the whiteboard — happens once per update, in a tight batch, only for the cells that changed. A vnode itself is nothing fancy:</p>
+        <pre><code>{ type: 'div', props: { className: 'card' }, children: [
+  { type: 'h1', props: {}, children: ['Hello'] }
+]}</code></pre>
+        <p>Your render function returns one of these trees every time. The framework keeps the last tree it saw, runs
+          <span class="term">reconciliation</span>
+          <span class="term__gloss">the diff-then-patch process that turns two trees into a minimal set of real DOM writes</span>
+          against the new one, and emits real DOM calls — <code>createElement</code>, <code>setAttribute</code>, <code>removeChild</code> — only for what changed. You write <span class="term" data-gloss="the UI is described as a function of state, not as a list of step-by-step instructions">declarative</span> code; the framework does the imperative surgery.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 620 250" role="img" aria-labelledby="vdomTitle vdomDesc" width="620" style="max-width:100%">
+            <title id="vdomTitle">Diffing the old and new vtree</title>
+            <desc id="vdomDesc">An old vtree and a new vtree each hold a div with an h1 and a p child. Only the p node differs between them, so the patch step touches only that node before writing to the real DOM.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">Old VTree</text>
+              <text x="350" y="20" fill="var(--text-muted)">New VTree</text>
+
+              <!-- old tree -->
+              <rect x="30" y="34" width="90" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              <text x="75" y="56" fill="var(--text)" text-anchor="middle">div</text>
+              <line x1="75" y1="68" x2="45" y2="94" stroke="var(--border)"/>
+              <line x1="75" y1="68" x2="140" y2="94" stroke="var(--border)"/>
+              <rect x="10" y="94" width="70" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              <text x="45" y="116" fill="var(--text)" text-anchor="middle">h1</text>
+              <rect x="105" y="94" width="70" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="140" y="116" fill="var(--danger)" text-anchor="middle">p</text>
+
+              <!-- new tree -->
+              <rect x="350" y="34" width="90" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              <text x="395" y="56" fill="var(--text)" text-anchor="middle">div</text>
+              <line x1="395" y1="68" x2="365" y2="94" stroke="var(--border)"/>
+              <line x1="395" y1="68" x2="460" y2="94" stroke="var(--border)"/>
+              <rect x="330" y="94" width="70" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              <text x="365" y="116" fill="var(--text)" text-anchor="middle">h1</text>
+              <rect x="425" y="94" width="70" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="460" y="116" fill="var(--danger)" text-anchor="middle">p'</text>
+
+              <text x="75" y="146" fill="var(--text-faint)" font-size="12" text-anchor="middle">unchanged</text>
+              <text x="395" y="146" fill="var(--text-faint)" font-size="12" text-anchor="middle">unchanged</text>
+              <text x="140" y="146" fill="var(--danger)" font-size="12" text-anchor="middle">changed</text>
+              <text x="460" y="146" fill="var(--danger)" font-size="12" text-anchor="middle">changed</text>
+
+              <!-- convergence to patch -->
+              <line x1="140" y1="128" x2="270" y2="180" stroke="var(--border)"/>
+              <line x1="460" y1="128" x2="330" y2="180" stroke="var(--border)"/>
+              <rect x="185" y="180" width="230" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="300" y="202" fill="var(--accent)" text-anchor="middle">Patch: update &lt;p&gt; only</text>
+
+              <line x1="300" y1="214" x2="300" y2="230" stroke="var(--border)"/>
+              <rect x="220" y="230" width="160" height="1" fill="none" stroke="none"/>
+              <text x="300" y="245" fill="var(--text-muted)" text-anchor="middle">→ Real DOM: one text write</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Same idea as the whiteboard photo: <code>div</code> and <code>h1</code> match, so they're left alone; only <code>p</code> differs, so only <code>p</code> gets patched.</figcaption>
+        </figure>
+
+        <h3>The pipeline in one line each</h3>
+        <ul>
+          <li><strong>Render.</strong> A component function returns a fresh vtree describing the wanted UI.</li>
+          <li><strong>Diff.</strong> The framework compares that tree to the last one it committed.</li>
+          <li><strong>Patch.</strong> Only the real DOM calls for what changed actually run.</li>
+        </ul>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not the real DOM.</strong> It's a plain-object mirror; the browser never sees it.</li>
+              <li><strong>Not the Shadow DOM.</strong> Shadow DOM is a browser feature for style and scope encapsulation in Web Components — a different, unrelated thing.</li>
+              <li><strong>Not automatically faster than hand-written DOM code.</strong> A careful imperative update will beat it. VDOM trades peak speed for a sane programming model.</li>
+              <li><strong>Not required for reactivity.</strong> Svelte and SolidJS skip the VDOM entirely and still get fine-grained updates.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>State changes ripple across many nodes and you don't want to track which DOM bits to mutate by hand.</li>
+              <li>You want a declarative <code>state → UI</code> function and are willing to pay a small diffing cost for it.</li>
+              <li>You're picking a framework (React, Vue, Preact) — the VDOM comes with the box.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You're updating one counter on an otherwise static page — <code>textContent =</code> is faster and simpler.</li>
+              <li>You need the lowest possible latency per keystroke (high-frequency canvas or game UIs) — go imperative or use a compiler-based framework like Svelte.</li>
+              <li>Your app is server-rendered HTML with a sprinkle of interactivity — htmx or vanilla JS is lighter.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>DOM</dt><dd>The browser's live tree of element nodes.</dd></div>
+          <div><dt>VNode</dt><dd>A plain JS object describing one element (<code>type</code>, <code>props</code>, <code>children</code>).</dd></div>
+          <div><dt>VTree</dt><dd>A tree of vnodes — what one render pass produces.</dd></div>
+          <div><dt>Diff</dt><dd>Walking the old and new vtrees to find what changed.</dd></div>
+          <div><dt>Patch</dt><dd>The list of real-DOM operations the diff produces.</dd></div>
+          <div><dt>Reconciliation</dt><dd>The whole diff-then-patch process.</dd></div>
+          <div><dt>Key</dt><dd>A stable identifier on a list item so the diff can match nodes across renders instead of guessing.</dd></div>
+          <div><dt>Mount / Unmount</dt><dd>First insertion of a vnode into the DOM, and its removal.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LSM Tree · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">LSM Tree</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">LSM Tree</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">LSM Tree</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>An LSM tree is a disk-based index made of several components that defers and batches mutations instead of writing them in place. A new value, an update, and a delete are all just newer entries that shadow older ones — nothing is ever edited on disk.</p>
+        <ul>
+          <li><strong>Core idea.</strong> Buffer writes in a sorted in-memory structure; flush the whole buffer to disk as one immutable file once it fills.</li>
+          <li><strong>Never in place.</strong> Records are never rewritten on disk — only created (flush) or dropped (compaction).</li>
+          <li><strong>Background reconciliation.</strong> A job called compaction periodically merges files (a k-way merge sort) to discard shadowed or deleted data and cap how many files a read must check.</li>
+        </ul>
+        <p>The canonical model comes from O'Neil, Cheng, Gawlick, and O'Neil, <em>The Log-Structured Merge-Tree (LSM-Tree)</em>, Acta Informatica 33, 1996.</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Memtable</dt><dd>The mutable in-memory buffer, kept sorted by key (usually a skip list or balanced tree). Inserts are O(log n); reads here are the freshest data.</dd></div>
+          <div><dt>WAL / commit log</dt><dd>An append-only file written before the memtable insert is acknowledged — the durability mechanism. The memtable is volatile; the WAL is what survives a crash and gets replayed on restart.</dd></div>
+          <div><dt>SSTable</dt><dd>Sorted String Table — an immutable on-disk file of key-value pairs sorted by key. Once written, never modified, only created or deleted. Carries a sparse index and a Bloom filter alongside it.</dd></div>
+          <div><dt>Sparse index</dt><dd>Keys plus file offsets recorded at intervals (e.g. one per block), kept in or near memory. Narrows a lookup to one block, which is then scanned linearly.</dd></div>
+          <div><dt>Bloom filter</dt><dd>A probabilistic membership check per SSTable. Answers "definitely absent" or "probably present," letting a read skip files that cannot contain the key.</dd></div>
+          <div><dt>Tombstone</dt><dd>A special marker entry recording that a key was deleted at a given time. Shadows older live values until compaction physically removes both.</dd></div>
+          <div><dt>Compaction</dt><dd>The background merge that reclaims space and bounds read fan-out, run by a compaction strategy.</dd></div>
+        </dl>
+
+        <p>LSM trees and B+-trees are the two dominant families of on-disk ordered index. The B+-tree — the engine behind InnoDB, Postgres, and most classic relational databases — mutates pages in place and optimizes for read latency and bounded space. The LSM tree is the write-optimized sibling: it turns random writes into sequential ones and pays for that on the read and space side. Hash-based log structures like Bitcask are a simpler cousin with no range scans. The whole design descends from the log-structured file system idea (Rosenblum &amp; Ousterhout, 1992).</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>The LSM tree is the <strong>storage engine</strong> — the layer beneath the query/transaction layer and above the block device. It owns the on-disk format, the memory buffers, the WAL, and the compaction scheduler. It doesn't parse queries or speak a wire protocol; a database embeds it.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Embeddable engine</div><p>RocksDB (the de facto reference, forked from LevelDB), LevelDB itself, Pebble (CockroachDB's Go rewrite), BadgerDB.</p></div>
+          <div class="card"><div class="card__title">Wide-column store</div><p>Apache Cassandra and ScyllaDB built directly on the LSM/SSTable model; HBase and Google Bigtable, the lineage that popularized SSTables.</p></div>
+          <div class="card"><div class="card__title">NewSQL on RocksDB</div><p>CockroachDB, TiKV, and MyRocks use RocksDB (or a fork of it) as the underlying store for a SQL or distributed-SQL engine.</p></div>
+          <div class="card"><div class="card__title">Time-series</div><p>InfluxDB and Prometheus's TSM/TSDB variants use LSM-like append-and-compact designs for ingestion.</p></div>
+        </div>
+        <p>Tooling reflects that split: RocksDB exposes its statistics and <code>LOG</code>/<code>OPTIONS</code> files; Cassandra ships <code>nodetool tablestats</code> and <code>nodetool compactionstats</code> plus per-table compaction settings. On the theory side, the RUM conjecture and the Dostoevsky/Monkey line of research study how far you can push the amplification trade-offs below.</p>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Writes and updates dominate — ingestion pipelines, time-series, metrics, event logs, IoT.</li>
+              <li>The disk strongly prefers sequential I/O — this still helps SSDs by cutting write churn and improving compression.</li>
+              <li>You need good on-disk compression; sorted immutable blocks compress well.</li>
+              <li>You can trade background CPU/I/O on compaction for cheap front-door writes.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Point-read latency is the headline metric and the working set doesn't fit in cache — a B-tree's single seek often wins.</li>
+              <li>The workload is read-mostly with rare writes — you'd pay compaction cost for little write benefit.</li>
+              <li>You need strict, predictable tail latency and can't absorb compaction-induced stalls.</li>
+              <li>The dataset is small enough to fit a simpler in-memory or B-tree index.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>The write path:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Append + fsync.</span> The mutation hits the WAL first, durably, before anything else happens.</li>
+          <li><span class="steps__title">Insert into the memtable.</span> A sorted structure absorbs the write in O(log n). The client is acknowledged here.</li>
+          <li><span class="steps__title">Flip to immutable.</span> Once the memtable hits its size threshold, freeze it, start a fresh active memtable, and queue the frozen one for flush.</li>
+          <li><span class="steps__title">Flush.</span> Write the frozen memtable to a new SSTable in one sequential pass, building its sparse index and Bloom filter along the way. The matching WAL segment can now be discarded.</li>
+        </ol>
+
+        <h3>The read path — newest wins</h3>
+        <p>A key may exist in several places at once, so a read walks them from newest to oldest:</p>
+        <ul>
+          <li>Check the active memtable, then any immutable-but-not-yet-flushed memtables.</li>
+          <li>For each on-disk SSTable, consult its
+            <span class="term">Bloom filter</span>
+            <span class="term__gloss">a probabilistic check that answers "definitely absent" or "probably present" for a key</span>
+            first. "Definitely absent" skips the file with zero disk I/O.</li>
+          <li>On "probably present," binary-search the
+            <span class="term">sparse index</span>
+            <span class="term__gloss">key-to-offset entries recorded at intervals, used to jump straight to the right disk block</span>
+            to the right block and scan it for the key.</li>
+          <li>Return the entry with the highest timestamp. A tombstone counts as "found, but deleted."</li>
+        </ul>
+        <p>With around 10 bits per key, a Bloom filter's false-positive rate sits near 1% — so only about 1 in 100 negative lookups triggers a wasted block read. Without it, a read that misses would have to check every SSTable on disk.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph WP["Write path"]
+      W1[Client writes] --> W2["Append to WAL, fsync"]
+      W2 --> W3["Insert into memtable (sorted)"]
+      W3 --> W4[Ack to client]
+      W3 -- memtable full --> W5["Flush -> new SSTable (sequential write)"]
+    end
+    subgraph RP["Read path"]
+      R1[Client reads key] --> R2["Check active + immutable memtables"]
+      R2 -- not found --> R3["Check each SSTable's Bloom filter"]
+      R3 -- definitely absent --> R6[Skip file, no disk I/O]
+      R3 -- probably present --> R4["Binary-search sparse index, read block"]
+      R4 --> R5["Return newest match; tombstone = deleted"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Two paths through the same structure: writes only ever append; reads walk from freshest to oldest and use the Bloom filter to skip files cheaply.</figcaption>
+        </figure>
+
+        <h3>Compaction strategies — the central design lever</h3>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Size-tiered (STCS)</div>
+            <p>Merges SSTables of similar size into one bigger SSTable. Low write amplification; high space amplification (a merge can need up to ~2x space transiently) and higher read amplification. Cassandra's default is <code>SizeTieredCompactionStrategy</code>.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Leveled (LCS)</div>
+            <p>Data sits in levels L0, L1, L2… Beyond L0, key ranges within a level don't overlap, and each level is a fixed multiple bigger than the one above (RocksDB's <code>max_bytes_for_level_multiplier</code> defaults to 10). A point read touches at most one SSTable per level — low read and space amplification, but write amplification climbs above 10x.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Tiered + leveled (hybrid)</div>
+            <p>Tiered for the small upper levels, leveled for the large lower ones — a middle ground used by RocksDB's "level" style compaction and others.</p>
+          </div>
+        </div>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gained</th><th scope="col">Given up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Out-of-place writes (append, never overwrite)</td><td>Sequential write throughput, simple crash recovery</td><td>Stale copies on disk until compaction (space amplification)</td></tr>
+              <tr><td>Multi-level / multi-SSTable layout</td><td>Cheap flushes, batched merges</td><td>Reads may fan out across files (read amplification)</td></tr>
+              <tr><td>Background compaction</td><td>Bounded read fan-out, space reclaim</td><td>Compaction burns CPU/I/O; can cause write stalls</td></tr>
+              <tr><td>Leveled vs size-tiered</td><td>Leveled: low read/space amplification</td><td>Leveled: high write amplification; STCS inverts the trade</td></tr>
+              <tr><td>Bloom filters</td><td>Skip absent-key SSTables cheaply</td><td>Extra memory; tunable false positives</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>These three knobs —
+          <span class="term">write amplification</span>
+          <span class="term__gloss">extra bytes physically rewritten by compaction per logical write</span>,
+          read amplification, and space amplification — cannot all be minimized at once; the
+          <span class="term" data-gloss="you can optimize at most two of read cost, write cost, and memory/space cost at the same time">RUM conjecture</span>
+          formalizes that you pick at most two.</p>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Write stalls / stop-the-world</p>
+            <p>Ingestion outpaces flush and compaction, L0 fills up, and the engine throttles or blocks writers. Cause: under-provisioned compaction threads or I/O.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Read amplification blowup</p>
+            <p>Too many overlapping SSTables — often under size-tiered — make point reads scan many files. Cause: compaction falling behind, or the wrong strategy for a read-heavy table.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Space amplification spike</p>
+            <p>Obsolete data plus in-flight merge copies bloat disk far beyond the logical size. Cause: size-tiered merges of large tiers, or compaction lag.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Tombstone accumulation</p>
+            <p>Masses of deletes or TTL expirations linger and slow reads — range scans must read past them. Cause: a tombstone survives until it and the shadowed data are compacted together <em>and</em> <code>gc_grace_seconds</code> (Cassandra default 864000s = 10 days) has elapsed.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Bloom filter under-sizing</p>
+            <p>Too few bits per key raises the false-positive rate, turning what should be cheap skips into wasted disk reads.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>The hardware fact underneath everything: storage devices serve large sequential writes far better than small random ones, and historically writing a record was the expensive part of indexing. A B-tree pays a random-I/O tax on every insert to stay sorted and read-optimal at all times. The LSM tree removes that tax: defer ordering work, batch it, and amortize it across many records in the background. It's a latency-vs-throughput, now-vs-later bargain on write cost.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 200" role="img" aria-labelledby="ioTitle ioDesc" width="560" style="max-width:100%">
+            <title id="ioTitle">Random writes versus sequential writes</title>
+            <desc id="ioDesc">A B-tree in-place update scatters small writes across random disk positions, forcing many seeks; an LSM flush writes one contiguous run at a single position.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="22" fill="var(--text-muted)">B-tree: in-place update</text>
+              <line x1="10" y1="46" x2="540" y2="46" stroke="var(--border)"/>
+              <rect x="40"  y="36" width="14" height="20" rx="2" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <rect x="150" y="36" width="14" height="20" rx="2" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <rect x="240" y="36" width="14" height="20" rx="2" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <rect x="330" y="36" width="14" height="20" rx="2" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <rect x="470" y="36" width="14" height="20" rx="2" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="10" y="76" fill="var(--danger)">scattered writes → one disk seek each</text>
+
+              <text x="10" y="118" fill="var(--text-muted)">LSM: memtable flush</text>
+              <line x1="10" y1="142" x2="540" y2="142" stroke="var(--border)"/>
+              <rect x="40" y="132" width="220" height="20" rx="2" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="10" y="172" fill="var(--accent)">one contiguous run → a single sequential write</text>
+              <text x="10" y="194" fill="var(--text-faint)" font-size="12">Same amount of data; very different disk-arm movement.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The same volume of writes: scattered across the disk (many seeks) versus laid down as one run (one seek, then a straight sweep).</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative — keep a single sorted file and merge each new write into it in place — is a non-starter: every write would rewrite the whole file. The next alternative, an in-place-updated B-tree, is exactly what the LSM tree reacts against. The multi-component shape (one mutable memory tier, many immutable disk tiers) falls out of two constraints: writes must be cheap, so buffer and append; and disk files must be safe to share without locking, so make them immutable and reconcile by timestamp. Immutability is the non-obvious linchpin — it makes flushes lock-free, makes SSTables trivially cacheable and replicable, and turns crash recovery into a WAL replay instead of a structural repair. The cost it imports — stale data and read fan-out — is exactly what compaction and Bloom filters exist to contain.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026 the LSM tree is the default storage engine for write-heavy and distributed data systems, not a niche choice. RocksDB and its descendants (Pebble, TiKV) sit under a large share of NewSQL and cloud-native databases, and the time-series and observability boom keeps ingestion-first workloads growing. Research keeps pushing the amplification frontier — learned indexes, learned Bloom filters, adaptive compaction — but it's worth understanding precisely because so many systems quietly inherit its trade-offs.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Service Mesh · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Service Mesh</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Service Mesh</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Service Mesh</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~12 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a mid-size SaaS, the mesh shows up the moment the platform team is asked to "make every internal call mTLS by Q3," or to explain why checkout p99 doubled last Tuesday. It sits between your Kubernetes Services and your apps' sidecars, owned by a small platform group that nobody else wants to think about — until it's the prime suspect in an incident.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS platform team</div><p>A 2-3 person group owns the mesh; every other team just gets mTLS and metrics for free.</p></div>
+          <div class="card"><div class="card__title">Regulated industries</div><p>Banks, healthcare, government: SPIFFE identities mapped to audit logs, mTLS everywhere, <code>AuthorizationPolicy</code> gating namespace-to-namespace calls.</p></div>
+          <div class="card"><div class="card__title">AI / GPU fleets</div><p>Model-serving pods, increasingly meshed in ambient mode, since they can't afford 150 MB of sidecar RAM per replica.</p></div>
+          <div class="card"><div class="card__title">Incident response</div><p>The first thing on-call asks: "did istiod push bad config?", "are the sidecars OOMing?", "is mTLS broken between namespaces again?"</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Roll out namespace by namespace, never cluster-wide</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Label one low-stakes namespace <code>istio-injection=enabled</code> (or <code>linkerd.io/inject=enabled</code>), let it bake a week, then expand. Keep a "meshed" and "unmeshed" SLO dashboard side by side.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A cluster-wide flip restarts every pod at once, causes sidecar OOMs you didn't predict, and leaves no baseline to compare against.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>kubectl label namespace --all istio-injection=enabled</code> on a Friday.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Roll mTLS to STRICT in three phases, not one</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Start mesh-wide with
+              <span class="term">PERMISSIVE</span>
+              <span class="term__gloss">accepts both plaintext and mTLS on the same port</span>,
+              watch <code>istio_requests_total{connection_security_policy="mutual_tls"}</code> climb to ~100% per namespace, then flip just that namespace to <code>STRICT</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A direct flip to STRICT silently breaks any workload that isn't meshed yet — CronJobs, init containers, that one legacy VM nobody told you about.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Setting <code>mtls.mode: STRICT</code> at the mesh root and finding out at 2 a.m. which workload wasn't meshed.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Scope every sidecar's visibility</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Define a <code>Sidecar</code> CRD per namespace listing only the upstream services it actually calls (Istio), or <code>Server</code> / <code>ServerAuthorization</code> in Linkerd.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>By default every sidecar gets the full mesh's config — in a 5,000-pod cluster that's hundreds of MB per proxy and istiod push storms on every Service change. Scoping cuts memory 5-10x.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Treating "every proxy knows everything" as fine because it works at 50 pods.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Manage mesh config in GitOps, with its own repo and review</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Put <code>VirtualService</code>, <code>DestinationRule</code>, <code>AuthorizationPolicy</code>, and <code>PeerAuthentication</code> in a <code>platform-mesh</code> repo synced by ArgoCD or Flux, with required platform-team review.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Mesh CRDs are blast-radius config — a bad host match can blackhole a whole service. Git history plus required review avoids the 3 a.m. "who changed the routing?" question.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>App teams pushing <code>VirtualService</code> into their own Helm charts with no central review.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Choose your mesh by team size and feature surface, not hype</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pick Linkerd with fewer than 5 platform engineers and a need for mTLS, observability, and simple traffic splits. Pick Istio ambient mode for WASM filters, <code>ext_authz</code>, or multi-cluster. Pick Cilium Service Mesh if you already run Cilium as your CNI.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Linkerd's Rust micro-proxy is ~0.8&nbsp;ms p99 overhead with a config surface one engineer can hold in their head; Istio's surface needs a dedicated team but supports every L7 use case.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Picking Istio because "everyone uses it" when the actual need is mTLS plus a Grafana dashboard.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Budget per-hop latency and retries explicitly</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set a per-hop p99 budget (e.g. 2 ms for the proxy itself). Use
+              <span class="term">retry budget</span>
+              <span class="term__gloss">a cap on total retries as a percentage of normal traffic, not a fixed count per call</span>
+              (Linkerd), or constrain <code>retries.attempts</code> to ≤2 and never retry non-idempotent calls. Document the call-chain depth.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Three retries at every hop of a 4-deep chain is 81 attempts during a brownout — a classic retry-storm amplification that has caused real outages.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Copy-pasting <code>attempts: 3, retryOn: 5xx</code> into every <code>VirtualService</code>.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[Pick one low-stakes namespace] --> B[Inject sidecar, bake one week]
+    B --> C[Enable PeerAuthentication PERMISSIVE]
+    C --> D{mutual_tls near 100 percent?}
+    D -- not yet --> C
+    D -- yes --> E[Flip that namespace to STRICT]
+    E --> F[Expand to the next namespace]
+    F --> A
+          </pre>
+          <figcaption class="diagram__caption">The safe rollout loop: one namespace at a time, PERMISSIVE until the metric proves readiness, then STRICT — repeat.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Right-size sidecar resources from real data, not defaults</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Istio's sidecar defaults to 100m CPU / 128&nbsp;Mi memory. Measure real p95 usage over a week and set requests at p95, limits at 2x. Linkerd's micro-proxy is smaller — start at 50m / 64&nbsp;Mi.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Istio 1.24 measures ~0.20 vCPU and 60&nbsp;MB per sidecar at 1000 RPS; at 200 pods that's 20 vCPU and 25&nbsp;GB just for proxies. Wrong defaults waste capacity or OOM-kill under load.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Shipping library defaults straight to a 1,000-pod cluster.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Exempt Jobs and init containers from injection</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Annotate short-lived workloads with <code>sidecar.istio.io/inject: "false"</code>, or use <code>holdApplicationUntilProxyStarts</code> (Istio 1.7+). For Jobs, also set a short <code>terminationDrainDuration</code> so the sidecar exits cleanly.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without this, Jobs hang forever because the sidecar never sees a shutdown signal, and init containers fail because traffic redirection exists before the proxy is ready.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Letting a CronJob silently leak pods every hour for a month.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Patch the control plane on a known cadence</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Track the control-plane version the way you track Kubernetes itself. Subscribe to the security mailing list. Patch within 2 weeks of a CVE.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Control planes have had real CVEs — remote-code-execution and denial-of-service chains through the proxy. An unpatched one is a privileged blast radius across every workload.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We installed it in 2023 and it's been fine" — said two years later, unpatched.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Use the mesh's identity, not hardcoded hostnames or IPs</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Call the Kubernetes Service DNS name and let the mesh resolve it. Reference workloads in <code>AuthorizationPolicy</code> by SPIFFE ID or service account.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Hardcoding pod IPs or external load-balancer addresses bypasses the mesh entirely — no mTLS, no retries, no metrics. That's the most common cause of "why isn't this call meshed?"</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hardcoding an upstream IP "because DNS was flaky once."</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Meshing everything on day one</p>
+            <p>Injecting the sidecar into every namespace in week one "to get it over with." Fails because there's no baseline to compare against and no isolated blast radius when something breaks. Mesh one namespace, measure, expand.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Using the mesh as a circuit-breaker replacement</p>
+            <p>Treating outlier detection as the same thing as application-level circuit breaking. Fails because mesh-level detection is connection-level, not semantic — it doesn't know "card declined" is a business response, not a failure. Keep app-level resilience for app-level concerns.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Ignoring per-hop latency</p>
+            <p>Adding a sidecar to a 50-service call chain because each hop "is only 1 ms." Fails because 50 × 1 ms is 50 ms of pure proxy tax on top of real work. Budget latency end-to-end and consider ambient mode or trimming the call graph.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Mesh as API gateway</p>
+            <p>Using <code>VirtualService</code> for north-south ingress and skipping a real gateway. Fails because mesh CRDs are tuned for east-west semantics, and the team ends up reinventing rate limiting, WAF, and auth at L7. Use a proper gateway in front.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Multi-cluster before single-cluster is solid</p>
+            <p>Linking three clusters with east-west gateways before single-cluster SLOs are stable. Fails because multi-cluster doubles the failure modes — cross-cluster cert trust, gateway availability, DNS. Get one cluster fully meshed and observable first.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Letting the control plane run unbounded</p>
+            <p>No <code>Sidecar</code> resources, no <code>discoverySelectors</code>, no scoping. Fails once the cluster passes ~2,000 services: control-plane CPU spikes during deploy windows and xDS push latency climbs past 30 seconds. Scope aggressively and shard if needed.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Ambient mode on day-one production</p>
+            <p>Adopting ambient because "no sidecars" sounds appealing, without testing the per-node proxy under load. Fails because one noisy pod can starve everything else on its node, and cert-rotation bugs are real. Pilot on staging for 2-3 months first.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Compliance-driven rollout (financial services)</div>
+            <p>A regional bank, ~80 microservices on 3 EKS clusters, needs PCI-DSS encryption in transit everywhere. They picked Linkerd for the small ops surface, ran PERMISSIVE for 6 weeks while remediating un-meshed CronJobs, then flipped STRICT one namespace per week. <em>Lesson:</em> the longest tail of work was finding every batch job and legacy ETL pod that lived outside Kubernetes.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Progressive-delivery platform (consumer SaaS)</div>
+            <p>A B2C team uses Istio plus Flagger for automated canaries: each PR triggers a 5% / 25% / 50% / 100% traffic shift over 30 minutes, auto-rolled back if p99 regresses. <em>Lesson:</em> the canary metric must be user-facing p99, not the mesh's per-hop p99 — internal hops can look fine while user latency degrades.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multi-cluster failover (global e-commerce)</div>
+            <p>Three Istio clusters — us-east, eu-west, ap-south — joined as one mesh via east-west gateways, with locality-routed traffic. <em>Lesson:</em> failover only works if every service has replicas in 2+ clusters and locality load-balancing is explicitly configured — the default is "stay local," which blackholes traffic when a cluster drains.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">AI inference fleet (ML platform)</div>
+            <p>A model-serving platform with 4,000+ GPU pods, each holding 80&nbsp;GB of GPU memory, moved from sidecar Istio to ambient mode to claw back ~150&nbsp;MB × 4,000 pods of RAM. <em>Lesson:</em> the savings were real, but they ran sidecar and ambient side by side for 4 months to validate the per-node proxy under bursty inference traffic.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> is request volume broken down by response code, response flag, source, and destination workload? Are control-plane push time and proxy convergence time on a dashboard?</li>
+              <li><strong>Failure handling:</strong> if the control plane goes down for 10 minutes, do existing proxies keep serving on last-known config? Have you tested it?</li>
+              <li><strong>Cert rotation:</strong> is there an alert for CSR issuance flatlining? A stalled CA is a 24-hour-fuse outage.</li>
+              <li><strong>503 triage:</strong> can on-call read an Envoy access log and tell "no healthy upstream" from "connection refused" from "no route" in under 2 minutes?</li>
+              <li><strong>Security:</strong> is <code>AuthorizationPolicy</code> default-deny in production namespaces? Has anyone audited it for source-namespace typos?</li>
+              <li><strong>Cost:</strong> what percent of cluster CPU and memory is mesh overhead (sidecars plus control plane)? Is that budgeted, or a surprise on the bill?</li>
+              <li><strong>Onboarding:</strong> can a new app team join the mesh with a single label, or do they need a platform engineer in a meeting?</li>
+              <li><strong>Upgrades:</strong> is there a documented control-plane upgrade procedure with rollback, rehearsed in staging this quarter?</li>
+              <li><strong>Exemptions:</strong> is the list of workloads that must not be injected written down in code, not tribal knowledge?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">First demo.</span> One "interesting" service gets meshed to show off retries or a service-map dashboard. Config is hand-applied in a shared <code>istio-system</code>-style namespace.</li>
+          <li><span class="steps__title">Spread.</span> Within 6-12 months it reaches most production namespaces, mTLS sits in PERMISSIVE, and someone builds a thin internal wrapper over <code>VirtualService</code> because the raw CRDs are too verbose for app teams.</li>
+          <li><span class="steps__title">The painful migration.</span> Around 150-300 services or ~2,000 pods, the control plane starts thrashing. The platform team rediscovers per-namespace scoping, <code>discoverySelectors</code>, and control-plane sharding — and ambient mode starts looking tempting, though migrating to it is its own multi-month project.</li>
+          <li><span class="steps__title">Maturity.</span> GitOps-managed config, narrow per-namespace scopes, default-deny authorization, golden-path Helm charts for app teams, and a small platform group that knows the discovery protocol by heart. Teams that walk away from a mesh are usually the ones who adopted it before they needed it — 10-service shops that replace it with a managed gateway plus per-language mTLS libraries, reclaiming ~20% of cluster capacity.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://istio.io/latest/docs/ops/deployment/performance-and-scalability/" rel="noopener">Istio Performance and Scalability docs</a> — the official baseline for sidecar CPU/memory per RPS.</li>
+          <li><a href="https://linkerd.io/2025/04/24/linkerd-vs-ambient-mesh-2025-benchmarks/" rel="noopener">Linkerd vs Ambient Mesh 2025 Benchmarks</a> — Buoyant's own numbers, biased but methodologically clear; pair with your own benchmark.</li>
+          <li><a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage" rel="noopener">Envoy response flags reference</a> — bookmark for on-call; the alphabet of mesh debugging.</li>
+          <li><a href="https://tetrate.io/blog/choosing-the-right-istio-architecture-a-data-driven-guide-to-ambient-sidecar-and-hybrid-deployment-models" rel="noopener">Tetrate — Choosing the Right Istio Architecture</a> — a practical sidecar vs. ambient vs. hybrid decision framework.</li>
+          <li><a href="https://gateway-api.sigs.k8s.io/mesh/" rel="noopener">Kubernetes Gateway API (GAMMA)</a> — the portable successor to vendor mesh CRDs.</li>
+          <li><a href="https://medium.com/@gopiaws98/debugging-503-uf-in-envoy-with-istio-and-alb-idle-timeouts-d284ca2cd647" rel="noopener">Debugging 503 UF in Envoy with Istio and ALB Idle Timeouts</a> — a real-world incident write-up covering the timeout-mismatch class of bugs.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

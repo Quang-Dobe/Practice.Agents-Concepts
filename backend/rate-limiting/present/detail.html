@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rate Limiting · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Rate Limiting</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Rate Limiting</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Rate Limiting</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Rate limiting enforces an upper bound on the rate of accepted requests from an identifiable caller — an IP, a user, an API key, a tenant, a route — over a finite time window. It works by <strong>counting</strong> events against shared state and <strong>rejecting or shaping</strong> any event that would push the count past a configured threshold.</p>
+        <ul>
+          <li><strong>Core idea.</strong> It's a special case of
+            <span class="term">admission control</span>
+            <span class="term__gloss">deciding whether to accept work at all, before it starts</span>.
+            A circuit breaker reacts to <em>downstream</em> health; a load shedder reacts to <em>local</em> resource pressure; a rate limiter reacts to <em>caller behavior</em>.</li>
+          <li><strong>Formally.</strong> For a stream of events arriving over time, the limiter decides allow/deny per event so that in every window of length W, the number of allowed events for a given key never exceeds N.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Key extraction</dt><dd>Pulling the identifier the limit is scoped to — an API key header, the <code>sub</code> claim from a JWT, the client IP after trusting <code>X-Forwarded-For</code> for N hops, or a pair like (tenant, route).</dd></div>
+          <div><dt>Counter store</dt><dd>Where per-key state lives: an in-memory dictionary, a Redis hash, a sorted set, or a distributed counter.</dd></div>
+          <div><dt>Algorithm</dt><dd>The policy that turns (state, now, request) into allow/deny: fixed window, sliding window log, sliding window counter, leaky bucket, token bucket, or <span class="term" data-gloss="Generic Cell Rate Algorithm — a leaky-bucket variant specified by the ATM Forum in 1996">GCRA</span>.</dd></div>
+          <div><dt>Decision plane</dt><dd>The code path that either accepts and updates state, or returns <code>429 Too Many Requests</code> with a <code>Retry-After</code> header.</dd></div>
+          <div><dt>Policy configuration</dt><dd>Per-route or per-tier limits, usually loaded from config — Envoy YAML, ASP.NET Core <code>AddFixedWindowLimiter</code>, Nginx <code>limit_req_zone</code>.</dd></div>
+        </dl>
+
+        <p>It sits in the family of <strong>traffic management</strong> primitives alongside load shedding, prioritization, and queueing. Its closest siblings:</p>
+        <ul>
+          <li><strong>Quotas</strong> — a longer horizon, billing-shaped.</li>
+          <li><strong>Concurrency limiters</strong> — cap requests in-flight rather than per-second.</li>
+          <li><strong>Bulkheads</strong> — isolate failure domains.</li>
+          <li><strong>Circuit breakers</strong> — open on downstream failure, not on caller volume.</li>
+        </ul>
+        <p>All five overlap in practice but solve different problems: a token bucket cannot save you from a flapping downstream, and a circuit breaker cannot stop a credential-stuffing attack.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>A request can be rate-limited at up to four layers, often simultaneously:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">1 · Edge / CDN</div><p>Cloudflare, Fastly, AWS WAF. Cheapest to enforce; stops abuse before it touches your origin. Coarse keys: IP, ASN, country.</p></div>
+          <div class="card"><div class="card__title">2 · API gateway / mesh</div><p>Kong, Apigee, Envoy + Lyft's <code>ratelimit</code> service. Enforced after TLS termination but before app code; knows routes and auth claims.</p></div>
+          <div class="card"><div class="card__title">3 · Application middleware</div><p>ASP.NET Core <code>RateLimiter</code>, Express <code>express-rate-limit</code>, Django Ratelimit. Knows business-level identifiers: user ID, plan tier.</p></div>
+          <div class="card"><div class="card__title">4 · Downstream resource wrappers</div><p>A <code>SemaphoreSlim</code> or a Polly rate-limit policy around a third-party SDK, to respect <em>their</em> limits.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App["Your request — pick a caller key"]
+    App --> A["1 · Edge / CDN (Cloudflare, Fastly, AWS WAF)"]
+    App --> B["2 · API gateway / mesh (Kong, Envoy + Lyft ratelimit)"]
+    App --> C["3 · Application middleware (ASP.NET RateLimiter, express-rate-limit)"]
+    App --> D["4 · Downstream resource wrapper (SemaphoreSlim, Polly)"]
+    A --> U[(Origin / third-party API)]
+    B --> U
+    C --> U
+    D --> U
+          </pre>
+          <figcaption class="diagram__caption">Four places the same guard can sit. A mature system layers them: edge stops obvious abuse, gateway enforces per-tenant SLOs, app enforces per-route business rules.</figcaption>
+        </figure>
+
+        <p>You'll meet real implementations everywhere: <strong>Stripe</strong> publishes per-account read/write limits enforced by a token bucket backed by Redis; the <strong>GitHub REST API</strong> allows 5,000 authenticated requests/hour, surfaced via <code>X-RateLimit-*</code> headers; every <strong>AWS</strong> service has its own per-region, per-account TPS limit; <strong>Cloudflare Rate Limiting Rules</strong> count at the edge on any request attribute; and <strong>OpenAI / Anthropic</strong> APIs enforce both RPM (requests per minute) and TPM (tokens per minute), the second being a cost-aware variant.</p>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>.NET:</strong> <code>Microsoft.AspNetCore.RateLimiting</code> (built in since .NET 7, four algorithms shipped), paired with <code>StackExchange.Redis</code> and a Lua script for distributed state.</li>
+          <li><strong>Node/Express:</strong> <code>express-rate-limit</code>; <code>rate-limiter-flexible</code> for Redis, Memcached, Mongo, or clustered Node.</li>
+          <li><strong>Mesh / gateway:</strong> Envoy's <code>ratelimit_filter</code> + the <code>envoyproxy/ratelimit</code> gRPC service; Kong's <code>rate-limiting-advanced</code>; NGINX <code>limit_req_zone</code>.</li>
+          <li><strong>Edge:</strong> Cloudflare Rate Limiting Rules, AWS WAF rate-based rules, Fastly VCL <code>ratecounter</code>.</li>
+          <li><strong>Redis-based custom limiters:</strong> the <code>redis-cell</code> module (GCRA in C), the <code>RedisRateLimiting</code> NuGet package, Stripe's open-source <code>ratelimit</code> Lua scripts.</li>
+          <li><strong>Client-side compliance:</strong> Polly (.NET), <code>tenacity</code> (Python), <code>retry-axios</code> (Node) — all parse <code>Retry-After</code> and back off with jitter.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>The endpoint is reachable by untrusted or partially trusted callers.</li>
+              <li>One caller's pathological behavior could degrade other callers sharing a DB, queue, or cache.</li>
+              <li>You need per-tier differentiation — free vs. paid.</li>
+              <li>The endpoint has expensive backing cost — LLM inference, geocoding, transactional email.</li>
+              <li>You depend on a third-party API with its own limits and need to stay under them.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Traffic is purely east-west, mTLS-authenticated, inside a trusted mesh — use timeouts, concurrency caps, and load shedding instead.</li>
+              <li>The real problem is DDoS volume at L3/L4 — that needs a scrubbing service, not an app limiter that will itself get saturated.</li>
+              <li>Fairness must be strict and queue-like, FIFO — use an explicit queue.</li>
+              <li>Calls are batched and asynchronous with no per-call latency SLA — a queue-based throughput controller is clearer.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>The pattern predates HTTP. <strong>GCRA</strong> was specified by the ATM Forum in <strong>1996</strong> as a leaky-bucket variant for cell-switched networks; <strong>token bucket</strong> appeared in network QoS literature in the late 1980s. Web-scale rate limiting became a daily concern around <strong>2006–2010</strong>, when public APIs like Twitter, Flickr, and AWS S3 discovered that one buggy client could exhaust their capacity. The <code>429</code> status was standardized in <strong>RFC 6585 (2012)</strong>. As of 2026 the IETF draft <code>draft-ietf-httpapi-ratelimit-headers</code> (revision 10) is trying to standardize <code>RateLimit-Limit</code>, <code>RateLimit-Remaining</code>, and <code>RateLimit-Reset</code>, replacing the long-standing zoo of vendor-prefixed <code>X-RateLimit-*</code> headers.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a single request through an app-level, Redis-backed token-bucket limiter:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Key extraction.</span> Middleware reads <code>Authorization: Bearer …</code>, validates the JWT, takes <code>sub</code> as the key. Falls back to client IP for anonymous requests.</li>
+          <li><span class="steps__title">Atomic check-and-decrement.</span> The middleware invokes a Lua script via <code>EVALSHA</code> on Redis. The script reads two fields from a hash: <code>tokens</code> (current count) and <code>last_refill</code> (epoch ms).</li>
+          <li><span class="steps__title">Refill.</span> The script computes <code>elapsed = now - last_refill</code>, then <code>new_tokens = min(capacity, tokens + elapsed * refill_rate)</code>.</li>
+          <li><span class="steps__title">Decision.</span> If <code>new_tokens ≥ 1</code>, decrement by 1, write back, return allowed with the remaining count. Otherwise write back unchanged and return the retry delay: <code>ceil((1 - new_tokens) / refill_rate)</code>.</li>
+          <li><span class="steps__title">TTL.</span> The script sets a
+            <span class="term" data-gloss="time-to-live: an expiry set on a stored key so Redis evicts it automatically">TTL</span>
+            of <code>capacity / refill_rate</code> so idle keys evict.</li>
+          <li><span class="steps__title">Response shaping.</span> On reject, the middleware short-circuits the pipeline, emits <code>429</code>, sets <code>Retry-After</code>, <code>RateLimit-Limit</code>, <code>RateLimit-Remaining: 0</code>, <code>RateLimit-Reset</code>, and increments a <code>ratelimit.rejected</code> metric.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant M as Middleware
+    participant R as Redis Lua script
+    C->>M: request + auth token
+    M->>M: extract key (sub or client IP)
+    M->>R: EVALSHA check-refill-decrement
+    R->>R: elapsed = now - last_refill
+    R->>R: new_tokens = min(capacity, tokens + elapsed*rate)
+    alt new_tokens >= 1
+        R-->>M: allowed, remaining, TTL set
+        M-->>C: 200 OK + RateLimit-Remaining
+    else new_tokens < 1
+        R-->>M: rejected, retry_after_ms
+        M-->>C: 429 + Retry-After + RateLimit-Reset
+    end
+          </pre>
+          <figcaption class="diagram__caption">One round trip to Redis. Atomicity comes from Redis running the whole Lua script as a single indivisible command — without that, an <code>INCR</code>-then-<code>EXPIRE</code> race leaks counters forever.</figcaption>
+        </figure>
+
+        <p>A <strong>sliding window log</strong> works differently: storage is a Redis sorted set keyed by user, each request adds a member scored by <code>now</code>. The script evicts anything older than the window, counts what's left, and rejects past N — exact, but O(N) memory per key. The <strong>sliding window counter</strong> approximates this with just two integers (the current and previous fixed-window counts), accurate to within a few percent at O(1) memory.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Token bucket</td><td>Burst tolerance, simple math, well-understood</td><td>Two parameters to tune (capacity + rate) instead of one</td></tr>
+              <tr><td>Leaky bucket (shaping)</td><td>Perfectly smooth output rate</td><td>Adds queueing latency; needs a queue</td></tr>
+              <tr><td>Fixed window</td><td>One integer per key, trivial to reason about</td><td>Up to 2× burst at window boundaries</td></tr>
+              <tr><td>Sliding window log</td><td>Exact accuracy</td><td>O(N) memory, expensive on hot keys</td></tr>
+              <tr><td>Sliding window counter</td><td>O(1) memory, close to accurate</td><td>~3–5% error vs. exact</td></tr>
+              <tr><td>Local (in-process) limiter</td><td>Sub-microsecond, no network</td><td>Per-instance limits multiply by replica count</td></tr>
+              <tr><td>Distributed (Redis) limiter</td><td>Globally correct</td><td>Adds 0.5–2 ms latency; Redis is now in your hot path</td></tr>
+              <tr><td>Edge limiter</td><td>Stops abuse cheaply, far from origin</td><td>Doesn't know app-level identities (user, plan)</td></tr>
+              <tr><td>Reject (429)</td><td>Immediate, no resource use</td><td>Pushes complexity to clients</td></tr>
+              <tr><td>Shape (queue)</td><td>Smooth UX, no client retries</td><td>Memory pressure under sustained overload</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Thundering herd on Retry-After</p>
+            <p>All clients get the same reset time and retry at once. Cause: a deterministic, un-jittered <code>Retry-After</code> value.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Counter-leak race</p>
+            <p>A counter is incremented but its TTL is never set, so the key lives forever. Cause: a two-call <code>INCR</code> + <code>EXPIRE</code> instead of one Lua script.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Edge-of-window double burst</p>
+            <p>A client sends 2N requests across a window boundary. Cause: fixed window with no smoothing.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">NAT / shared-IP punishment</p>
+            <p>One key — an office NAT, a corporate proxy — represents thousands of legitimate users. Cause: keying by IP when an authenticated identity was available.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Limiter as the bottleneck</p>
+            <p>Redis hits 100% CPU running the Lua script. Cause: a single-instance Redis serving all keys; fix with hash-slot sharding or a local first tier.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Clock skew across nodes</p>
+            <p>A sliding window log evicts the wrong entries. Cause: using each node's local wall clock instead of a server-side time call.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Silent failure under a Redis outage</p>
+            <p>The limiter fails open and admits all traffic. Cause: no explicit fail-closed policy on a cache miss or timeout.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Retry-storm amplification</p>
+            <p>Clients get a 429, retry immediately, get another 429, retry again. Cause: an aggressive client retry budget interacting with a too-tight limit.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Every shared resource — CPU, DB connections, third-party quota, dollars per inference call — is finite. Without admission control, a system's behavior under overload is unspecified: typically queue growth, latency blowup, and cascading timeouts. Rate limiting collapses that into one explicit contract — <em>up to N per W, beyond that a 429</em> — that's cheap to enforce, cheap to communicate, and gives clients deterministic feedback.</p>
+
+        <h3>Why it looks the way it does</h3>
+        <p>Token bucket dominates because it captures the only two facts a real API cares about: the steady-state rate (the drip) and the tolerable burst (the bucket size). Pure leaky bucket forces queueing, which complicates HTTP semantics and adds latency. Pure fixed window is too crude — it lets through nearly double the intended rate right at the window edge:</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 190" role="img" aria-labelledby="windowTitle windowDesc" width="560" style="max-width:100%">
+            <title id="windowTitle">Fixed-window edge-of-boundary double burst</title>
+            <desc id="windowDesc">A limit of five requests per window. Five requests cluster at the end of window A and five more cluster at the start of window B, so ten requests pass in about two seconds even though each window individually stayed within its own limit of five.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">limit = 5 requests / window</text>
+              <!-- window A box -->
+              <rect x="10" y="34" width="260" height="80" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="20" y="52" fill="var(--text-faint)" font-size="12">Window A · 12:00:00–12:00:59</text>
+              <!-- 5 requests clustered at the right edge of window A -->
+              <circle cx="205" cy="80" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="220" cy="80" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="235" cy="80" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="250" cy="80" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="260" cy="95" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="205" y="105" fill="var(--text-muted)" font-size="11">5 requests, last second</text>
+              <!-- window B box -->
+              <rect x="270" y="34" width="260" height="80" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="280" y="52" fill="var(--text-faint)" font-size="12">Window B · 12:01:00–12:01:59</text>
+              <!-- 5 requests clustered at the left edge of window B -->
+              <circle cx="290" cy="80" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="305" cy="80" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="320" cy="80" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="335" cy="80" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="280" cy="95" r="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="290" y="105" fill="var(--text-muted)" font-size="11">5 requests, first second</text>
+              <line x1="270" y1="34" x2="270" y2="114" stroke="var(--warn)" stroke-width="2" stroke-dasharray="4 3"/>
+              <text x="270" y="130" fill="var(--warn)" text-anchor="middle" font-size="12">window boundary</text>
+              <text x="270" y="160" fill="var(--text)" text-anchor="middle" font-size="14">10 requests in ~2 real seconds — 2× the intended rate</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A sliding window or token bucket has no such reset instant, so this double burst can't happen.</figcaption>
+        </figure>
+
+        <p>Sliding window log is too memory-hungry at scale. Token bucket is the middle ground: O(1) state, two intuitive knobs, room for the bursts real clients produce on cold start, and a graceful decay to a flat rate under sustained load. The <code>429</code> + <code>Retry-After</code> design (instead of a silent TCP reset) exists because HTTP is request-response and clients need to know why. Choosing to
+          <span class="term">fail open</span>
+          <span class="term__gloss">let all traffic through when the limiter itself breaks, favoring availability</span>
+          or
+          <span class="term">fail closed</span>
+          <span class="term__gloss">reject traffic when the limiter breaks, favoring cost and safety over availability</span>
+          during an outage is deliberate: most public APIs fail open, while billing-sensitive systems like LLM APIs fail closed, because cost matters more than availability there.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, three pressures keep rate limiting central. First, <strong>LLM API costs</strong> are real money per call, so token-aware limits (RPM plus TPM) are now a first-class product surface. Second, <strong>agentic clients</strong> — AI agents looping with retries — produce traffic patterns humans never did; naive limits either let them run away or strangle legitimate automation, so adaptive, identity-aware limits are becoming the baseline. Third, <strong>multi-tenant SaaS</strong> has matured to where per-tenant fairness during a noisy-neighbor incident is a contractual SLA, not a nice-to-have. The IETF <code>RateLimit</code> headers draft is on track to become an RFC, which should finally end the <code>X-RateLimit-*</code> dialect war.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JWT · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">JWT</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">JWT</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">JWT</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>If you've ever added <code>[Authorize]</code> to a controller and configured <code>AddJwtBearer</code>, you've been a JWT verifier whether you realized it or not. JWT is almost never the interesting part of a feature — it's the load-bearing piece underneath that quietly breaks audits, scaling, and on-call shifts when someone gets a detail wrong.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS backend</div><p>The auth service hands out a JWT after login; every downstream API, gateway, and sidecar verifies it locally instead of calling the auth DB per request.</p></div>
+          <div class="card"><div class="card__title">Microservice mesh</div><p>An API gateway (Kong, Envoy, AWS API Gateway) validates the token at the edge, then forwards it — or a re-signed internal version — so each service reads <code>sub</code>, <code>tenant_id</code>, and <code>scope</code> without re-authenticating.</p></div>
+          <div class="card"><div class="card__title">Federated / workload identity</div><p>OIDC logins, GitHub Actions deploying to AWS, Kubernetes service accounts. JWT is the interchange format: the issuer publishes a public JWKS, the verifier caches it, and the token crosses an org boundary on nothing but a signature.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Use short-lived access tokens + opaque refresh tokens</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Issue access JWTs with <code>exp</code> of 5–15 minutes, paired with a long-lived (days–weeks) refresh token that is opaque, random, and stored server-side (<code>user_id</code>, <code>family_id</code>, <code>expires_at</code>, <code>revoked_at</code>). Rotate the refresh token on every use; if a used one reappears, revoke the whole family.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>JWT has no native revocation. A short access-token life means a stolen one is useful for minutes, not weeks. The refresh token <em>can</em> be revoked because it lives in your database.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Long-lived (hours or days) access JWTs with no refresh flow — that's a bearer credential you cannot recall.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Pick the algorithm based on issuer/verifier trust</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use HS256 only when the same service signs and verifies (single binary, shared secret, no third party). Use RS256 or ES256 whenever issuer and verifier are different services or organizations. Prefer ES256 for new systems — signatures around 64 bytes vs. ~256 for RS256, faster to verify, equivalent security at a smaller key size.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>With HS256, every verifier holds the signing secret. One compromised verifier forges tokens for the whole system. Asymmetric signing lets verifiers hold only the public key.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>HS256 with a secret shared across teams or environments — it will leak via a config file, a Docker image, or a Slack message.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Pin the <code>alg</code> to an allow-list on verify</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Hard-code the accepted algorithms in your verifier config and never let the token's own header decide:</p>
+            <pre><code>jwt.verify(token, key, {
+  algorithms: ['RS256'],   // allow-list, not "whatever the header says"
+  issuer: 'https://auth.example.com',
+  audience: 'api.example.com',
+});</code></pre></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The <code>alg: none</code> bypass and the classic RS256→HS256 confusion attack both depend on the verifier trusting the header. An allow-list shuts both down.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Calling <code>verify(token, key)</code> with no <code>algorithms</code> option — some libraries still default to "any."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Always verify signature, <code>exp</code>, <code>iss</code>, and <code>aud</code> — in that order</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run the full check on every request, even between internal services. Signature first (reject forgeries before parsing claims), then <code>exp</code> with 30–60s leeway, then <code>iss</code> exact-match, then <code>aud</code> contains your service's identifier.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Skipping <code>aud</code> lets a token issued for service A be replayed against service B. Skipping <code>iss</code> lets a rogue IdP whose key you happen to trust mint valid tokens for you. Both are real CVE patterns.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"It came through the gateway, so it's fine." Defense in depth means every hop verifies.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Fetch verification keys from a JWKS endpoint with <code>kid</code>-aware caching</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Resolve keys via the issuer's <code>/.well-known/jwks.json</code> (or the OIDC discovery document). Cache the JWKS in memory, refresh only on an unknown <code>kid</code> (rate-limited, e.g. minimum 5 minutes between refetches). Set <code>kid</code> on every token you sign.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Key rotation is when systems break. JWKS + <code>kid</code> is how rotation happens with zero downtime — the issuer publishes the new key, signs with it, verifiers pick it up on the next miss.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hard-coding the public key in config (someone forgets to rotate it), or refetching JWKS on every request (you'll take down your own IdP).</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Pick client-side storage with eyes open about XSS vs. CSRF</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For browser apps, default to <code>httpOnly; Secure; SameSite=Lax</code> (or <code>Strict</code>) cookies plus CSRF protection on state-changing endpoints. For SPAs needing cross-origin calls, an in-memory access token + httpOnly refresh-token cookie is the modern compromise.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>localStorage</code> is readable by any JS on the page — one XSS and every token is exfiltrated. Cookies are immune to that but reintroduce CSRF. There's no option without a trade-off; pick consciously.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Putting the JWT in <code>localStorage</code> "because it's easier," and never putting a JWT in a URL query string — it ends up in history, Referer headers, and proxy logs.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Keep payloads small and free of PII</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Put <code>sub</code>, <code>iss</code>, <code>aud</code>, <code>exp</code>, <code>iat</code>, <code>jti</code>, and a handful of authorization claims (<code>scope</code>, <code>roles</code>, <code>tenant_id</code>). Anything bigger — full profile, permission matrix — belongs behind a lookup the resource server does once and caches.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every request carries the token. Past roughly 4 KB, tokens start hitting default header limits in Nginx, ALB, and CloudFront (commonly an 8 KB total request-header budget). PII in the payload means a token leak is also a data-protection incident.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Stuffing every permission into the token "so downstream doesn't have to look anything up." That's how you discover the 8 KB header limit at 2 a.m.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Design revocation before you need it</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Decide upfront: short <code>exp</code> is your primary revocation strategy. For logout / disabled accounts / suspected theft, add a
+              <span class="term">deny-list</span>
+              <span class="term__gloss">a store of revoked token IDs (jti) that verifiers check after signature verification</span>
+              keyed on <code>jti</code> in Redis, TTL'd to the token's remaining lifetime. Rotating the signing key invalidates every token in flight, for "something bad happened."</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>"We'll add revocation later" becomes "we have no way to log a user out" during an incident. Decide which scenarios you actually need to cover, and which the short <code>exp</code> already handles.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A deny-list every request hits unconditionally — you've reinvented sessions, more slowly, with worse semantics.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Separate secrets per environment, rotate signing keys on a schedule</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use different signing keys per environment (dev, staging, prod). Rotate on a schedule (quarterly is common) and immediately on suspected compromise. Keep the previous key in the JWKS during the overlap window so in-flight tokens still verify.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A leaked staging key that also signs prod tokens is an instant production breach. Scheduled rotation forces the rotation machinery to actually work.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>One <code>.env</code> value reused across environments — or one key signing tokens since 2019.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Know the standardized profiles you're actually implementing</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Issuing OAuth 2.0 access tokens as JWTs? Follow RFC 9068 (<code>typ: at+jwt</code>, required claims, audience binding). Doing OIDC? Follow the <code>id_token</code> rules in the OIDC Core spec — it's for the client, not for authorizing API calls. If token theft is in your threat model, look at
+              <span class="term">DPoP</span>
+              <span class="term__gloss">Demonstrating Proof of Possession, RFC 9449 — binds a token to a private key the client holds, so a stolen token alone isn't enough</span>
+              (RFC 9449) or mTLS-bound tokens (RFC 8705).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Reinventing these profiles guarantees subtle interop bugs with Auth0, Okta, Entra ID, and every SDK that expects them.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using an OIDC <code>id_token</code> as an API access token — a common confusion that breaks audience semantics.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">"Just decode it to read the user id"</p>
+            <p>Code calls a decode function (no signature check) to pull <code>sub</code> out and never adds the verify step later. Any attacker can mint a token with any <code>sub</code>. Always verify, then read claims — never the reverse.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting the header's <code>alg</code></p>
+            <p>The verifier picks the algorithm dynamically from <code>token.header.alg</code>. Enables <code>alg: none</code> and RS256→HS256 confusion. Fix: an explicit allow-list in the verify call.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Storing passwords or full PII in claims</p>
+            <p>Assuming "signed" means "encrypted." Anyone who captures the token reads it on jwt.io. Fix: claims hold IDs and authorization data only; lookups happen server-side.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Infinite-lived tokens</p>
+            <p><code>exp</code> set to a year, or missing entirely, "because refresh is annoying." A single stolen token = a year of access. Fix: short <code>exp</code> + refresh tokens, always.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Same signing key across environments</p>
+            <p>A dev laptop's <code>.env</code> leaks the key that also signs production tokens. Fix: per-environment keys, rotated on a schedule.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">JWTs in URLs</p>
+            <p>Magic links, implicit-flow fragments, <code>?token=...</code> query parameters. They leak via browser history, Referer headers, CDN logs, and screenshots. Fix: POST bodies or the <code>Authorization</code> header; for magic links, a short-lived single-use code exchanged over POST.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">No <code>aud</code> enforcement in a multi-API system</p>
+            <p>The same IdP issues tokens for multiple APIs; one API skips <code>aud</code> and accepts tokens minted for any of them. Fix: every resource server pins its own audience identifier and rejects mismatches.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Refresh tokens that never rotate</p>
+            <p>A refresh token is reused indefinitely; theft is undetectable. Fix: rotate on every refresh, revoke the family if an old one reappears (RFC 9700, the OAuth 2.0 BCP).</p></div></div>
+
+        <!-- REFRESH LIFECYCLE DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant R as Resource Server
+    participant A as Auth Server
+    C->>R: API call with short-lived access JWT
+    Note over C,R: exp passes - access token expires
+    C->>A: Refresh using stored refresh token
+    A->>A: Validate refresh token, then rotate it
+    A-->>C: New access JWT + new refresh token
+    alt old refresh token replayed later
+        A->>A: Reuse detected - revoke whole token family
+        A-->>C: 401 - re-authenticate required
+    end
+          </pre>
+          <figcaption class="diagram__caption">
+            <span class="term">Refresh token rotation</span>
+            <span class="term__gloss">issuing a new refresh token on every use and revoking the whole family if an old one reappears</span>
+            — the standard mitigation for JWT's weak revocation story.
+          </figcaption>
+        </figure>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">B2B SaaS with tenant isolation</div>
+            <p>Auth service issues RS256 JWTs with <code>sub</code>, <code>tenant_id</code>, <code>roles</code>, <code>scope</code>, 15-minute <code>exp</code>. Every API validates against the auth service's JWKS, enforces <code>aud=api.example.com</code>, and scopes every query by <code>tenant_id</code>. <em>Lesson:</em> role changes don't propagate until the access token expires — "removing a user takes up to 15 minutes" needs to be a known product fact, or you need a deny-list path.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Microservice mesh behind a gateway</div>
+            <p>Envoy validates the external customer JWT at the edge, then mints a short-lived internal JWT signed by the mesh CA for downstream services, which trust only that CA's JWKS. <em>Lesson:</em> re-minting at the edge lets internal-only claims (trace context, downstream-only roles) travel without ever reaching the customer. The cost is one extra signing operation per request — measure it.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">CI/CD workload identity</div>
+            <p>GitHub publishes a JWKS at a well-known URL; AWS STS verifies the OIDC token's signature, <code>iss</code>, <code>aud</code>, and a <code>sub</code> pattern like <code>repo:org/repo:ref:refs/heads/main</code> before assuming a role — no long-lived AWS keys. <em>Lesson:</em> the whole model rests on the <code>sub</code> trust-policy condition; writing a wildcard match instead of an exact one silently grants any repo in the org access to your prod role.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Mobile app with biometric re-auth</div>
+            <p>The access JWT lives in memory only. The refresh token sits in the OS keychain, protected by biometrics; on app foreground, it's exchanged for a fresh access JWT. <em>Lesson:</em> keychain-backed refresh tokens are the closest thing to "device-bound" without DPoP — they survive app reinstalls badly, so clearing the keychain entry is the actual logout.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> are verification-failure metrics broken down by reason (<code>expired</code>, <code>bad_signature</code>, <code>wrong_aud</code>, <code>unknown_kid</code>)? A spike in <code>bad_signature</code> is either a bad key rotation or an attack.</li>
+              <li><strong>Failure handling:</strong> if the JWKS endpoint is down, is the cache stale-while-revalidate or fail-closed — and has that been tested in a chaos drill?</li>
+              <li><strong>Algorithm pinning:</strong> does every <code>verify</code> call pass an explicit <code>algorithms</code> allow-list? Grep the codebase for a decode-without-verify pattern.</li>
+              <li><strong>Audience and issuer pinning:</strong> does every resource server have its own <code>aud</code> identifier and a configured (not inferred) issuer URL?</li>
+              <li><strong>Token size:</strong> is the p99 access-token size tracked as a metric and kept under 4 KB?</li>
+              <li><strong>Refresh-token storage:</strong> are refresh tokens hashed at rest, rotated on use, and family-revoked on reuse detection?</li>
+              <li><strong>Key management:</strong> do signing keys differ per environment, and has the rotation runbook been run at least once outside an emergency?</li>
+              <li><strong>Logging hygiene:</strong> no raw <code>Authorization</code> headers in logs — is <code>Bearer</code> redaction covered by a test?</li>
+              <li><strong>Onboarding:</strong> can a new engineer find the issuer URL, JWKS URL, expected <code>aud</code>, and token TTL in one place?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">HS256 and a shared secret.</span> Every tutorial starts here. It works until a second service needs to verify tokens and someone copies the secret into a second <code>.env</code> file.</li>
+          <li><span class="steps__title">Migration to RS256/ES256 + JWKS.</span> Usually triggered by a leaked-config-file incident, or by adopting a hosted IdP (Auth0, Cognito, Entra ID) that issues asymmetric tokens by default.</li>
+          <li><span class="steps__title">The revocation inflection point.</span> Early systems ship without it — short <code>exp</code> is "good enough" until support needs to instantly log out a compromised account. Teams either add a Redis deny-list keyed on <code>jti</code>, or accept and document the window. Shortening long-lived tokens later is the painful migration: every client that mishandles refresh breaks at once.</li>
+          <li><span class="steps__title">Maturity.</span> Hosted or hardened IdP, ES256 signing, JWKS with scheduled <code>kid</code> rotation, 5–15 minute access tokens, rotating refresh tokens with family revocation, and DPoP or mTLS-bound tokens for high-value APIs. The remaining work is about which claims go in the token and who's allowed to add new ones — claim bloat is the long-term threat, not crypto.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.rfc-editor.org/rfc/rfc9700.html" rel="noopener">RFC 9700 — Best Current Practice for OAuth 2.0 Security</a> — the IETF's consolidated advice; the refresh-token rotation and sender-constraint sections are essential.</li>
+          <li><a href="https://www.rfc-editor.org/rfc/rfc9068.html" rel="noopener">RFC 9068 — JWT Profile for OAuth 2.0 Access Tokens</a> — turns "JWTs as access tokens" from convention into requirement; states exactly which claims must appear.</li>
+          <li><a href="https://www.rfc-editor.org/rfc/rfc9449.html" rel="noopener">RFC 9449 — DPoP (Demonstrating Proof of Possession)</a> — the modern answer to bearer-token theft; worth reading even if you don't implement it yet.</li>
+          <li><a href="https://auth0.com/docs/secure/tokens/refresh-tokens/refresh-token-rotation" rel="noopener">Auth0 — Refresh Token Rotation</a> — a clean, concrete writeup of the rotation-with-family-revocation pattern.</li>
+          <li><a href="https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html" rel="noopener">OWASP — JSON Web Token Cheat Sheet</a> — the attack-surface counterpart to the RFCs; covers the alg-confusion and <code>none</code> attacks at implementation level.</li>
+          <li><a href="https://portswigger.net/web-security/jwt" rel="noopener">PortSwigger Web Security Academy — JWT Attacks</a> — interactive labs for every classic JWT vulnerability; do them once and you will never write a vulnerable verifier.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

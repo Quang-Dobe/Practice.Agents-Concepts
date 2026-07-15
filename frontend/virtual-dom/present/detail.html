@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Virtual DOM · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Virtual DOM</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Virtual DOM</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Virtual DOM</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~9 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A Virtual DOM (VDOM) is an in-memory tree of plain JavaScript objects that mirrors the structure the framework wants the real DOM to take, paired with a <span class="term">reconciler</span><span class="term__gloss">the algorithm that walks the old and new tree and decides what to insert, update, or remove</span> that diffs a new tree against the previously committed one and emits a minimal sequence of imperative DOM mutations.</p>
+        <ul>
+          <li><strong>It's a pattern, not a standard.</strong> Every framework picks its own vnode shape, its own diffing heuristics, and its own scheduling layer.</li>
+          <li><strong>The contract, roughly:</strong> <code>render(state) → VTree_new</code>, then <code>diff(VTree_old, VTree_new) → Patch</code>, then <code>apply(Patch) → real DOM mutations</code>.</li>
+          <li><strong>Family.</strong> It belongs to the declarative UI runtimes — the middle path between hand-written imperative DOM code and a compiler that emits updates at build time.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>VNode</dt><dd>A JS object describing one element — at minimum <code>{ type, props, children }</code>. React calls it a <code>ReactElement</code>; Vue calls it a <code>VNode</code>; Snabbdom calls it that too.</dd></div>
+          <div><dt>VTree</dt><dd>The root-down tree produced by a single render call. Pure data, no DOM handles.</dd></div>
+          <div><dt>Component</dt><dd>A function (or class) whose output is a vtree. Owns local state and re-renders when that state changes.</dd></div>
+          <div><dt>Reconciler</dt><dd>Walks <code>(oldTree, newTree)</code> and decides what to insert, update, or remove.</dd></div>
+          <div><dt>Renderer</dt><dd>The platform-specific backend that turns a patch into real side effects. <code>react-dom</code> is one renderer; <code>react-native</code> is another; Ink renders to a terminal. The reconciler itself is platform-agnostic.</dd></div>
+          <div><dt>Scheduler</dt><dd>Decides <em>when</em> reconciliation work runs and at what priority. React's scheduler uses a lane model; Vue uses a microtask queue.</dd></div>
+          <div><dt>Key</dt><dd>A stable identity hint on list children that lets the diff match nodes across renders instead of zipping positionally.</dd></div>
+        </dl>
+        <p>Its siblings in the declarative-UI family: <strong>fine-grained reactivity</strong> (SolidJS, MobX, Vue's reactive proxies), where individual state reads wire up targeted DOM bindings and no tree is rediffed, and <strong>compile-time DOM</strong> (Svelte 4), which turns templates into update instructions at build time. The VDOM is the runtime middle path — declarative like signals, general like a compiler, slower than both in the steady state.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>It runs entirely on the main thread, in JavaScript, between your component code and <code>document.*</code> calls — in the browser, in Node during server-side rendering, and in any host that ships a renderer.</p>
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    A["Your component code"] --> B["Reconciler — diff(oldVTree, newVTree)"]
+    B --> C{Which renderer?}
+    C --> D["react-dom → browser DOM"]
+    C --> E["react-native → native views"]
+    C --> F["ink → terminal"]
+    C --> G["react-three-fiber → WebGL scene graph"]
+          </pre>
+          <figcaption class="diagram__caption">One reconciler, many renderers. The diff logic is platform-agnostic; only the last mile changes.</figcaption>
+        </figure>
+
+        <h3>Where you typically encounter it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">React</div><p>The canonical VDOM library; its reconciler is Fiber.</p></div>
+          <div class="card"><div class="card__title">Vue 2 and Vue 3</div><p>Vue 3's renderer is a VDOM augmented with compiler-emitted patch flags. Vapor Mode opts individual components out of the VDOM entirely.</p></div>
+          <div class="card"><div class="card__title">Preact</div><p>A 3 kB VDOM with a React-compatible API.</p></div>
+          <div class="card"><div class="card__title">Inferno</div><p>A VDOM tuned for raw benchmark speed.</p></div>
+          <div class="card"><div class="card__title">Snabbdom</div><p>The lean library Vue 2 was originally built on; still used as a teaching reference.</p></div>
+          <div class="card"><div class="card__title">Mithril, hyperapp</div><p>Smaller VDOM frameworks still in production use.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Inspecting vtrees:</strong> React DevTools, Vue DevTools — see the component/fiber tree and its props and state.</li>
+          <li><strong>Measuring reconciliation cost:</strong> the browser's Performance panel, the React Profiler (records render duration per commit), <code>why-did-you-render</code>.</li>
+          <li><strong>Bypassing the VDOM where it hurts:</strong> <code>useMemo</code>, <code>React.memo</code>, <code>useTransition</code>, Vue's <code>v-once</code> / <code>v-memo</code>, the React Compiler (auto-memoization, stable since React 19).</li>
+          <li><strong>Alternative renderers of the same VDOM:</strong> <code>react-three-fiber</code>, <code>react-native</code>, <code>ink</code>, <code>react-pdf</code>.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>State updates touch many nodes scattered across the tree — dashboards, editors, chat, social feeds.</li>
+              <li>The UI is naturally a <code>state → tree</code> function and you don't want to track DOM nodes by hand.</li>
+              <li>You need one component model that targets multiple backends (web, native, canvas).</li>
+              <li>You want server-rendered HTML hydrated by the same code on the client.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The page is mostly static with a sprinkle of interactivity — a <code>&lt;script&gt;</code> block or htmx is lighter.</li>
+              <li>You need predictably sub-millisecond updates per event (instrument UIs, audio meters, high-frequency canvas) — go imperative or use Solid/Svelte.</li>
+              <li>The component count is small but updates are constant, like a single counter at 60 fps — <code>textContent =</code> beats any reconciler.</li>
+              <li>Your team is small enough that the per-update overhead and the ~40 kB bundle cost outweigh the ergonomic win.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>React introduced the Virtual DOM publicly in 2013. Facebook's motivating problem was the news feed: many small, interdependent state changes producing inconsistent UI when written by hand — a dropdown that forgot to close, an unread badge out of sync. Diff-and-patch on a tree mirror is an older idea (XSLT, Erlang's <code>simple_diff</code>, virtual rendering in game engines); React's contribution was the heuristic that made diffing two arbitrary UI trees cheap enough to run on every state change in a real browser.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>The lifecycle of one update in a <span class="term" data-gloss="React's unit-of-work tree — each node can pause and resume rendering independently">Fiber</span>-style reconciler:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Trigger.</span> A state setter (<code>setState</code>, a <code>useState</code> setter, a Vue reactive write) marks a component dirty and schedules work.</li>
+          <li><span class="steps__title">Render phase (interruptible).</span> The reconciler walks down from the dirty component, calling each component function to build a new, work-in-progress tree — via
+            <span class="term">double-buffering</span><span class="term__gloss">building the next tree in memory without touching what's on screen, through an alternate pointer to the current tree</span>,
+            so the screen isn't disturbed while the next version is built.</li>
+          <li><span class="steps__title">Diffing.</span> For each old/new node pair at the same position: if the type differs, tear down the old subtree and mount the new one — no further diffing inside. If the type matches, keep the DOM node, diff its props, then recurse into children. For child lists, match by <code>key</code> where provided; without keys the diff is positional.</li>
+          <li><span class="steps__title">Yielding.</span> The render phase runs in small units. Between units the scheduler checks for higher-priority work — user input, an animation frame — and if so pauses, lets the browser breathe, and resumes later. This is the "concurrent" part of concurrent React.</li>
+          <li><span class="steps__title">Commit phase (synchronous, uninterruptible).</span> Once the work-in-progress tree is complete, the framework applies the DOM mutations, runs refs, then layout and passive effects. The alternate pointers swap: work-in-progress becomes current.</li>
+          <li><span class="steps__title">Paint.</span> The next frame reflects the patched DOM.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Rendering: state setter schedules work
+    Rendering --> Rendering: yields to input/animation, then resumes
+    Rendering --> Diffing: work-in-progress tree complete
+    Diffing --> Committing: patch list ready
+    Committing --> Idle: DOM mutated, effects run, trees swap
+    note right of Rendering: interruptible — can pause mid-tree
+    note right of Committing: synchronous and uninterruptible
+          </pre>
+          <figcaption class="diagram__caption">One update's lifecycle. Only the Rendering phase can pause; Committing always runs start to finish.</figcaption>
+        </figure>
+
+        <p>The diff itself is <strong>O(n)</strong> rather than the textbook tree-edit-distance <strong>O(n³)</strong>, because of two assumptions baked in: elements of different types are assumed to yield different trees, so a type change short-circuits the recursion; and keys identify stable siblings, turning list reconciliation into a hash-map lookup instead of a full alignment problem.</p>
+
+        <pre><code>function diffChildren(parentDOM, oldChildren, newChildren) {
+  const oldByKey = new Map(oldChildren.map(c => [c.key, c]));
+  let lastIndex = 0;
+  newChildren.forEach((newChild, i) => {
+    const oldChild = oldByKey.get(newChild.key);
+    if (oldChild) {
+      patch(oldChild, newChild);                 // same key -> update in place
+      if (oldChild.index < lastIndex) move(parentDOM, oldChild.dom, i);
+      else lastIndex = oldChild.index;
+      oldByKey.delete(newChild.key);
+    } else {
+      mount(parentDOM, newChild, i);             // new key -> insert
+    }
+  });
+  for (const leftover of oldByKey.values()) unmount(parentDOM, leftover);
+}</code></pre>
+
+        <h3>Why the key matters: two ways to diff the same list update</h3>
+        <p>Insert one new row at the head of a 3-item list. With keys, the diff matches by identity and reuses the existing DOM nodes; without keys, it matches by position and rewrites every row after the insertion point.</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 620 260" role="img" aria-labelledby="keyTitle keyDesc" width="620" style="max-width:100%">
+            <title id="keyTitle">Keyed vs positional list diffing</title>
+            <desc id="keyDesc">Inserting one item at the head of a three-item list. Keyed diffing mounts one new node and moves the rest, reusing their DOM identity. Positional diffing without keys instead rewrites the content of every existing row and mounts only the last one, losing DOM state such as focus or animation.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+
+              <text x="10" y="18" fill="var(--text-muted)" font-size="13">Keyed — identity follows the id</text>
+              <rect x="10"  y="28" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="40" y="47" fill="var(--text)" text-anchor="middle">id:1</text>
+              <rect x="80"  y="28" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="110" y="47" fill="var(--text)" text-anchor="middle">id:2</text>
+              <rect x="150" y="28" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="180" y="47" fill="var(--text)" text-anchor="middle">id:3</text>
+
+              <line x1="40"  y1="58" x2="150" y2="86" stroke="var(--border)"/>
+              <line x1="110" y1="58" x2="220" y2="86" stroke="var(--border)"/>
+              <line x1="180" y1="58" x2="290" y2="86" stroke="var(--border)"/>
+
+              <rect x="80"  y="86" width="60" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="110" y="105" fill="var(--accent)" text-anchor="middle">id:9</text>
+              <rect x="150" y="86" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="180" y="105" fill="var(--text)" text-anchor="middle">id:1</text>
+              <rect x="220" y="86" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="250" y="105" fill="var(--text)" text-anchor="middle">id:2</text>
+              <rect x="290" y="86" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="320" y="105" fill="var(--text)" text-anchor="middle">id:3</text>
+              <text x="10" y="132" fill="var(--text-faint)">1 mount (id:9) + 3 moves. DOM for 1, 2, 3 is reused untouched.</text>
+
+              <text x="10" y="168" fill="var(--text-muted)" font-size="13">Positional — position is the only identity</text>
+              <rect x="10"  y="178" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="40" y="197" fill="var(--text)" text-anchor="middle">pos0</text>
+              <rect x="80"  y="178" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="110" y="197" fill="var(--text)" text-anchor="middle">pos1</text>
+              <rect x="150" y="178" width="60" height="30" rx="6" fill="none" stroke="var(--border)"/><text x="180" y="197" fill="var(--text)" text-anchor="middle">pos2</text>
+
+              <line x1="40"  y1="208" x2="40"  y2="216" stroke="var(--border)"/>
+              <line x1="110" y1="208" x2="110" y2="216" stroke="var(--border)"/>
+              <line x1="180" y1="208" x2="180" y2="216" stroke="var(--border)"/>
+
+              <rect x="10"  y="216" width="60" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="40" y="235" fill="var(--danger)" text-anchor="middle">pos0'</text>
+              <rect x="80"  y="216" width="60" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="110" y="235" fill="var(--danger)" text-anchor="middle">pos1'</text>
+              <rect x="150" y="216" width="60" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="180" y="235" fill="var(--danger)" text-anchor="middle">pos2'</text>
+              <rect x="220" y="216" width="60" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="250" y="235" fill="var(--accent)" text-anchor="middle">pos3</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">3 nodes wrongly reused with the wrong content, plus 1 mount. Input focus, animation state, and video playback follow the <em>position</em>, not the item.</figcaption>
+        </figure>
+
+        <p>Vue 3 adds a compile-time twist: its template compiler emits <span class="term">patch flags</span><span class="term__gloss">compiler-emitted hints marking exactly which part of a vnode can change</span>, e.g. "this element's only dynamic part is its <code>class</code>," so the runtime skips everything else, and gathers dynamic descendants into a flat <strong>block</strong> array so an update walks only dynamic nodes: <code>O(dynamic)</code>, not <code>O(total)</code>.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Diff a tree mirror instead of touching the DOM</td><td>Declarative code; cross-platform renderers; predictable <code>state → UI</code></td><td>Per-update CPU and allocation cost; bundle size for the reconciler</td></tr>
+              <tr><td>O(n) heuristic diff (same-type, keys)</td><td>Cheap enough to run on every render</td><td>Cross-type moves and reordering without keys are worst-case slow</td></tr>
+              <tr><td>Interruptible render phase (Fiber)</td><td>Long renders no longer freeze input</td><td>Effects can run more than once across pauses; a more complex mental model</td></tr>
+              <tr><td>Component-level memoization (<code>React.memo</code>, <code>useMemo</code>)</td><td>Skip subtrees when inputs are equal</td><td>Manual referential-equality bookkeeping; easy to misuse</td></tr>
+              <tr><td>Compiler-assisted VDOM (Vue 3 patch flags, React Compiler)</td><td>Reduces work without changing the user-facing API</td><td>Tighter coupling between compiler and runtime</td></tr>
+              <tr><td>VDOM over fine-grained reactivity (signals)</td><td>One mental model, no subscription graph to wire up</td><td>Steady-state updates traverse more code than a direct signal write</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Keys based on array index in a reorderable list</p>
+            <p>The diff matches by position, not by item, so state attached to a child — input focus, an animation, video playback position — jumps to the wrong row.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">A fresh object literal as a prop on every render</p>
+            <p>Breaks <code>React.memo</code> / <code>PureComponent</code> shallow equality, defeats memoization, and re-renders the whole subtree anyway.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Wrapping the app in a context whose value is a fresh object</p>
+            <p>Every consumer reconciles on every render, no matter how small the actual change was.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Type oscillation</p>
+            <p>Conditionally swapping a <code>&lt;div&gt;</code> for a <code>&lt;section&gt;</code> around the same children forces an unmount and remount, losing all DOM state.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">A giant flat list without virtualization</p>
+            <p>The diff is O(n), but n = 50,000 still allocates 50,000 vnodes per render. Pair long lists with <code>react-window</code> or <code>vue-virtual-scroller</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Effect cascades</p>
+            <p>A <code>useEffect</code> writes state that triggers another render, which triggers another effect — an infinite reconciliation loop until the framework bails out with a warning.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>The DOM is an imperative, stateful, slow-to-mutate API, but UI logic is naturally a pure function of state. Bridging that gap by hand — tracking which node needs which attribute change — doesn't scale across a team. The VDOM makes the bridge automatic, at the cost of some bookkeeping CPU. It also batches mutations: instead of writing to the DOM mid-computation (which can force a layout read), it collects every change first and writes once, in a single commit pass.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 210" role="img" aria-labelledby="batchTitle batchDesc" width="560" style="max-width:100%">
+            <title id="batchTitle">Interleaved writes vs one batched commit</title>
+            <desc id="batchDesc">Without batching, writes and reads alternate, forcing a layout recalculation after each write. With VDOM batching, every change is computed first and written once, paying the layout cost only a single time.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">Without batching</text>
+              <rect x="10"  y="30" width="60" height="32" rx="6" fill="var(--border-soft)" stroke="var(--border)"/><text x="40" y="51" fill="var(--text)" text-anchor="middle">write</text>
+              <rect x="80"  y="30" width="60" height="32" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="110" y="51" fill="var(--danger)" text-anchor="middle">reflow</text>
+              <rect x="150" y="30" width="60" height="32" rx="6" fill="var(--border-soft)" stroke="var(--border)"/><text x="180" y="51" fill="var(--text)" text-anchor="middle">write</text>
+              <rect x="220" y="30" width="60" height="32" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="250" y="51" fill="var(--danger)" text-anchor="middle">reflow</text>
+              <rect x="290" y="30" width="60" height="32" rx="6" fill="var(--border-soft)" stroke="var(--border)"/><text x="320" y="51" fill="var(--text)" text-anchor="middle">write</text>
+              <rect x="360" y="30" width="60" height="32" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="390" y="51" fill="var(--danger)" text-anchor="middle">reflow</text>
+              <text x="10" y="86" fill="var(--text-faint)" font-size="12">Each interleaved read forces a fresh layout pass — 3 reflows.</text>
+
+              <text x="10" y="126" fill="var(--text-muted)">With VDOM batching</text>
+              <rect x="10"  y="136" width="130" height="32" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="75" y="157" fill="var(--accent)" text-anchor="middle">compute whole patch</text>
+              <rect x="150" y="136" width="90" height="32" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="195" y="157" fill="var(--accent)" text-anchor="middle">write once</text>
+              <rect x="250" y="136" width="70" height="32" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="285" y="157" fill="var(--danger)" text-anchor="middle">1 reflow</text>
+              <text x="10" y="192" fill="var(--text-faint)" font-size="12">All reads happen first, on the tree in memory — layout pays once, at the very end.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The VDOM turns N interleaved read/write cycles into one computed patch and one commit.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>An obvious alternative is <strong>fine-grained reactivity</strong>: at setup time, every state-dependent expression registers itself as a subscriber and updates exactly the DOM nodes that read it. Knockout did this in 2010; SolidJS, MobX, and Vue's reactive system do it today. It's faster in the steady state — no diff, no tree walk — but it needs either explicit signal primitives or proxies over your state, and the subscription graph itself costs memory and setup time.</p>
+        <p>The other alternative is <strong>compile-time DOM</strong>, as in Svelte 4: the compiler emits per-component update functions that mutate exactly the right nodes, with no runtime diff and a tiny bundle. The trade-off is that the compiler must see the template statically — dynamic component types and runtime tree shapes are harder to support.</p>
+        <p>React's bet was the opposite of both: keep the user-facing model as "just call a function with new props," and pay for the diff. That bet is what makes components plain functions and what makes a <code>useState</code> setter feel free at the call site. VDOM is the design you pick when you want declarative code, runtime flexibility, and one mental model, and are willing to spend CPU on a diff to get them.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026 the VDOM is neither growing nor going away. Pure VDOM loses benchmark battles to Solid and Svelte 5, but the response from VDOM frameworks has been to layer compilers and signals on top rather than abandon the model. The React Compiler, stable since React 19, auto-memoizes components so most manual <code>useMemo</code> / <code>useCallback</code> calls become unnecessary. Vue 3.6 introduced Vapor Mode, a per-component opt-out of the VDOM that compiles straight to direct DOM updates. Both accept the same conclusion: the VDOM is the right default, but its steady-state cost is worth optimizing away once the compiler can prove it's safe.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

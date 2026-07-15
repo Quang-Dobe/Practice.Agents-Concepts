@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CAP Theorem · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CAP Theorem</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CAP Theorem</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CAP Theorem</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Distributed databases copy data across many machines. When the network between those machines breaks — a
+          <span class="term">partition</span>
+          <span class="term__gloss">a network split that stops some nodes from reaching others</span>
+          — you cannot give every client the newest correct data <em>and</em> keep every node answering. You have to pick one.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>CAP Theorem says that during a partition, a distributed system must choose between staying correct (reject some requests) or staying up (answer every request, even with stale data). Partitions are not rare — they happen on real networks all the time — so every distributed system is making this choice, whether the team names it or not.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a bank with two branches, Hanoi and Saigon, sharing one account ledger by phoning each other after every transaction. Now the phone line cuts out.</p>
+        <p>A customer walks into the Saigon branch and asks to withdraw $500. The teller has two options:</p>
+        <ul>
+          <li><strong>Refuse the withdrawal</strong> until the line is back. The ledger stays correct everywhere — no risk of the same $500 leaving twice — but the customer leaves angry. This is
+            <span class="term" data-gloss="sacrifices availability to stay consistent during a partition">CP</span>.</li>
+          <li><strong>Allow the withdrawal</strong> and write it down locally, planning to sync later. The customer is happy, but the two branches now disagree about the balance until they reconnect — and might find an overdraft when they do. This is
+            <span class="term" data-gloss="sacrifices consistency to stay available during a partition">AP</span>.</li>
+        </ul>
+        <p>There is no third door where the Saigon teller magically knows the Hanoi balance without a working phone line. That third door doesn't exist once you accept that phone lines — and networks — can drop.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    HN["Hanoi branch: ledger says $1000"]
+    SG["Saigon branch: ledger says $1000"]
+    HN -. phone line cuts .-> SG
+    SG --> W{"Saigon teller: customer wants $500 out"}
+    W -->|Refuse the withdrawal| CPn["CP: ledger stays correct, customer waits"]
+    W -->|Allow the withdrawal| APn["AP: customer served, branches may disagree"]
+          </pre>
+          <figcaption class="diagram__caption">The whole trade-off in one shape: once the line is down, the teller must either refuse or risk disagreement.</figcaption>
+        </figure>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a permanent pick-two rule.</strong> The trade-off only bites <em>during</em> a partition. In normal operation you usually get all three properties at once.</li>
+              <li><strong>Not the same as ACID.</strong> ACID is about transactions on one database. CAP is about behavior across many nodes when the network misbehaves.</li>
+              <li><strong>Not the whole picture.</strong> PACELC extends it to cover latency-vs-consistency choices even when the network is healthy — that's a Detail-page topic.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You're choosing a database for a multi-region service and need to reason about isolated regions.</li>
+              <li>Stale reads are dangerous — payments, inventory, leader election — and you need to argue for CP behavior.</li>
+              <li>Downtime is unacceptable — shopping carts, social feeds, DNS — and you need to argue for AP behavior.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You're running a single-node Postgres on one machine. No partitions, no CAP.</li>
+              <li>You're picking between SQL and NoSQL. CAP doesn't map cleanly onto that axis — plenty of NoSQL is CP and some SQL is AP-tuned.</li>
+              <li>You want a precise consistency model for one operation. CAP is too coarse; you want linearizability, causal consistency, or eventual consistency instead.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Consistency (C)</dt><dd>Every read returns the most recent write — formally, linearizability.</dd></div>
+          <div><dt>Availability (A)</dt><dd>Every non-failing node returns a non-error response to every request.</dd></div>
+          <div><dt>Partition tolerance (P)</dt><dd>The system keeps operating even when messages between nodes are dropped or delayed.</dd></div>
+          <div><dt>Partition</dt><dd>A network split that prevents some nodes from reaching others.</dd></div>
+          <div><dt>CP system</dt><dd>Sacrifices availability during a partition to stay consistent (e.g. ZooKeeper, etcd).</dd></div>
+          <div><dt>AP system</dt><dd>Sacrifices consistency during a partition to stay available (e.g. Cassandra, DynamoDB in default mode).</dd></div>
+          <div><dt>Tunable consistency</dt><dd>Real systems often let you pick C-vs-A per request, not once at install time.</dd></div>
+        </dl>
+
+        <!-- WHAT'S NEXT -->
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

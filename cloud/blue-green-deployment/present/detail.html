@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blue-Green Deployment · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Blue-Green Deployment</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Blue-Green Deployment</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Blue-Green Deployment</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Blue-green deployment is a release strategy where two production-grade environments — <strong>blue</strong> and <strong>green</strong> — run in parallel, each on one version of the app. A routing primitive atomically shifts 100% of user traffic from one to the other.</p>
+        <ul>
+          <li><strong>Deploy and cutover are separate steps.</strong> The new build installs and warms up on the idle pool first — the cutover itself is only a pointer flip.</li>
+          <li><strong>Rollback is symmetric.</strong> The environment that was just live stays warm for a set window, so rolling back is a second pointer flip, not a redeploy.</li>
+          <li><strong>Family.</strong> It's the simplest member of the <em>all-or-nothing release</em> family, alongside <em>recreate</em> — as opposed to <em>progressive delivery</em> (canary, rolling, traffic-shaping).</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Two homogeneous fleets</dt><dd>Same instance type, network, and dependencies — they differ only in application version.</dd></div>
+          <div><dt>Traffic-switch primitive</dt><dd>The atomic decision point: ALB listener rules, Route 53 weighted records, a Kubernetes <code>Service</code> selector, an Istio <code>VirtualService</code>, Cloud Run traffic tags.</dd></div>
+          <div><dt>Health gate</dt><dd>Readiness probes, smoke tests, or synthetic checks the idle environment must pass before the switch is allowed.</dd></div>
+          <div><dt>Drain mechanism</dt><dd>Connection draining that lets in-flight requests on the old fleet finish after the switch.</dd></div>
+          <div><dt>Shared stateful tier</dt><dd>Usually one database, one cache, one broker — both colors read and write the same data, which is exactly what makes schema changes the hard part.</dd></div>
+        </dl>
+
+        <p>In the wider <strong>deployment strategies</strong> family it sits next to rolling, canary, recreate, A/B, and shadow:</p>
+        <ul>
+          <li><strong>Rolling</strong> replaces instances in place, batch by batch — no second environment, no instant rollback.</li>
+          <li><strong>Canary</strong> sends a slice of real traffic to the new version to measure it — progressive, not atomic.</li>
+          <li><strong>Recreate</strong> stops blue, then starts green — downtime, no parallel state.</li>
+          <li><strong>Blue-green</strong> optimizes for rollback speed at the cost of double infrastructure during the cutover window.</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>The switch itself lives at the <strong>edge / L7 routing layer</strong>: an ALB listener, ingress controller, service mesh, API gateway, or DNS. The two fleets sit one layer below, in compute — EC2 auto-scaling group, ECS service, Kubernetes <code>Deployment</code>, Lambda alias, container revision.</p>
+        <p>The stateful tier — RDS, DynamoDB, Kafka, Redis — is almost always <strong>shared</strong> between the two colors. Duplicating it turns a blue-green release into a full disaster-recovery exercise.</p>
+
+        <h3>Where you'll find it built in</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">AWS ECS</div><p>Native ECS blue/green (GA July 2025) and the older CodeDeploy controller both ship it as a first-class deployment type.</p></div>
+          <div class="card"><div class="card__title">AWS Lambda</div><p><code>AWS::Lambda::Alias</code> with <code>RoutingConfig</code> shifts a fixed percentage between two versions; SAM/CodeDeploy wraps this as blue-green.</p></div>
+          <div class="card"><div class="card__title">Kubernetes / Argo Rollouts</div><p>The <code>blueGreen</code> strategy uses <code>activeService</code> and <code>previewService</code> fields.</p></div>
+          <div class="card"><div class="card__title">Google Cloud Run</div><p>Every deploy creates an immutable revision; traffic tags route between them.</p></div>
+          <div class="card"><div class="card__title">Heroku</div><p><code>preboot</code> is essentially a managed blue-green for dynos.</p></div>
+          <div class="card"><div class="card__title">Azure App Service</div><p>Deployment slots with the "swap" operation are the same pattern.</p></div>
+        </div>
+        <p>On-prem, IIS's Application Request Routing (ARR) does the same job in front of two app pools.</p>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Traffic switching:</strong> AWS ALB/NLB, Route 53 weighted records, Envoy, Istio, NGINX ingress, HAProxy, Cloudflare load balancers.</li>
+          <li><strong>Orchestration:</strong> AWS CodeDeploy, Argo Rollouts, Flagger, Spinnaker, Harness, Octopus Deploy.</li>
+          <li><strong>Schema migrations during cutover:</strong> Liquibase, Flyway, Bytebase, Reshape (Postgres), gh-ost / pt-online-schema-change (MySQL).</li>
+          <li><strong>Session and state handling:</strong> Redis or DynamoDB as an out-of-process session store so neither color owns the session; sticky cookies only as a fallback.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <p>The term was popularized by Daniel Terhorst-North and cemented by Jez Humble and David Farley in <em>Continuous Delivery</em> (2010). Before it, "deployment" meant a Friday-night maintenance window: stop the service, copy the build, run migrations, hope. Cheap virtualization — EC2 from 2006, then containers — made a second full environment for an hour affordable, and blue-green followed naturally.</p>
+
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Your release is a single atomic binary or contract change that's hard to feature-flag.</li>
+              <li>Rollback time matters in seconds, not minutes — payments, checkout, public APIs, regulated systems.</li>
+              <li>Your app tier is stateless or near-stateless — sessions live in Redis, not in memory.</li>
+              <li>Your platform makes a second environment cheap and short-lived — ECS, Lambda, Cloud Run, Argo Rollouts.</li>
+              <li>Your schema changes can be staged through
+                <span class="term">expand-contract</span>
+                <span class="term__gloss">splitting a migration into add-and-dual-write, then backfill-and-switch, then drop-the-old-column, across separate deploys</span>
+                so both colors run safely against the same database.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The release ships a non-backward-compatible schema migration — a <code>DROP COLUMN</code> is fatal the moment green's migration runs.</li>
+              <li>You need to validate the change against real users before full rollout — that's canary's job.</li>
+              <li>The system holds large in-memory state per node — long-lived websockets, in-process caches, game-server matches.</li>
+              <li>Doubling infrastructure is prohibitive — large stateful clusters, GPU fleets, on-prem capacity you can't conjure on demand.</li>
+              <li>You have no automated smoke tests for the idle environment — without them, "healthy" is a guess.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Daniel Terhorst-North popularized the term; Jez Humble and David Farley cemented it in <em>Continuous Delivery</em> (2010). AWS shipped native ECS blue/green support in July 2025, retiring the CodeDeploy hop many teams had hand-rolled for years.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk one release through a typical ALB + ECS setup:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Steady state.</span> The listener forwards 100% of traffic to <code>tg-blue</code>. <code>tg-green</code> exists with zero registered targets.</li>
+          <li><span class="steps__title">Provision green.</span> The controller starts a new task set on the new build. Tasks register into <code>tg-green</code> and pass ALB health checks — typically 5 consecutive 200s on <code>/healthz</code>.</li>
+          <li><span class="steps__title">Test traffic (optional).</span> A separate test listener lets a deployer or a CI job hit green directly, without touching production traffic.</li>
+          <li><span class="steps__title">Bake.</span> Both versions run; only blue serves users. Pre-cutover hooks can run synthetic checks here.</li>
+          <li><span class="steps__title">Cutover.</span> The controller flips the listener — or the Kubernetes <code>Service</code> selector, or the Cloud Run traffic split. From the next request on, production traffic goes to green.</li>
+          <li><span class="steps__title">Drain.</span> Old tasks enter <code>DRAINING</code>. The ALB stops sending new connections but waits out the
+            <span class="term" data-gloss="the wait before a draining target is fully removed - 300 seconds by default on AWS ALB, configurable 0 to 3600">deregistration delay</span>
+            for in-flight requests to finish.</li>
+          <li><span class="steps__title">Keep blue warm.</span> Blue stays live for a
+            <span class="term">bake time</span>
+            <span class="term__gloss">the window the just-replaced color is kept running so rollback is one pointer flip instead of a redeploy</span>
+            — a configurable duration (CodeDeploy capped it at 2880 minutes, i.e. 48 hours).</li>
+          <li><span class="steps__title">Terminate or repurpose.</span> Once bake time passes with no alarms, blue scales to zero or becomes the next deploy's green.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant D as Deployer/CI
+    participant ALB as Router (ALB listener)
+    participant B as Blue pool
+    participant G as Green pool
+    Note over ALB,B: Steady state - 100% traffic on blue
+    D->>G: provision new build
+    G-->>ALB: health checks pass
+    D->>G: optional test traffic (separate listener)
+    Note over B,G: Bake - both live, only blue serves users
+    D->>ALB: cutover (atomic listener flip)
+    ALB->>G: forward 100% of traffic
+    ALB->>B: begin drain (deregistration delay)
+    Note over B: blue stays warm for the bake window
+    D->>B: terminate, or reuse as next green
+          </pre>
+          <figcaption class="diagram__caption">One release through the switch: provision, bake, flip, drain, keep warm, retire.</figcaption>
+        </figure>
+
+        <p>Argo Rollouts runs the same dance with two Kubernetes <code>Service</code> objects: <code>activeService</code> and <code>previewService</code>. Both point at the old <code>ReplicaSet</code> at rest; on promotion, <code>activeService</code>'s selector is patched to the new hash, and shortly after, <code>previewService</code> follows.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">What you gain</th><th scope="col">What you give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Two full environments</td><td>Instant rollback; no in-place mutation</td><td>~2x infra cost during the cutover window</td></tr>
+              <tr><td>Atomic 100% cutover</td><td>Simple mental model; no per-user variance</td><td>No early-warning sample; a bad release hits all users at once</td></tr>
+              <tr><td>Shared database</td><td>One source of truth; no data drift</td><td>Every schema change must be backward compatible (expand-contract)</td></tr>
+              <tr><td>Single switch primitive</td><td>Easy to script and automate</td><td>Cutover correctness depends entirely on the router behaving atomically</td></tr>
+              <tr><td>Bake / termination window</td><td>Cheap rollback for a fixed period</td><td>Pays double infra for the bake duration</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Schema breakage on cutover</p>
+            <p>A migration drops a column blue still uses. Blue starts throwing 500s during drain.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">In-flight long requests dropped</p>
+            <p>The drain timeout is shorter than the slowest real request — file uploads, long-poll, streaming — so the edge returns 502s.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Sticky session collapse</p>
+            <p>ALB sticky cookies pinned users to blue's tasks; after drain they're rebalanced and lose session state unless it lives in Redis or DynamoDB.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">DNS-based switch with stale resolvers</p>
+            <p>A Route 53 weighted-record cutover stretches over the full TTL; some clients keep hitting blue for minutes after teardown.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Connection pools cached on green</p>
+            <p>Green came up before DB credentials rotated. Its pool is full of dead connections; <code>/healthz</code> passes but real traffic 500s.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Asymmetric warm caches</p>
+            <p>Blue's in-process caches were hot; green starts cold and the cutover spikes p99 latency and downstream load.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Singleton background jobs running on both colors</p>
+            <p>A nightly cron or a Kafka consumer with a fixed <code>group.id</code> — both environments race or double-process. Needs explicit
+              <span class="term" data-gloss="a mechanism so exactly one running instance holds the right to do a piece of work">leader election</span>
+              or worker-pinning.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>It answers two tensions: <strong>deployment risk vs. release velocity</strong>, and <strong>rollback cost vs. uptime</strong>. Before cloud elasticity, both were resolved with maintenance windows. Once infrastructure became rentable by the minute, the cheapest way to make a release reversible in seconds turned out to be simple: keep the previous version running.</p>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative is <strong>rolling deployment</strong>: replace instances one at a time, no second environment. Rolling is cheaper — it reuses existing capacity — but it loses on two fronts:</p>
+        <ul>
+          <li>Old and new versions coexist for the <em>entire</em> rollout, not just a short drain window, so backward compatibility has to hold longer and across more version pairs.</li>
+          <li>Rollback is also a rolling process — recovery time grows with fleet size.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 170" role="img" aria-labelledby="coexTitle coexDesc" width="560" style="max-width:100%">
+            <title id="coexTitle">Version-coexistence window: rolling vs blue-green</title>
+            <desc id="coexDesc">Rolling deploys keep the old and new version running side by side for the entire rollout. Blue-green compresses that overlap to a short bake-and-drain window near the end.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">deploy starts</text>
+              <text x="540" y="20" fill="var(--text-muted)" text-anchor="end">deploy complete</text>
+              <line x1="10" y1="30" x2="540" y2="30" stroke="var(--border)"/>
+
+              <text x="10" y="60" fill="var(--text)">Rolling</text>
+              <rect x="90" y="46" width="450" height="26" rx="6" fill="var(--warn-soft)" stroke="var(--warn)"/>
+              <text x="315" y="63" fill="var(--warn)" text-anchor="middle">old + new coexist for the whole rollout</text>
+
+              <text x="10" y="112" fill="var(--text)">Blue-green</text>
+              <rect x="90" y="98" width="450" height="26" rx="6" fill="none" stroke="var(--border)"/>
+              <rect x="470" y="98" width="70" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="505" y="115" fill="var(--accent)" text-anchor="middle" font-size="11">bake + drain</text>
+
+              <text x="10" y="150" fill="var(--text-faint)" font-size="12">Same rollout length, very different overlap.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Rolling coexistence spans the whole rollout; blue-green compresses it to the bake-and-drain window at the very end.</figcaption>
+        </figure>
+
+        <p>Blue-green compresses that coexistence window to seconds or minutes and makes rollback a single API call, at the price of doubling infrastructure for that window. When a bad five minutes costs more than a few extra instance-hours, the trade is an easy call.</p>
+        <p>The other obvious alternative is <strong>canary</strong>: send a small slice of real traffic to the new version and measure it. Canary costs less than full blue-green and adds a real safety sample, but it needs per-request traffic splitting, automated metric analysis, and the discipline to actually pause and inspect results. Blue-green is what you reach for when you want the rollback guarantee without that complexity.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, the pattern is moving from "DIY with CodeDeploy" to a first-class platform primitive. AWS shipped native ECS blue/green in July 2025, removing the CodeDeploy hop. Cloud Run revisions and Argo Rollouts made it routine in serverless and Kubernetes respectively. The interesting frontier is no longer the cutover mechanic — that's solved — it's the database tier: expand-contract migrations, online schema-change tools, and dual-write strategies are where most blue-green incidents now start.</p>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Worth checking in your own setup</p>
+            <ul>
+              <li>Does your drain timeout actually cover your real p99 request duration?</li>
+              <li>Are all your schema migrations expand-contract, so the previous binary still runs cleanly against the post-migration schema?</li>
+              <li>Where does session state live — would a user mid-flow notice the cutover?</li>
+              <li>Do your background workers, crons, and event consumers behave correctly with both colors running? Who holds the lease?</li>
+              <li>Does your health check exercise the same code paths as production traffic, or just return 200 unconditionally?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>B-Tree Index · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">B-Tree Index</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">B-Tree Index</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">B-Tree Index</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~12 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Every OLTP backend leans on a small set of B-tree indexes that hold the whole system up: the primary key on <code>users</code>, the foreign key from <code>orders</code> to <code>users</code>, a composite that powers every listing page, a partial unique index that enforces "one active row per account." Pull any one of them and a 30 ms page load turns into a 4-second one.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS OLTP schema</div><p>Primary keys, foreign keys, and the one composite index every listing endpoint depends on.</p></div>
+          <div class="card"><div class="card__title">E-commerce / marketplace</div><p>What makes <code>ORDER BY created_at DESC LIMIT 50</code> finish in single-digit milliseconds at 50M rows.</p></div>
+          <div class="card"><div class="card__title">Multi-tenant analytics</div><p>The difference between a report that scans a hot table and one that hits a covering index and never touches the heap.</p></div>
+          <div class="card"><div class="card__title">Hidden everywhere</div><p>Every <code>UNIQUE</code> constraint, every <code>PRIMARY KEY</code>, every FK validation in InnoDB. Most "the index is wrong" tickets trace back to column order or a predicate the planner can't use.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Index foreign keys, but only the ones you actually filter or join on</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Add a B-tree on every FK that appears in a <code>WHERE</code> or <code>JOIN</code>, and on FKs the parent's deletes or updates cascade through.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Postgres does not auto-index FKs the way MySQL does. A missing FK index turns every <code>DELETE</code> on the parent into a full scan on the child, and cascade locks can stall writes for seconds.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Indexing every FK by reflex. One that's never queried just costs writes and storage.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Put the most selective column first — except when a range query says otherwise</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For <code>WHERE tenant_id = ? AND status = 'open'</code>, index <code>(tenant_id, status)</code>. For <code>WHERE tenant_id = ? AND created_at &gt; ?</code>, still lead with the equality column, <code>tenant_id</code>, then the range column.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The tree is physically sorted left to right. Equality on the leading column collapses the search to one contiguous run; a range after that is a single leaf walk. A range in the <em>middle</em> of a composite kills every column to its right.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>(created_at, tenant_id)</code> for tenant-scoped queries — every tenant's rows scatter across the whole timeline.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Respect the leftmost-prefix rule or you're paying for an unused index</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For an index on <code>(a, b, c)</code>, make sure real queries filter on <code>a</code>, on <code>(a, b)</code>, or on <code>(a, b, c)</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A query filtering only on <code>b</code> can't seek — <code>b</code> is only locally ordered inside each <code>a</code> bucket. The planner silently falls back to a scan, and <code>idx_scan</code> for that index sits at zero forever.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Building one fat five-column index and assuming it covers every subset of those columns.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Don't wrap indexed columns in functions — build an expression index</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>If you query <code>WHERE lower(email) = $1</code>, create <code>CREATE INDEX ON users (lower(email))</code>. Same idea for <code>date_trunc('day', created_at)</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An index on <code>email</code> is sorted by <code>email</code>, not by <code>lower(email)</code>. A function-wrapped column always triggers a full scan unless a matching expression index exists.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Casting in the app to "match" the column type — implicit casts (e.g. <code>WHERE int_col = '42'</code>) also defeat indexes in some drivers.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Use partial indexes when a predicate is always present and narrow</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Build <code>CREATE INDEX ON orders (created_at) WHERE status = 'pending'</code> if your hot query is "show pending orders by date."</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A <span class="term">partial index</span><span class="term__gloss"> an index built over only the rows matching a WHERE clause</span> can be 5–100× smaller than the full one and fits in cache. Especially strong for soft-delete (<code>WHERE deleted_at IS NULL</code>) and "one active row" uniqueness.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A partial predicate that doesn't match the query verbatim — the planner won't use the index at all.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Skip indexes on low-cardinality columns; fold them into composites instead</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Instead of <code>CREATE INDEX ON orders (status)</code>, build <code>(status, created_at)</code>, or make the index partial on the rare value.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A boolean or 3-value status column has tens of millions of duplicates. The planner correctly picks a full scan over 10M random heap fetches, so the standalone index is dead weight that still costs every write.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Indexing <code>is_active</code>, <code>is_deleted</code>, <code>gender</code>, or <code>country</code> alone. They earn their place only as the trailing column of a composite, or inside a partial index's predicate.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Reach for INCLUDE when one query is hot and one extra column makes it index-only</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Build <code>CREATE INDEX ON sales (customer_id, sold_at) INCLUDE (amount)</code> if the hot query is <code>SELECT amount FROM sales WHERE customer_id = ? AND sold_at &gt; ?</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The included column lives in the leaf without being part of the sort key, so writes don't reorder the tree. The plan flips from Index Scan plus heap fetch to an
+              <span class="term">index-only scan</span><span class="term__gloss"> a scan that answers the query from the index alone, skipping the row fetch</span> — roughly halving the I/O.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Stuffing every selected column into <code>INCLUDE</code>. Wide leaves lower fan-out and raise tree height — include 1–2 small columns, not 8.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Pick monotonic primary keys; if you need UUIDs, use v7 or ULID, not v4</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default to <code>bigint identity</code> / <code>bigserial</code>. If you need a globally unique opaque ID, use UUIDv7, ULID, or a Snowflake-style ID — all time-ordered.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>UUIDv4 inserts land at random positions in the tree. Pages split everywhere and the index stabilizes around 60–70% full instead of 90%; benchmarks show 2–5× slower insert throughput and 5–10× more I/O per insert from the cascading splits. UUIDv7 keeps inserts at the right edge — the same write pattern as a plain sequence.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Switching to UUIDv4 primary keys "for security" — they expose nothing v7 doesn't, and they wreck the write path.</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM: monotonic vs random key inserts -->
+        <figure class="diagram">
+          <svg viewBox="0 0 560 210" role="img" aria-labelledby="pkTitle pkDesc" width="560" style="max-width:100%">
+            <title id="pkTitle">Monotonic vs random primary key inserts</title>
+            <desc id="pkDesc">Monotonic keys like bigint or UUIDv7 fill the rightmost leaf and split cleanly near full. Random keys like UUIDv4 scatter inserts across every leaf and split everywhere at roughly half full.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--accent)" font-weight="650">Monotonic key (bigint, UUIDv7)</text>
+              <g stroke="var(--accent)" fill="var(--accent-soft)">
+                <rect x="10"  y="30" width="80" height="30" rx="4"/>
+                <rect x="96"  y="30" width="80" height="30" rx="4"/>
+                <rect x="182" y="30" width="80" height="30" rx="4"/>
+                <rect x="268" y="30" width="80" height="14" rx="4"/>
+              </g>
+              <text x="268" y="62" fill="var(--text-faint)" font-size="12">new inserts land here</text>
+              <text x="10" y="86" fill="var(--text-muted)">Splits happen only at the right edge — pages stay ~90–95% full.</text>
+
+              <text x="10" y="120" fill="var(--danger)" font-weight="650">Random key (UUIDv4)</text>
+              <g stroke="var(--danger)" fill="var(--danger-soft)">
+                <rect x="10"  y="130" width="80" height="17" rx="4"/>
+                <rect x="96"  y="130" width="80" height="22" rx="4"/>
+                <rect x="182" y="130" width="80" height="12" rx="4"/>
+                <rect x="268" y="130" width="80" height="24" rx="4"/>
+                <rect x="354" y="130" width="80" height="16" rx="4"/>
+              </g>
+              <text x="10" y="176" fill="var(--text-muted)">Inserts scatter everywhere — every page splits at ~50%, settling around 60–70% full.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Same index, two key strategies: a monotonic key fills pages tight; a random key leaves them half-empty and splitting constantly.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Read EXPLAIN before you trust the index</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run <code>EXPLAIN (ANALYZE, BUFFERS)</code> and learn the four shapes: Index Scan (fetch matching rows from the heap), Index Only Scan (the index covers everything — best case), Bitmap Index Scan + Bitmap Heap Scan (medium selectivity, often optimal at 0.5–5%), and Seq Scan (correct once over ~10% of rows match).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Adding an index doesn't guarantee it's used. The planner decides from <code>pg_statistic</code>; stale <code>ANALYZE</code> or a mistuned <code>random_page_cost</code> makes it pick wrong.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"I created the index, so the query must be fast now" — without ever checking the plan.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Treat index bloat as a real maintenance task</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Watch index size vs. table size with <code>pgstattuple</code>. Run <code>REINDEX INDEX CONCURRENTLY</code> or <code>pg_repack</code> once bloat passes ~30%. In InnoDB, use <code>OPTIMIZE TABLE</code> during a maintenance window.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A long-running transaction blocks <code>VACUUM</code>; dead entries pile up; a 2 GB index becomes 6 GB; the working set stops fitting in <code>shared_buffers</code>; latencies climb 10×. Bloat is silent until it isn't.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Plain <code>REINDEX</code> on a production table — it takes an exclusive lock. Always use <code>CONCURRENTLY</code> on Postgres 12+.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Match index direction when sorts are paginated</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For <code>ORDER BY created_at DESC LIMIT 50</code>, a plain ascending index is fine — Postgres can scan it backwards. For mixed directions like <code>(a ASC, b DESC)</code>, build <code>CREATE INDEX ON t (a ASC, b DESC)</code> to match.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Mixed-direction ordering is the one case a backward scan can't cover. Without a matching index the planner adds a Sort node, which spills to disk on large results and breaks
+              <span class="term">keyset pagination</span><span class="term__gloss"> paging by "give me rows after this cursor value" instead of by OFFSET</span>.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Designing the index without ever looking at the real <code>ORDER BY</code> clause.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Tune fillfactor on heavily-updated indexes; leave the default everywhere else</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Postgres defaults to <span class="term" data-gloss="how full a B-tree page is packed at build time; 90 leaves 10% slack per page">fillfactor</span> 90 for B-tree indexes. For a table with very frequent updates on indexed columns, lower it to 70–80 so <span class="term" data-gloss="an update that never touches an index because the new row version fits on the same page">HOT updates</span> stay on-page and new entries fit without splitting.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Lower fillfactor trades storage for fewer page splits and less bloat over time. Higher fillfactor (100, for append-only tables) packs leaves tighter and shrinks the index.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Cargo-culting fillfactor 70 on every table — for append-only or read-mostly tables you're just wasting space.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The "index everything" reflex</p>
+            <p>Every column gets its own index "just in case." Writes slow down as index count grows, the working set blows past RAM, and most of those indexes are never read. Index from observed queries, not speculation.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Composite column order matches the schema, not the query</p>
+            <p>Columns get listed in the order they appear in the table — <code>(created_at, tenant_id)</code> — while queries filter <code>WHERE tenant_id = ?</code>. The index sits unused. Order columns by query shape, not table shape.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Indexing a column a trigger rewrites</p>
+            <p>A <code>BEFORE INSERT</code> trigger reshapes the value at insert time, but the <code>WHERE</code> clause searches on the original input. A classic timezone or collation pitfall — index the post-trigger form.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>SELECT *</code> over a covering index</p>
+            <p>The index covers six of seven columns; the seventh forces a heap fetch, and the plan silently degrades from Index Only Scan to Index Scan. Project explicit columns when relying on <code>INCLUDE</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Indexed boolean as the primary filter</p>
+            <p><code>WHERE is_active = true</code> on a table where 95% of rows are active. The planner ignores the index. Either flip to a partial index on the rare value, or drop the index.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Re-adding a redundant index</p>
+            <p>An index on <code>(a, b)</code> already serves queries filtering on <code>a</code> alone — a separate index on <code>(a)</code> is pure write-amplification.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting <code>idx_scan &gt; 0</code> as proof it's needed</p>
+            <p>Postgres counts a single use, ever, as a hit. Compare <code>idx_scan</code> against table writes and against other indexes over time — a single lifetime hit is not evidence.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Multi-tenant SaaS list views</div>
+            <p>~10K tenants, 500M total rows. Every list endpoint filters by <code>tenant_id</code> first, so the pattern is <code>(tenant_id, sort_column) INCLUDE (2–3 hot columns)</code> per dominant query shape. <em>Lesson:</em> in multi-tenant systems, <code>tenant_id</code> leads almost every useful index — skip it and one noisy tenant blows up cache for everyone else.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Keyset pagination on a feed</div>
+            <p>A feed at ~10K writes/sec uses <code>WHERE (created_at, id) &lt; (cursor_ts, cursor_id) ORDER BY created_at DESC, id DESC LIMIT 50</code> backed by <code>(created_at DESC, id DESC)</code>. <em>Lesson:</em> <code>OFFSET 10000</code> paging gets quadratically slower; keyset pagination plus a matching composite index stays flat.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Soft-delete with a partial unique index</div>
+            <p>An auth service enforces "one active email per user" while keeping deleted rows: <code>CREATE UNIQUE INDEX ON users (email) WHERE deleted_at IS NULL</code>. <em>Lesson:</em> partial unique indexes express constraints no trigger or app-side check does as cleanly.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Time-series append</div>
+            <p>An ingestion table at 50K inserts/sec keyed on a Snowflake ID. The clustered B+tree fills its rightmost leaf, splits cleanly to ~15/16 full, and stays dense at ~95%. <em>Lesson:</em> monotonic keys trigger storage-engine fast paths random keys never reach.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">The covering-index rescue</div>
+            <p>A three-table reporting join timed out at 8 seconds. Adding <code>(account_id, period) INCLUDE (revenue, cost)</code> to the fact table flipped the plan to Index Only Scan; the query dropped to 40 ms. <em>Lesson:</em> covering indexes are the biggest lever for read-heavy queries stuck on an OLTP database.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Stats freshness:</strong> is <code>autovacuum</code> running, and when did <code>ANALYZE</code> last touch the hot tables?</li>
+              <li><strong>Plan verification:</strong> does every new or changed index have an <code>EXPLAIN (ANALYZE, BUFFERS)</code> attached to its PR, showing Index Scan or Index Only Scan, not Seq Scan?</li>
+              <li><strong>Unused-index alert:</strong> is there a weekly job listing indexes with <code>idx_scan = 0</code> over 30 days? Drop them — they're pure write-tax.</li>
+              <li><strong>Bloat monitoring:</strong> is index size vs. live-tuple ratio tracked, with an alert past 2× expected size?</li>
+              <li><strong>Lock-safe migrations:</strong> is every production <code>CREATE INDEX</code> and <code>REINDEX</code> run <code>CONCURRENTLY</code>?</li>
+              <li><strong>PK choice review:</strong> new tables reviewed for bigint vs. UUID — and if UUID, is it v7 or ULID, not v4?</li>
+              <li><strong>Cost ceiling:</strong> each new index adds ~10–20% write overhead. Past 10 indexes on a hot table, is that justified?</li>
+              <li><strong>Onboarding:</strong> can a new engineer read <code>pg_stat_user_indexes</code> and an <code>EXPLAIN ANALYZE</code> plan on day one?</li>
+              <li><strong>Backup-and-restore size:</strong> indexes can be 50–70% of total relation size, and restore time scales with them. Know the number.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">One index per query.</span> Engineers add a B-tree the first time something is slow, and the database happily obliges. By year two the hottest table has 8–12 indexes, half of them overlapping, and writes have visibly slowed.</li>
+          <li><span class="steps__title">A painful migration.</span> Usually one of three things forces it: switching primary-key strategy (UUIDv4 → v7/ULID, rewriting every secondary index), introducing partitioning (B-trees are local to each partition, which changes uniqueness semantics), or moving reports off the OLTP store entirely. The PK migration is the worst — it touches every foreign key in the schema.</li>
+          <li><span class="steps__title">A small, repeatable workflow.</span> Query patterns come from <code>pg_stat_statements</code>, indexes are designed from those patterns instead of guessed, and a quarterly review drops the unused ones. Indexes get treated as code — versioned, reviewed, tied to a specific query — not sprinkled on as a performance band-aid.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.postgresql.org/docs/current/indexes-index-only-scans.html" rel="noopener">PostgreSQL — Indexes and Index-Only Scans</a> — the primary source for covering indexes and the visibility-map interaction.</li>
+          <li><a href="https://use-the-index-luke.com/" rel="noopener">Use The Index, Luke</a> — Markus Winand's free book; the canonical reference for index design across Postgres, MySQL, Oracle, SQL Server.</li>
+          <li><a href="https://blog.jcole.us/2013/01/10/btree-index-structures-in-innodb/" rel="noopener">Jeremy Cole — InnoDB B+Tree Index Structures</a> — visualizations of how clustered indexes actually look on disk.</li>
+          <li><a href="https://www.cybertec-postgresql.com/en/what-is-fillfactor-and-how-does-it-affect-postgresql-performance/" rel="noopener">Cybertec — What is fillfactor and how does it affect performance</a> — concrete numbers on fillfactor trade-offs.</li>
+          <li><a href="https://dev.to/umangsinha12/postgresql-uuid-performance-benchmarking-random-v4-and-time-based-v7-uuids-n9b" rel="noopener">PostgreSQL UUID Performance: v4 vs v7 benchmark</a> — measured insert throughput and index-size differences.</li>
+          <li><a href="https://pgdash.io/blog/postgres-btree-index.html" rel="noopener">pgDash — Notes on PostgreSQL B-Tree Indexes</a> — an operator-oriented walkthrough of bloat, partial indexes, and INCLUDE in production.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

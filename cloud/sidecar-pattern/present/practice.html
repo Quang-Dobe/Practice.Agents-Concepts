@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sidecar Pattern · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sidecar Pattern</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sidecar Pattern</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sidecar Pattern</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>On any Kubernetes platform with more than a handful of services, the sidecar is the workhorse you trip over weekly: the Envoy in front of every Pod in an Istio mesh, the Vault Agent writing database credentials to an <code>emptyDir</code>, the Cloud SQL Auth Proxy that makes your app think Postgres is on localhost, or the Fluent Bit someone added before checking whether a DaemonSet would do.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">B2B SaaS backend</div><p>Sidecars sit between the app and three outside worlds: identity (mTLS, workload identity), data (managed DB auth, secrets), and observability (logs, traces, metrics).</p></div>
+          <div class="card"><div class="card__title">Regulated environment</div><p>In fintech and healthcare, sidecars deliver compliance features — encryption in transit, audit logs, secret rotation — onto legacy services nobody may rewrite. The sidecar becomes the compliance boundary.</p></div>
+          <div class="card"><div class="card__title">Job / CronJob fleet</div><p>Historically the place sidecars broke things, because the Job never finished while the proxy kept running. The textbook reason native sidecars matter.</p></div>
+          <div class="card"><div class="card__title">Platform on-call</div><p>"Service is up but 502" is very often a sidecar problem, not an app problem.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Set memory limits; leave CPU limits off or generous</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set <code>resources.requests</code> and a memory <code>limit</code> on every sidecar. For an Istio Envoy at moderate traffic: request 100m CPU / 128Mi memory, cap memory at 512Mi–1Gi based on observed RSS. Leave CPU limits unset, or well above the request.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>CPU throttling on the proxy shows up directly as app tail latency — the request can't leave the Pod until Envoy moves it. Unbounded memory causes OOMKills that cascade across the namespace.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Copy-pasting <code>cpu: 100m</code> as a hard limit onto every sidecar — the single most common cause of mysterious p99 spikes in Istio meshes.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Use native sidecars on Kubernetes 1.29+</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run Kubernetes 1.29 or later (GA in 1.33) and turn on native sidecars in your mesh or agent — for Istio, <code>values.pilot.env.ENABLE_NATIVE_SIDECARS=true</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Solves the startup race and the shutdown drop in one stroke, and fixes Jobs that hang forever because the sidecar refuses to exit.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>The <code>preStop: sleep 30</code> and <code>holdApplicationUntilProxyStarts</code> workarounds on new clusters — the right answer in 2022, tech debt in 2026.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Scope sidecar config to what each workload actually needs</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use Istio <code>Sidecar</code> resources and <code>exportTo</code> to restrict each Envoy's view of the mesh to the services it actually calls. In a 2,000-endpoint cluster, scoping a service down to 20 endpoints can drop its sidecar memory from ~60 MB to ~45 MB.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>By default, Envoy gets the entire mesh's config pushed to it. 60 MB × 500 Pods is 30 GB of cluster RAM spent telling each Pod about services it will never call.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Treating "the mesh is too expensive" as inherent. Often the fix is two YAML files, not a migration to ambient.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Talk over localhost or a Unix socket, not a Service</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Have the app connect to <code>127.0.0.1:&lt;port&gt;</code> or <code>unix:///var/run/&lt;x&gt;.sock</code> exposed by the sidecar, using a shared <code>emptyDir</code> for socket files.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A Service round-trip leaves the node, hits kube-proxy/iptables, and breaks the per-Pod identity guarantee — defeating the reason for a sidecar. Localhost is loopback-fast and stays in the Pod's own network namespace.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We exposed the sidecar as a ClusterIP because it was easier to test." That's now a fleet-wide proxy, not a sidecar.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Prefer DaemonSets for stdout/stderr log shipping</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Log to stdout/stderr, let the container runtime write to <code>/var/log/containers/*.log</code> on the node, and run one Fluent Bit per node as a DaemonSet.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A sidecar log shipper per Pod multiplies a 40–50 MB process by every Pod on the node. A 60-Pod node pays ~2.5 GB for sidecar Fluent Bits where one DaemonSet costs ~50 MB.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Reaching for a Fluent Bit sidecar by default. Use one only for per-Pod identity in the shipping path, or when the app writes to a file instead of stdout.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Define ordering and readiness explicitly</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Give the sidecar a <code>startupProbe</code> and <code>readinessProbe</code>. With native sidecars, kubelet won't start the app until the sidecar's startup probe passes, and the Pod won't go Ready until its readiness probe passes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without probes, "started" just means the process is running — for Envoy that can mean iptables is already redirecting traffic into a proxy that hasn't loaded its config. First requests fail with connection refused or a 503.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Relying on Pod-level readiness alone. The Pod can be Ready while Envoy is still waiting on its first config push.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Pin the sidecar image; treat upgrades as a deployment</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pin the proxy/agent image by digest in the injection template. Roll mesh upgrades via Istio revision tags so new sidecar versions can be canaried to one namespace at a time.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A bad sidecar image gets injected into every new Pod cluster-wide the moment the webhook updates. Without revisions, "roll back the mesh" means deleting every Pod.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Running the mesh control plane on <code>latest</code>, or auto-updating the webhook config. The blast radius is the entire cluster.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Plan for the admission webhook being down</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Choose the injector's <code>failurePolicy</code> deliberately — <code>Fail</code> blocks new Pods if <code>istiod</code> is down (safer for security), <code>Ignore</code> admits Pods with no sidecar (safer for availability). Document the choice and run <code>istiod</code> with a
+              <span class="term" data-gloss="a PodDisruptionBudget — a rule capping how many replicas of something may be down at once">PDB</span>
+              and at least 3 replicas across zones.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A single-replica <code>istiod</code> in CrashLoop on a Friday evening is the canonical sidecar outage. With <code>Fail</code>, no new Pods start anywhere; with <code>Ignore</code>, Pods come up without mTLS, silently breaking compliance.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving <code>failurePolicy</code> at the chart default without knowing what it is.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">For secret sidecars, write to tmpfs and signal the app</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Mount the shared <code>emptyDir</code> with <code>medium: Memory</code> (
+              <span class="term">tmpfs</span>
+              <span class="term__gloss">a memory-backed filesystem — its contents never touch disk</span>)
+              so rotated secrets never touch disk, and send the app a
+              <span class="term" data-gloss="a Unix signal commonly used to tell a process to reload its configuration">SIGHUP</span>
+              on rotation, or have the app inotify-watch the secret file.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Secrets on a disk-backed <code>emptyDir</code> survive container restarts in node storage and can be read by anyone with debug access to the node. Apps that read a secret once at startup never see rotations and break hours later when the lease expires.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Reading the secret file at startup and caching it forever. The whole point of the sidecar was rotation.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Treat the sidecar itself as a first-class observable</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Scrape the sidecar's own metrics (Envoy: <code>:15090/stats/prometheus</code>, Vault Agent: <code>:8200/v1/sys/metrics</code>). Alert on sidecar CPU throttling, memory near limit, xDS push errors, and certificate rotation failures.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>When the sidecar is unhealthy the app <em>looks</em> unhealthy. Engineers spend hours debugging the app before someone thinks to check <code>istio-proxy</code>. Dashboards that surface sidecar health by default cut MTTR in half.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"The sidecar is the platform team's problem." It's in your Pod; it's in your blast radius.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The Swiss-Army-Pod</p>
+            <p>A Pod with five sidecars — Envoy, Vault Agent, Fluent Bit, an OTel Collector, a Cloud SQL Proxy. Each made sense alone; together they out-consume the app and quadruple startup time. Consolidate via the OTel Collector and move log shipping to a node DaemonSet.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Business logic in the sidecar</p>
+            <p>Smuggling request validation, feature flags, or authorization rules into Envoy via Lua/WASM filters because "it's faster than a deploy." Six months later nobody knows where the rule lives. Keep domain decisions in the app or a dedicated policy service (OPA, Cedar).</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Sidecar on hostNetwork Pods</p>
+            <p>iptables redirect rules are written into the Pod's own network namespace; a <code>hostNetwork: true</code> Pod bypasses them, so the sidecar sees nothing and traffic flows unencrypted while dashboards report full mesh coverage.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Default resources on every sidecar</p>
+            <p>Copying the same 100m/128Mi request onto every Pod regardless of traffic. Tiny services waste capacity; high-RPS services get OOMKilled. Tier sidecar resource profiles per workload instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Sidecar as a substitute for an SDK</p>
+            <p>Putting a 200 MB language-runtime sidecar next to every microservice so it can call a "client library" over localhost. The sidecar is now bigger than the app. Use a real SDK, or move to Dapr only when the polyglot tax is real.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Ignoring Job/CronJob semantics</p>
+            <p>Running mesh-injected Jobs on a pre-1.29 cluster: the main container exits, the sidecar keeps running, the Job sits <code>Active</code> forever, and the next scheduled run piles on. Use native sidecars, or annotate Jobs to skip injection.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Webhook with single-replica istiod</p>
+            <p>One control-plane Pod, no PDB. A node drain takes down injection; new Pods either fail admission or come up bare. Run a 3-replica <code>istiod</code> with topology spread and a PDB, monitored as a Tier-0 service.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Polyglot fintech, ~300 services / 6 languages</div>
+            <p>Istio sidecars give every service mTLS with SPIFFE identities and uniform retry/circuit-breaker behavior across Go, Java, Python, and Rust. <em>Lesson:</em> the win wasn't the mesh features — it was that the security team stopped reviewing TLS code in every PR.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">E-commerce checkout on GKE, ~2,000 RPS</div>
+            <p>Cloud SQL Auth Proxy sidecar on every checkout Pod; the app connects to <code>localhost:5432</code> as if Postgres were local. <em>Lesson:</em> the sidecar's connection pool sits in front of the app's own pool — size both, or connections get burned on the DB side.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Healthcare data platform, frequent secret rotation</div>
+            <p>Vault Agent sidecar pulls DB credentials with a 1-hour TTL, renders them to tmpfs, sends SIGHUP on rotation. <em>Lesson:</em> many ORMs cache the connection string at startup and never re-read it — rotation is silently broken until the next deploy.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Migration to ambient, mid-size platform, ~500 Pods</div>
+            <p>Measured 12% of cluster memory going to Envoy sidecars; moved L4 traffic to Istio ambient (ztunnel as a DaemonSet), kept sidecars only on ~20 services needing L7 via
+              <span class="term">waypoint proxy</span>
+              <span class="term__gloss">ambient mesh's per-namespace proxy that adds back L7 features</span>.
+              <em>Lesson:</em> dashboards aggregating by <code>source_workload</code> had to be rewritten — ztunnel reports differently than Envoy.</p>
+          </div>
+        </div>
+
+        <!-- COMPARISON DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Sidecar["Sidecar per Pod"]
+      S1[Per-Pod identity and isolation]
+      S2[Memory cost multiplied by Pod count]
+    end
+    subgraph Daemon["DaemonSet per node"]
+      D1[One shared agent per node]
+      D2[Cheap, but no per-Pod identity]
+    end
+          </pre>
+          <figcaption class="diagram__caption">The two placements teams weigh once sidecar sprawl shows up on a memory dashboard.</figcaption>
+        </figure>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li>Are sidecar CPU requests sized from real usage, with CPU limits unset or generous?</li>
+              <li>Are memory limits set on every sidecar, with alerts at 80% of limit?</li>
+              <li>Is the cluster on Kubernetes ≥1.29 and actually emitting native sidecars? (<code>kubectl get pod -o yaml | grep -A2 initContainers</code>)</li>
+              <li>Is there a synthetic test that deletes a Pod under load and counts 5xxs to prove shutdown ordering works?</li>
+              <li>Do Jobs/CronJobs actually reach <code>Completed</code>, or are they hanging on sidecars?</li>
+              <li>Is the injection webhook's <code>failurePolicy</code> an intentional, documented choice?</li>
+              <li>Is <code>istiod</code> / the injector control plane running ≥3 replicas with a PDB?</li>
+              <li>Are sidecar metrics (xDS push errors, certificate expiry, CPU throttling) on the on-call dashboard?</li>
+              <li>For Vault sidecars: is the shared volume tmpfs, and does the app actually reload on rotation?</li>
+              <li>Is there a documented threshold — e.g. "if sidecar memory exceeds 10% of cluster RAM, evaluate ambient"?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Year one — adoption.</span> A team adopts one sidecar — usually a service mesh or a Cloud SQL Proxy — for one clear win (mTLS, IAM auth). It feels free: app teams don't know it exists, the platform team owns it.</li>
+          <li><span class="steps__title">Year two — sprawl.</span> A logging sidecar lands for custom parsing, a Vault Agent for secrets, an OTel Collector for traces. Each addition is locally reasonable; Pod startup time doubles and 30% of cluster memory is sidecars.</li>
+          <li><span class="steps__title">Consolidate or migrate.</span> Teams either consolidate aggressively (one OTel Collector replaces three shippers, logging moves to a DaemonSet) or migrate bulk L4 traffic to a sidecarless data plane. The hard part isn't the technical move — it's untangling implicit dependencies: apps assuming Envoy rewrites headers, dashboards assuming Envoy metric names, policies assuming per-Pod proxy identity. Budget a quarter of platform work for that.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/" rel="noopener">Kubernetes — Sidecar Containers (official docs)</a> — the canonical reference for native sidecars and lifecycle semantics.</li>
+          <li><a href="https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/753-sidecar-containers/README.md" rel="noopener">KEP-753 Sidecar Containers</a> — the design doc; explains why <code>initContainers + restartPolicy: Always</code> and not a new field.</li>
+          <li><a href="https://istio.io/latest/docs/overview/dataplane-modes/" rel="noopener">Istio — Sidecar or ambient?</a> — Istio's own framing of the trade-off, with current performance numbers.</li>
+          <li><a href="https://www.usenix.org/system/files/conference/hotcloud16/hotcloud16_burns.pdf" rel="noopener">Burns &amp; Oppenheimer — Design patterns for container-based distributed systems (2016)</a> — the paper that named sidecar/ambassador/adapter; still the clearest taxonomy.</li>
+          <li><a href="https://newsletter.iximiuz.com/posts/making-sense-out-of-native-sidecar-containers-in-kubernetes" rel="noopener">iximiuz — Making sense of native sidecar containers in Kubernetes</a> — the best practical walkthrough of the new model, with shutdown-ordering diagrams.</li>
+          <li><a href="https://developer.hashicorp.com/vault/docs/deploy/kubernetes/injector/annotations" rel="noopener">HashiCorp — Vault Agent Injector annotations</a> — the exhaustive reference for injection annotations you will eventually need.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

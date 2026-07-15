@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Components — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Web Components</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Web Components</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>frontend</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Web Components</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">frontend</span>
+            <span class="badge">encapsulation</span>
+            <span class="badge">custom elements</span>
+          </div>
+          <h1 class="hero__title">Web Components</h1>
+          <p class="hero__tagline">The browser's built-in way to define your own reusable HTML tags that work in any framework or none.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">3</div><div class="stat__label">specs combine: Custom Elements, Shadow DOM, Template</div></div>
+          <div class="stat"><div class="stat__num">4</div><div class="stat__label">lifecycle callbacks a custom element gets</div></div>
+          <div class="stat"><div class="stat__num">2016</div><div class="stat__label">Custom Elements v1 &amp; Shadow DOM v1 ship (Safari first)</div></div>
+          <div class="stat"><div class="stat__num">2024</div><div class="stat__label">Declarative Shadow DOM reaches Baseline "newly available"</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED): the three specs combining into one tag -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    CE["Custom Elements — a tag name + lifecycle callbacks"]
+    SD["Shadow DOM — a private, style-isolated DOM subtree"]
+    TPL["HTML Template — inert markup you stamp out cheaply"]
+    CE --> WC(("Your own tag, e.g. user-card"))
+    SD --> WC
+    TPL --> WC
+    WC --> ANY["Works in React, Angular, Vue, or plain HTML"]
+          </pre>
+          <figcaption class="diagram__caption">Three browser specs combine into one reusable tag — no framework required to define or run it.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the sealed-appliance mental model, and what a Web Component is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: the three specs, where they live, when to reach for them, the full lifecycle, and why Shadow DOM won over CSS-only scoping.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Twelve best practices with the Do/Why/Avoid triad, anti-patterns, real case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail for the lifecycle and trade-off table, or Practice for the tuning rules.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

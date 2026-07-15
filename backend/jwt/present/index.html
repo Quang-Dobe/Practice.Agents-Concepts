@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JWT — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">JWT</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">JWT</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>backend</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">JWT</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">backend</span>
+            <span class="badge">auth token</span>
+            <span class="badge">stateless</span>
+          </div>
+          <h1 class="hero__title">JWT</h1>
+          <p class="hero__tagline">A small signed token the server hands a client to prove "I already checked who you are" — without the server having to remember it.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">3</div><div class="stat__label">segments: header · payload · signature</div></div>
+          <div class="stat"><div class="stat__num">2015</div><div class="stat__label">RFC 7519 standardized (drafted 2010)</div></div>
+          <div class="stat"><div class="stat__num">5–15 min</div><div class="stat__label">typical short-lived access-token exp</div></div>
+          <div class="stat"><div class="stat__num">4 KB</div><div class="stat__label">recommended token-size budget</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED): anatomy of the token, bespoke inline SVG -->
+        <figure class="diagram">
+          <svg viewBox="0 0 800 210" role="img" aria-labelledby="anatomyTitle anatomyDesc" width="800" style="max-width:100%">
+            <title id="anatomyTitle">Anatomy of a JWT</title>
+            <desc id="anatomyDesc">A JWT is three base64url-encoded segments joined by dots: header, payload, and signature. The signature is computed over the header and payload together, so changing either one breaks it.</desc>
+            <g font-family="var(--font-mono)" font-size="11">
+              <text x="10" y="24" fill="var(--info)">eyJhbGciOiJIUzI1NiJ9</text>
+              <text x="170" y="24" fill="var(--text-faint)">.</text>
+              <text x="180" y="24" fill="var(--accent)">eyJzdWIiOiIxMjMiLCJuYW1lIjoiQWxpY2UifQ</text>
+              <text x="470" y="24" fill="var(--text-faint)">.</text>
+              <text x="480" y="24" fill="var(--warn)">dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk</text>
+            </g>
+            <g font-family="var(--font-sans)">
+              <text x="125" y="46" text-anchor="middle" font-size="13" fill="var(--info)">header</text>
+              <rect x="10" y="56" width="230" height="104" rx="8" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="248" y="118" font-size="28" fill="var(--text-faint)">.</text>
+              <text x="411" y="46" text-anchor="middle" font-size="13" fill="var(--accent)">payload</text>
+              <rect x="266" y="56" width="290" height="104" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="564" y="118" font-size="28" fill="var(--text-faint)">.</text>
+              <text x="677" y="46" text-anchor="middle" font-size="13" fill="var(--warn)">signature</text>
+              <rect x="582" y="56" width="200" height="104" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+              <text x="752" y="74" font-size="16">🔒</text>
+              <g font-family="var(--font-mono)" font-size="12" fill="var(--text)">
+                <text x="22" y="82">{ "alg": "HS256",</text>
+                <text x="22" y="100">&#160;&#160;"typ": "JWT" }</text>
+                <text x="278" y="80">{ "sub": "123",</text>
+                <text x="278" y="98">&#160;&#160;"name": "Alice",</text>
+                <text x="278" y="116">&#160;&#160;"exp": 1735689600 }</text>
+                <text x="594" y="90">HMACSHA256(</text>
+                <text x="594" y="108">&#160;header+payload,</text>
+                <text x="594" y="126">&#160;secret )</text>
+              </g>
+              <text x="400" y="192" text-anchor="middle" font-size="13" fill="var(--danger)">Change one character in header or payload → the signature stops matching.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The whole idea in one shape: three signed segments. Anyone can read them; only the signer can produce a matching seal.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the wristband mental model, and what a JWT is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: what's in the token, where it's used, when to reach for it, how signing and verification work, and why it's built this way.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Ten best practices with the Do/Why/Avoid triad, anti-patterns, real case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail for the claim set and validation flow, or Practice for the tuning rules and the algorithm-confusion attack you must guard against.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

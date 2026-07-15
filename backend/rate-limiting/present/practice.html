@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rate Limiting · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Rate Limiting</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Rate Limiting</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Rate Limiting</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical SaaS backend, rate limiting is the thin layer between your auth middleware and your business logic — a couple dozen lines of config plus a Redis dependency the team forgets exists until Redis hiccups. It's invisible when it works and deafening when it doesn't. You'll meet it in four settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">App middleware</div><p>A couple dozen lines of config in <code>Program.cs</code>, keyed by user or tenant, backed by Redis.</p></div>
+          <div class="card"><div class="card__title">The gateway</div><p>Kong, Envoy, or AWS API Gateway plugins, where per-tenant SLOs live separately from per-endpoint business rules.</p></div>
+          <div class="card"><div class="card__title">The edge</div><p>Cloudflare or AWS WAF rate-based rules that shed obvious abuse before it costs you origin compute.</p></div>
+          <div class="card"><div class="card__title">Client-side wrapper</div><p>A Polly rate-limit policy or a <code>SemaphoreSlim</code> around a third-party SDK — because OpenAI, Stripe, Twilio, and SendGrid all impose limits on <em>you</em>.</p></div>
+        </div>
+        <p>If you work on a public API, a login endpoint, an LLM-backed feature, or anything multi-tenant, rate limiting is load-bearing. Treat it that way.</p>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Key on identity, not on IP, whenever you have one</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Extract the limit key from the strongest identifier available — the <code>sub</code> claim from a verified JWT, an API key hash, a tenant ID — and fall back to IP only for anonymous traffic.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Office NATs, mobile
+              <span class="term" data-gloss="carrier-grade NAT: many mobile subscribers sharing one public IP">CGNAT</span>,
+              and corporate proxies aggregate thousands of legitimate users behind one IP. Keying on IP turns a legitimate burst into a customer-wide outage.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Defaulting to <code>client_ip</code> everywhere because it's the easy first parameter to grab.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Make the Redis call atomic with a Lua script</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Implement check-refill-decrement as one <code>EVAL</code>/<code>EVALSHA</code> Lua script. Use <code>redis-cell</code> (GCRA in C) if you can install Redis modules.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A two-step <code>INCR</code> + <code>EXPIRE</code> has a race where the <code>EXPIRE</code> is skipped if the client dies between calls, and the counter never expires — multiply by your key cardinality and Redis memory climbs without bound.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We'll just do <code>INCR</code> and <code>EXPIRE</code> separately — it'll be fine most of the time."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Decide fail-open vs. fail-closed explicitly, and instrument both</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pick per endpoint. Public read endpoints fail open (availability over correctness). Auth, payment, and LLM endpoints fail closed (cost and security over availability). Emit a metric every time the fallback fires.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Silent fail-open during a Redis outage is how a $40,000 LLM bill gets generated overnight. Silent fail-closed is how a Redis blip takes the whole product down.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Inheriting the library's default and never reading the docs to find out what it is.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Always set Retry-After, and jitter it server-side</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Return <code>Retry-After</code> in seconds with ±20% random jitter so clients don't synchronize. Also emit <code>RateLimit-Limit</code>, <code>RateLimit-Remaining</code>, <code>RateLimit-Reset</code> per the IETF draft.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A deterministic <code>Retry-After</code> produces a thundering herd at exactly the reset time — a clean traffic cliff followed by a near-vertical spike that re-trips the limiter.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Returning a 429 with no header and hoping the client implements exponential backoff on its own.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Two-tier the limiter: local first, distributed second</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run a small in-process token bucket (per replica, generous limit) in front of the Redis-backed global limiter. The local one absorbs hot-key bursts without a network call.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A single-instance Redis hitting 100% CPU on Lua execution is a real incident — Stripe and Shopify have both written about it. A local first tier cuts Redis QPS by 10–100×.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Sending every request to Redis when 95% of the answer is "obviously allowed, the bucket is full."</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    Req[Incoming request] --> L["Local bucket (per replica)"]
+    L -- token available --> Allow[Allow immediately]
+    L -- empty --> D["Distributed bucket (Redis)"]
+    D -- token available --> Allow
+    D -- empty --> Reject["Reject: 429 + Retry-After"]
+          </pre>
+          <figcaption class="diagram__caption">The two-tier limiter: the fast local check handles most traffic; only borderline cases pay the Redis round trip.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Dark-launch every new limit before enforcing it</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run the limiter in
+              <span class="term" data-gloss="run a new rule in log-only mode so it records what it would have blocked, without actually blocking anything">dark-launch</span>
+              — log-only — mode for a week. Compare what would have been blocked against complaint volume and real traffic patterns. Then flip to enforce.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>This is Stripe's published playbook. Limits set by guessing in a meeting room are almost always wrong by at least one order of magnitude, in one direction or the other.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Shipping a new limit on Friday afternoon "to be safe" and finding out Monday that you blocked your biggest customer's nightly batch job.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Scope limits to key × route-class, not just key</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Bucket routes into classes —
+              <span class="term">route-class</span>
+              <span class="term__gloss">a group of similar endpoints, e.g. read / write / expensive, sharing one limit</span>
+              like <code>read</code>, <code>write</code>, <code>expensive</code> (search, export, AI) — and apply different limits per class. The key becomes (tenant, route-class).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A flat per-user limit means one heavy <code>/reports/export</code> call consumes the budget for fifty cheap <code>/me</code> polls — UX that feels broken for reasons the user can't see.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>One global "1,000 req/min per user" knob applied to everything from <code>/healthz</code> to <code>/ai/generate</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Cost-shape, not just count-shape, for expensive endpoints</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For LLM and similar pay-per-call backends, enforce two parallel limits: requests per minute (RPM) and a cost-weighted limit —
+              <span class="term" data-gloss="tokens per minute: a cost-aware limit sized to how much text a call actually processes">TPM</span>
+              for tokens, or dollars per hour. Charge the bucket by estimated cost on entry, reconcile on exit.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A 200,000-token prompt is 1,000× more expensive than a 200-token one. RPM alone lets a single customer rack up a five-figure bill while staying "within limits."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Counting only request volume on endpoints where per-request cost varies by orders of magnitude.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Bound the key-space cardinality</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Hash long keys to a fixed length, set Redis <code>maxmemory-policy allkeys-lru</code>, and reject or aggregate keys that would explode cardinality — e.g. per-path limits on a path that includes a UUID.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Naive keying on (user, path) for a path like <code>/orders/{id}</code> produces unbounded keys, and Redis OOM-kills itself overnight.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using the raw URL as part of the key without normalizing it to a route template first.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Make the limiter observable from day one</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Emit four metrics: <code>ratelimit.allowed</code>, <code>ratelimit.rejected</code>, <code>ratelimit.fallback</code>, and p99 <code>ratelimit.latency_ms</code>, each tagged by route and tier. Alert on rejection-rate spikes and on fallback-mode activation.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without the rejection metric you'll only learn about a misconfigured limit from a support ticket. Without the fallback metric you won't know your limiter has been silently disabled for three weeks.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Logging rejections to stdout and calling it observability.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The IP-only limiter on an authenticated endpoint</p>
+            <p>Looks fine in dev, where everyone has a different IP; in production one shared corporate NAT triggers limits for thousands of real users. Use the authenticated identity once you have it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The INCR-then-EXPIRE racer</p>
+            <p>Two Redis calls instead of a Lua script. Under partial failure the TTL is never set and the counter leaks. Use one atomic script.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The fail-open default no one chose</p>
+            <p>The library failed open, the team never noticed, and the limiter was effectively disabled for the eighteen months since the last Redis incident. Make the choice explicit and alert on it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The synchronized retry stampede</p>
+            <p>Server returns <code>Retry-After: 60</code>, ten thousand clients retry at second 61, the limiter trips again, infinite loop. Jitter server-side, back off exponentially client-side.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The global single-Redis bottleneck</p>
+            <p>All limiter traffic hits one Redis primary, which becomes the production-traffic CPU ceiling. Shard by key, or add a per-replica local first tier.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The unbounded key-space</p>
+            <p>Keying by raw path or query string creates a new Redis key per unique URL; memory grows linearly with traffic until the box dies. Normalize to route templates.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The "we'll add limits later" project</p>
+            <p>Limits get retrofitted after the first incident, set conservatively to avoid breaking anyone, and then become permanent because nobody dares raise them. Dark-launch from the start, even at generous values.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The limiter that punishes its own retries</p>
+            <p>Internal retry logic — Polly, gRPC's built-in retry — fires three attempts that each consume a token, so legitimate clients get rate-limited by their own resilience code. Retry-budget separately, or charge once per logical operation.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Public REST API, tiered pricing</div>
+            <p>A B2B SaaS exposes a versioned REST API: free tier gets 60 req/min, Pro gets 1,000, Enterprise is negotiated. Token bucket per (API key, route-class) in Redis, IETF <code>RateLimit-*</code> headers on every response, dark-launched for two weeks before enforcement. <em>Lesson:</em> the headers themselves became a feature — customers built dashboards on <code>RateLimit-Remaining</code> and noticed problems before support did.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Login / credential-stuffing defense</div>
+            <p>An e-commerce backend rate-limits <code>POST /auth/login</code> by (email, IP) at 5/min and by IP alone at 30/min. The limiter fails closed: a Redis blip is preferable to an open door. Paired with a CAPTCHA after N rejections rather than a hard block. <em>Lesson:</em> keying purely by email lets an attacker lock out a target user; the tuple key prevents that.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">LLM gateway in front of OpenAI/Anthropic</div>
+            <p>An internal gateway enforces both RPM and TPM per team, charging the token bucket by estimated tokens at request time and reconciling on response. Spillover above quota is queued (leaky bucket) rather than rejected, since the calling code is batch-style. <em>Lesson:</em> queue depth is the leading indicator of cost overruns.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multi-tenant background-job runner</div>
+            <p>A scheduler runs tenant-owned jobs on shared workers. The limit is concurrency-based — <code>SemaphoreSlim(8)</code> per tenant — not RPM, because the scarce resource is worker slots, not API throughput. <em>Lesson:</em> rate limiting and concurrency limiting are different tools; pick by what's actually scarce.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> are allowed, rejected, fallback, and limiter p99 latency all on a dashboard with alerts on each?</li>
+              <li><strong>Failure handling:</strong> when Redis goes away, do you know within 60 seconds whether you're failing open or closed — and is that the choice you made on purpose?</li>
+              <li><strong>Atomicity:</strong> is check-and-decrement a single Lua script or <code>redis-cell</code> call, with no <code>INCR</code>+<code>EXPIRE</code> two-step anywhere?</li>
+              <li><strong>Headers:</strong> do 429 responses include <code>Retry-After</code> with server-side jitter, plus the standard <code>RateLimit-*</code> triple?</li>
+              <li><strong>Key hygiene:</strong> are limit keys normalized to route templates, hashed if long, and bounded so Redis memory can't grow unbounded?</li>
+              <li><strong>Security:</strong> is the login endpoint keyed by (email, IP), not just email (lockout abuse) or just IP (shared NAT)?</li>
+              <li><strong>Cost:</strong> on every paid-per-call backend, is there a cost-weighted limit, not only a request-count one?</li>
+              <li><strong>Onboarding:</strong> can a new engineer find the limit config in under five minutes and tell you which limits are enforced vs. log-only?</li>
+              <li><strong>Tests:</strong> is there an integration test that simulates Redis being unreachable and asserts the documented fallback behavior?</li>
+              <li><strong>Client behavior:</strong> do your own internal clients and shipped SDKs respect <code>Retry-After</code> with jitter and exponential backoff?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">In-process middleware.</span> <code>AddFixedWindowLimiter</code> in ASP.NET or <code>express-rate-limit</code> in Node, keyed by IP, single instance, no observability. Works for the first six months on low traffic and one replica.</li>
+          <li><span class="steps__title">Redis-backed shared state.</span> At horizontal scale-out, three replicas make the effective limit 3× what's configured, forcing the move to Redis. This is the painful point — a Lua script gets written, atomicity bugs surface, and someone learns what fail-open means at 2 a.m. during a Redis failover.</li>
+          <li><span class="steps__title">Tiered limits.</span> Once the product becomes multi-tenant or adds pricing tiers, limits move per-tenant and per-route-class, and config moves out of code into a database or feature-flag system, because product now owns the values.</li>
+          <li><span class="steps__title">Dedicated limit service.</span> Reached by maybe one in five projects: a shared gRPC service — often <code>envoyproxy/ratelimit</code> — across the fleet, with adaptive limits that move with downstream health. By then rate limiting is a platform capability with its own on-call rotation.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://stripe.com/blog/rate-limiters" rel="noopener">Scaling your API with rate limiters — Stripe Engineering</a> — the canonical production write-up: four limiter types, dark-launch methodology, and why token bucket wins.</li>
+          <li><a href="https://github.com/envoyproxy/ratelimit" rel="noopener">envoyproxy/ratelimit</a> — Lyft's open-source gRPC limit service; the config schema teaches you how to structure descriptors and tiers.</li>
+          <li><a href="https://github.com/brandur/redis-cell" rel="noopener">redis-cell (GCRA in Rust)</a> — a Redis module implementing the Generic Cell Rate Algorithm; the README explains why GCRA beats a hand-rolled token bucket.</li>
+          <li><a href="https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/" rel="noopener">IETF draft: draft-ietf-httpapi-ratelimit-headers</a> — the spec replacing the <code>X-RateLimit-*</code> zoo; implement these now and forget the vendor dialects.</li>
+          <li><a href="https://dev.to/saumya_karnwal/distributed-rate-limiting-five-problems-that-break-your-counters-454" rel="noopener">Distributed Rate Limiting — Five Problems That Break Your Counters</a> — a tight list of the failure modes above, with concrete repros.</li>
+          <li><a href="https://learn.microsoft.com/aspnet/core/performance/rate-limit" rel="noopener">ASP.NET Core Rate Limiting docs (Microsoft Learn)</a> — the four built-in algorithms, partition keys, and how to wire a Redis store.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
