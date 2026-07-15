@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Virtual DOM · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Virtual DOM</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Virtual DOM</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/virtual-dom/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Virtual DOM</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>The Virtual DOM is invisible until the day a list jitters during reorder, an input loses focus on every keystroke, or the Performance tab shows 80 ms of scripting per click — at which point it's suddenly the whole job. Four shapes come up again and again:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Long, reorderable lists</div><p>Kanban boards, inbox views, query result tables.</p></div>
+          <div class="card"><div class="card__title">Form-heavy screens</div><p>Every keystroke causes a parent re-render.</p></div>
+          <div class="card"><div class="card__title">Dashboards</div><p>The same context fans out to dozens of widgets.</p></div>
+          <div class="card"><div class="card__title">Editor-like UIs</div><p>Rich text, canvas overlays, drag-and-drop — where VDOM ownership collides with imperative DOM state.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Key list items by stable identity, never by array index</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use the item's own id — <code>key={user.id}</code>, <code>key={message.uuid}</code>, <code>key={`${row.id}-${col.id}`}</code> for grids. If your data has no id, generate one at <em>creation</em> time, not render time, and store it with the item.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The diff matches children by key. Index keys work silently until rows reorder, insert at the head, or get filtered — then DOM state (input value, focus, animation, video position) follows the position instead of the item. It's the single most common reconciliation bug.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>key={i}</code>, <code>key={Math.random()}</code>, <code>key={JSON.stringify(item)}</code>. The first lies about identity, the second forces an unmount and remount every render, the third is slow and brittle.</p></div>
+        </article>
+        <pre><code>// Bad — type into row 2, delete row 1, your text is now in row 1.
+{rows.map((row, i) => &lt;Row key={i} row={row} /&gt;)}
+
+// Good — text follows the row because identity is stable.
+{rows.map(row => &lt;Row key={row.id} row={row} /&gt;)}</code></pre>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Stabilize prop references before reaching for memo</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Wrap callbacks in <code>useCallback</code>, derived objects and arrays in <code>useMemo</code>, and hoist literals out of render. Only then wrap the receiving child in <code>React.memo</code>. In Vue 3, prefer <code>shallowRef</code> for big objects you replace by reference (chart data, editor documents).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>React.memo</code> does a <span class="term">shallow comparison</span><span class="term__gloss">checking prop equality one level deep, by reference, not by deep value</span> of props. If the parent re-renders and passes a fresh object or inline function, the reference is new every time, equality fails, and memo does nothing except cost a comparison.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Sprinkling <code>memo</code> on every component "just in case" without checking what props it actually receives. Premature memo is dead code with a benchmark cost.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Lift state down, not up, when only a leaf cares</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>If only a search box needs the query string, keep its <code>useState</code> inside that component, not the page-level parent. Split a fat parent into children that own their own slices.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A re-render of a parent re-renders every child whose memoization fails. Keeping state at the leaf turns a 200-component re-render into a 1-component re-render with no memo gymnastics.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hoisting every piece of state to the top "because it's cleaner." It centralizes complexity and broadcasts re-renders.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Treat context values as immutable identities</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Memoize the <code>value</code> passed to a Provider. Split unrelated state into separate contexts — one for theme, one for auth, one for the current user — instead of one mega-context.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every consumer of a context re-renders when the provider's value identity changes. A fresh object literal on every parent render fans out to every consumer in the tree.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>&lt;Ctx.Provider value={{ user, setUser }}&gt;</code> written inline. That object is fresh every render.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Read the Profiler before optimizing</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Open React DevTools Profiler, enable "record why each component rendered," run the interaction, then read the flamegraph. Warm-colored bars are slow renders; gray bars didn't re-render.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Memoization decisions made without measurement are almost always wrong. The Profiler names which prop's identity changed and which subtree to actually fix.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Optimizing components you haven't measured. In Vue 3, the Vue DevTools Performance tab does the same job — look for components that light up on every update when they shouldn't.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Use v-memo and shallowRef deliberately in Vue 3</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Reach for <code>v-memo</code> on large <code>v-for</code> lists whose items rarely change (<code>v-memo="[item.id, item.updatedAt]"</code>). Use <code>shallowRef</code> when wrapping objects you mutate by replacement — chart datasets, editor instances, large parsed ASTs.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Vue's runtime is already cheap thanks to patch flags, but big lists and deeply nested reactive proxies are where it still hurts. <code>shallowRef</code> skips reactivity recursion below the root.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Wrapping every ref in <code>shallowRef</code> "for performance." You lose reactivity on mutations and spend an afternoon debugging why the UI doesn't update.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Virtualize lists past a few hundred rows</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>react-window</code>, <code>react-virtuoso</code>, or <code>vue-virtual-scroller</code> once row count exceeds the viewport by more than roughly 3×. This is
+              <span class="term">virtualization</span><span class="term__gloss">rendering only the rows currently visible, recycling a small pool of DOM nodes as the user scrolls</span>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>VDOM cost is per node, not per pixel. The diff is O(n), but n = 10,000 still allocates 10,000 vnodes per render. Virtualization caps n at "what's visible."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Building your own "render only what's visible" with <code>scrollTop</code> listeners. Edge cases — variable row height, keyboard navigation, screen readers — eat months.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Escape the VDOM with refs for imperative APIs, not to "fix" rendering</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use a ref when the browser API is imperative by nature: <code>input.focus()</code>, <code>element.scrollIntoView()</code>, attaching a third-party widget to a <code>&lt;div&gt;</code>. For layered UI (modals, tooltips, toasts) use a
+              <span class="term">portal</span><span class="term__gloss">rendering a node into a different part of the real DOM tree while it stays in the same place in the component tree logically</span>
+              so it renders into <code>document.body</code> while the framework still owns its lifecycle.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Refs are the sanctioned escape hatch. Portals keep stacking-context bugs out of your tree without breaking event bubbling or context.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Calling <code>flushSync</code> to "force a render," mutating DOM children the framework also renders, or stashing DOM nodes you appended yourself inside a managed parent. The next reconciliation overwrites or orphans them.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Don't define components inside other components</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Declare every component at module scope. If it needs to close over props, pass them in explicitly.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A component declared inside a parent's function body gets a new function identity on every parent render. The framework sees a different type, tears down the whole subtree, and remounts it — state, focus, and animations all reset.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Inline component declarations inside JSX, render props that close over state setters without <code>useCallback</code>, and higher-order components applied inside render.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Know when to leave the VDOM behind</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For input-heavy or animation-heavy surfaces — trading grids, audio meters, real-time canvas overlays, large form builders — evaluate Solid, Svelte 5, or Vue Vapor Mode. They skip the diff in the steady state and update only the bound DOM nodes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The VDOM has a fixed per-render floor: allocate vnodes, walk the tree, compare props. At 120 Hz on a 5,000-node screen, that floor becomes the bottleneck no amount of memo can fix.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Rewriting a CRUD dashboard in Solid to chase a 2 ms benchmark. Most apps are bound by ergonomics, not by the VDOM. The rewrite is worth it only when the Profiler shows the reconciler itself, not your code, as the long pole.</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph V["Default path: VDOM diff"]
+      V1["Render the subtree"]
+      V2["React.memo / useMemo to skip re-renders"]
+    end
+    subgraph F["Escape hatch: fine-grained"]
+      F1["Solid, Svelte 5, or Vue Vapor Mode"]
+      F2["Update only the bound DOM nodes"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Two ways to keep an update cheap: skip subtrees with memoization, or skip the diff entirely with a fine-grained framework.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>key={Math.random()}</code> or <code>key={Date.now()}</code></p>
+            <p>Looks like it gives every item a unique key; actually forces an unmount and remount every render, destroying state and animations. Use the item's own id.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">A new object literal in a memoized child's props</p>
+            <p><code>&lt;Child style={{margin: 8}} /&gt;</code> next to <code>React.memo(Child)</code>. Memo never hits; everything re-renders. Hoist the literal out of render or <code>useMemo</code> it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Context as a state-management bus</p>
+            <p>One Provider with a giant combined value re-renders every consumer on any change. Split contexts by update frequency and audience.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Conditional element type</p>
+            <p><code>{condition ? &lt;div&gt;…&lt;/div&gt; : &lt;section&gt;…&lt;/section&gt;}</code> around the same children. The type change forces a full unmount. Put the conditional inside the element, not around it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Calling <code>forceUpdate</code> or <code>flushSync</code> to "make it render now"</p>
+            <p>Almost always covers for state that should live in the framework's reactivity and doesn't. Move the state in; remove the force.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Direct DOM mutation on managed nodes</p>
+            <p><code>document.querySelector('.row').classList.add(...)</code> inside a component the framework also renders. The next reconciliation overwrites it. Use props or a ref scoped to your own element.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Defining a component inside another component's body</p>
+            <p>Looks tidy; remounts the whole subtree on every parent render. Hoist it to module scope.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Spreading unknown props all the way down</p>
+            <p><code>&lt;Wrapper {...props}&gt;</code> with no shape contract — every parent prop change reaches every leaf, and memoization is impossible because identities you don't own keep changing.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Inbox-style list, 5k–50k items</div>
+            <p>Email, chat, and support-ticket teams key by message id, virtualize with <code>react-virtuoso</code>, and memoize rows on <code>(id, isRead, updatedAt)</code>. <em>Lesson:</em> the row's click handler must be stable too — an unstable inline handler alone defeats memo and the whole list re-renders on every selection.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Realtime dashboard, 30+ widgets</div>
+            <p>Each widget subscribes to its own slice via a
+              <span class="term">selector</span><span class="term__gloss">a function that reads one slice of shared store state so a component re-renders only when that slice changes</span>
+              hook rather than one global context. <em>Lesson:</em> keep the WebSocket handler outside the component tree, writing to the store — putting the socket inside a top-level component re-renders the world on every tick.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Drag-and-drop kanban board</div>
+            <p>Cards use stable ids as keys; the drag preview renders through a portal so it can escape <code>overflow: hidden</code>. <em>Lesson:</em> optimistic reordering must commit a new array with new positions but the same item references, or memoization breaks downstream.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Form builder, 200+ live inputs</div>
+            <p>Each field owns its own state; the form-level value is assembled on submit via refs or a form library that bypasses controlled-input re-renders. <em>Lesson:</em> a single top-level controlled form re-renders every field on every keystroke — local state at the leaf is the cheapest possible memoization.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Trading grid, 100+ updates/second</div>
+            <p>After exhausting memoization, the team replaced the hot grid with a Solid island inside an otherwise React app. <em>Lesson:</em> you don't have to pick one framework for the whole app — render the hot surface with fine-grained reactivity and keep the chrome as-is. The boundary is a single mount point.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Lists:</strong> does every <code>.map(...)</code> use a stable, non-index key derived from data identity?</li>
+              <li><strong>Profiler:</strong> does a recent recording exist for the screen's primary interaction, with a known reason for every warm bar?</li>
+              <li><strong>Memoization:</strong> has every <code>React.memo</code> been verified to actually skip renders (gray in the Profiler on unrelated updates)?</li>
+              <li><strong>Context:</strong> is each Provider's <code>value</code> memoized, and are mega-contexts split by audience?</li>
+              <li><strong>Virtualization:</strong> is any list expected to exceed a few hundred items virtualized, with row-height assumptions documented?</li>
+              <li><strong>Refs vs render:</strong> does imperative DOM work (focus, scroll, third-party widgets) go through refs, never through <code>flushSync</code> hacks?</li>
+              <li><strong>Portals:</strong> does overlay UI (modals, tooltips) use portals, with event bubbling and focus traps tested?</li>
+              <li><strong>Effects:</strong> does no effect write state that the same effect depends on?</li>
+              <li><strong>Onboarding:</strong> do new engineers know how to open the Profiler, read a flamegraph, and find the prop whose identity changed?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Ignore it.</span> State lives at the top, callbacks are inline, props are object literals, lists are keyed by index. It works because the app is small and the framework is fast enough.</li>
+          <li><span class="steps__title">First jank ticket.</span> A screen crosses roughly 50 components, or a list crosses a few hundred rows, and reactive memoization begins: someone discovers <code>React.memo</code> and <code>useCallback</code> and sprinkles them across the codebase for a partial win. The Profiler flushes out bad keys, fresh object literals, and mega-contexts along the way.</li>
+          <li><span class="steps__title">Architectural phase.</span> State is colocated with the components that read it, a store with selector hooks handles genuinely shared state, long lists are virtualized, and the team makes a deliberate VDOM-vs-fine-grained choice for hot spots. The painful migration is usually moving from one big context or one big form state to selectors — it touches every consumer.</li>
+          <li><span class="steps__title">Compiler trust.</span> With React 19's compiler and Vue's Vapor Mode shipping, the next migration is removing hand-written <code>useMemo</code> / <code>useCallback</code> once the team trusts the compiler to do it instead.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://react.dev/learn/rendering-lists" rel="noopener">React docs — Rendering Lists and You Might Not Need an Effect</a> — the modern canonical guidance on keys and on avoiding effect cascades.</li>
+          <li><a href="https://vuejs.org/guide/best-practices/performance" rel="noopener">Vue.js — Performance guide</a> — official coverage of <code>v-memo</code>, <code>shallowRef</code>, and what the Vue 3 compiler already does for you.</li>
+          <li><a href="https://legacy.reactjs.org/blog/2018/09/10/introducing-the-react-profiler.html" rel="noopener">Introducing the React Profiler (Brian Vaughn, React blog)</a> — the clearest explanation of what the flamegraph and ranked chart show.</li>
+          <li><a href="https://blog.isquaredsoftware.com/2020/05/blogged-answers-a-mostly-complete-guide-to-react-rendering-behavior/" rel="noopener">Mark Erikson — A (Mostly) Complete Guide to React Rendering Behavior</a> — the best deep article on why components re-render in practice.</li>
+          <li><a href="https://dev.to/this-is-learning/components-are-pure-overhead-hpm" rel="noopener">Ryan Carniato — Components are Pure Overhead</a> — the case for fine-grained reactivity over VDOM, from the author of SolidJS.</li>
+          <li><a href="https://react.dev/learn/react-compiler" rel="noopener">React Compiler docs</a> — what auto-memoization does, what it doesn't, and how to verify it ran on your component.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/virtual-dom/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

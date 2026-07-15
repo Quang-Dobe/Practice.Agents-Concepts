@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hydration · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Hydration</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Hydration</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/hydration/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Hydration</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Hydration is the process by which a client-side UI framework adopts a pre-existing DOM subtree produced by a server (SSR) or a build step (SSG), walks its own component tree against that DOM in lockstep, attaches event listeners, restores state from a serialized payload, and runs mount-time effects — without recreating the DOM nodes already on the page.</p>
+        <ul>
+          <li><strong>It's a proof, not just a render.</strong> Given a server-rendered subtree and a client component tree, hydration is a walk that checks the two agree, while populating the framework's own runtime structures (React's Fiber tree, Vue's vnode tree, Svelte's component instances).</li>
+          <li><strong>Every node ends up owned by one component.</strong> The walk finishes with each DOM node claimed by exactly one component instance.</li>
+          <li><strong>Mismatches force a choice.</strong> If the check fails — wrong node, wrong attribute, wrong text — the framework either throws that piece away and re-renders it from scratch (Vue, older React), or logs an error and patches what it can (React 18+).</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Server renderer</dt><dd><code>renderToString</code> / <code>renderToPipeableStream</code> (React), <code>renderToString</code> (Vue), Svelte's <code>render</code>, SolidJS's <code>renderToStringAsync</code>. Produces HTML plus a separate serialized state payload.</dd></div>
+          <div><dt>Serialized state envelope</dt><dd>The JSON blob shipped alongside the HTML so the client doesn't refetch: <code>__NEXT_DATA__</code> in Next.js, <code>__NUXT__</code> in Nuxt, a <code>&lt;script&gt;</code> tag SvelteKit's runtime reads on boot.</dd></div>
+          <div><dt>Client hydration entry point</dt><dd><code>hydrateRoot(domNode, &lt;App/&gt;)</code> (React 18+), <code>createSSRApp(App).mount('#app')</code> (Vue 3), <code>hydrate(App, { target })</code> (Svelte), <code>hydrate(() =&gt; &lt;App/&gt;, root)</code> (SolidJS).</dd></div>
+          <div><dt>Reconciler</dt><dd>The framework's tree-walking diff engine in hydration mode — the Fiber reconciler for React, the <code>hydrate</code> function in Vue's runtime core, generated index-walking code for Svelte.</dd></div>
+          <div><dt>Event delegation system</dt><dd>A small number of root-level listeners dispatching synthetic events down to the matched component, instead of one DOM listener per handler.</dd></div>
+        </dl>
+
+        <p>Hydration sits inside the family of isomorphic / universal rendering strategies. Its siblings differ in how much work the client repeats:</p>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Strategy</th><th scope="col">Server work</th><th scope="col">Client work</th><th scope="col">TTI</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>CSR</td><td>none</td><td>full render + mount</td><td>slow (after JS)</td></tr>
+              <tr><td>SSR, no hydration</td><td>HTML</td><td>none — page is inert</td><td>n/a (no JS app)</td></tr>
+              <tr><td>SSR + hydration</td><td>HTML + state</td><td>re-render + reconcile + attach</td><td>medium</td></tr>
+              <tr><td>SSG + hydration</td><td>HTML at build</td><td>same as SSR + hydration</td><td>medium</td></tr>
+              <tr><td>Islands (Astro, Fresh)</td><td>HTML + state</td><td>hydrate only marked components</td><td>fast</td></tr>
+              <tr><td>RSC + selective hydration</td><td>HTML + RSC payload</td><td>hydrate only client components</td><td>fast</td></tr>
+              <tr><td>Resumability (Qwik)</td><td>HTML + serialized framework state</td><td>resume on first interaction</td><td>near-zero</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Hydration is the <strong>default</strong> for SSR-capable JS frameworks; islands and resumability both exist as answers to its cost.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Hydration is a browser-runtime concern, but it depends on three other layers cooperating:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">1 · Server / build pipeline</div><p>Runs the SSR renderer, emits HTML and the state envelope.</p></div>
+          <div class="card"><div class="card__title">2 · Bundler</div><p>Produces the client JS bundle with the same component code the server ran, plus the runtime in hydration mode. Code-splitting here decides hydration granularity.</p></div>
+          <div class="card"><div class="card__title">3 · Framework runtime</div><p>The Fiber / vnode / instance machinery that performs reconciliation in the browser.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    A["Server / build pipeline\nSSR renderer + state envelope"] --> D["Browser"]
+    B["Bundler\nsame component code, code-split per route"] --> D
+    C["Framework runtime\nFiber / vnode / instance machinery"] --> D
+    D --> E["Hydration walk\nreconciler matches fiber-by-fiber against live DOM"]
+          </pre>
+          <figcaption class="diagram__caption">Three layers cooperate before a single hydration walk happens in the browser. React compares fiber-by-fiber against the next DOM node — it never text-diffs the HTML string.</figcaption>
+        </figure>
+
+        <h3>Where you typically encounter it</h3>
+        <ul>
+          <li><strong>Next.js App Router</strong> — React Server Components by default; <code>'use client'</code> components hydrate via <code>hydrateRoot</code>, streamed by <code>renderToPipeableStream</code>.</li>
+          <li><strong>Nuxt 3</strong> — Vue 3's <code>createSSRApp</code> under the hood, with <code>&lt;ClientOnly&gt;</code> as the standard mismatch escape hatch.</li>
+          <li><strong>SvelteKit</strong> — hydration per route, controllable via the <code>csr</code> page option.</li>
+          <li><strong>Remix</strong> — React, hydrates the full route tree.</li>
+          <li><strong>SolidStart</strong> — SolidJS <code>hydrate</code>, fine-grained reactivity instead of a virtual-DOM diff.</li>
+          <li><strong>Astro</strong> — explicit <code>client:load</code>, <code>client:visible</code>, <code>client:idle</code>, <code>client:media</code> directives per island.</li>
+          <li><strong>Qwik / QwikCity</strong> — does not hydrate; it resumes instead.</li>
+        </ul>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Diagnosing mismatches:</strong> the React DevTools Components tab, browser-extension detection scripts, the Next.js dev overlay, <code>why-did-you-render</code>.</li>
+          <li><strong>Deferring hydration:</strong> <code>react-lazy-hydration</code>, Astro's <code>client:*</code> directives, Nuxt lazy-hydration helpers.</li>
+          <li><strong>Replacing hydration:</strong> Qwik (resumability), Marko (server-driven streaming with auto-islands), HTMX (no hydration — it re-renders fragments from the server).</li>
+          <li><strong>State serialization:</strong> <code>superjson</code>, <code>devalue</code> (used internally by SvelteKit), Next's built-in JSON serializer.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for SSR + hydration when</p>
+            <ul>
+              <li>The site is content-driven and needs FCP under ~1.5s on mobile.</li>
+              <li>SEO or a social-card preview matters and content is dynamic per request (logged-in user, A/B test, geo).</li>
+              <li>The app is interactive enough that a pure templating stack (Rails, Django, Razor Pages) would force a round trip on every click.</li>
+              <li>You're already on a meta-framework that defaults to it.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Avoid it when</p>
+            <ul>
+              <li>The page has zero JS interactivity — ship plain HTML; you don't need a framework runtime at all.</li>
+              <li>The app is behind auth and SEO/FCP don't matter — CSR is simpler, no SSR infra to run.</li>
+              <li>The page is dynamic per keystroke (a complex editor) — the hydration cost happens once but the bundle stays the same size; you pay for SSR without much FCP benefit if users dwell for minutes.</li>
+              <li>You can't keep server and client output deterministically equal (heavy <code>Date.now</code>, locale APIs, scattered <code>window</code> checks). Fighting mismatches will cost more than the win.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Two narrower alternatives</p>
+            <p>Reach for <strong>islands or RSC</strong> when most of the page is static and only a few regions are interactive — product pages, marketing sites, docs, blogs with a comment widget. Reach for <strong>resumability</strong> when interactivity must feel instant on slow devices and the serialized framework state is small enough to fit in the HTML payload without ballooning bytes-over-wire.</p>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>The term appears in the React ecosystem around 2015, when <code>ReactDOM.render</code> first accepted server-rendered markup, and is named explicitly with <code>ReactDOM.hydrate</code> in React 16 (2017). Before SSR-aware reconciliation, libraries like Meteor and <code>react-dom-stream</code> patched HTML by hand or threw away server markup on mount. The motivation: pure CSR's blank-page problem hurt SEO and Core Web Vitals, while pure server templating (Rails, Django) couldn't deliver SPA-like interactivity. React 18 (2022) reshaped hydration again with <code>hydrateRoot</code>, streaming SSR via <code>renderToPipeableStream</code>, and selective hydration through Suspense boundaries.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a single request through a React 18 Next.js pipeline — the canonical case:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Request arrives.</span> Next.js routes it to a page module.</li>
+          <li><span class="steps__title">Server-side render.</span> <code>renderToPipeableStream(&lt;App/&gt;)</code> walks the tree. A Suspense boundary that hits a pending promise emits a fallback in its HTML slot and rendering continues for its siblings.</li>
+          <li><span class="steps__title">Stream flush.</span> <code>onShellReady</code> fires once the non-suspended shell is done; the server pipes that HTML to the client. Extra chunks append as suspended parts resolve.</li>
+          <li><span class="steps__title">Payload emitted.</span> Next embeds <code>self.__next_f.push([...])</code> chunks carrying the
+            <span class="term">RSC payload</span>
+            <span class="term__gloss">a serialized description of the rendered tree, including props for client components</span>.</li>
+          <li><span class="steps__title">Client receives HTML.</span> The browser parses and paints — FCP happens here, before any framework JS runs.</li>
+          <li><span class="steps__title">Client bundle loads.</span> The runtime and every <code>'use client'</code> component arrive, code-split per route.</li>
+          <li><span class="steps__title"><code>hydrateRoot</code> runs.</span> React allocates a Fiber tree; for each fiber it expects a matching DOM node at the current cursor. It adopts existing nodes — it never creates new ones.</li>
+          <li><span class="steps__title">Event delegation attaches.</span> React installs delegated listeners at the root so matched fibers can receive synthetic events.</li>
+          <li><span class="steps__title">Effects run.</span> <code>useEffect</code> callbacks fire after the initial commit, in the same order as a normal first render.</li>
+          <li><span class="steps__title">Selective hydration kicks in.</span> If a
+            <span class="term" data-gloss="a component boundary that can show a fallback while its content is still loading">Suspense boundary</span>
+            's JS hasn't arrived, React skips it and keeps hydrating the rest. A click inside a not-yet-hydrated boundary makes React prioritize hydrating that boundary first.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant S as Server
+    participant Br as Browser
+    participant R as React runtime
+    S->>Br: HTML stream + serialized payload
+    Br->>Br: parse and paint (FCP)
+    Br->>R: client bundle loads
+    R->>Br: hydrateRoot walks the DOM
+    alt fiber matches DOM node
+        R->>Br: adopt node, attach listeners
+    else mismatch found
+        R->>Br: log error, re-render that subtree
+    end
+    R->>Br: effects run, page responds (TTI)
+          </pre>
+          <figcaption class="diagram__caption">The matching step is a structural compare — tag name, key, a small set of attributes, and text nodes by string equality — not a text diff of the HTML.</figcaption>
+        </figure>
+
+        <p>The
+          <span class="term">reconciler</span>
+          <span class="term__gloss">the framework's tree-walking engine that matches fibers or vnodes to existing DOM nodes</span>
+          behaves differently per framework once a mismatch appears. React 18 logs an error and, for the offending subtree, falls back to a
+          <span class="term" data-gloss="discard the mismatched server DOM and re-render that subtree from scratch on the client">two-pass render</span>.
+          Vue is more aggressive: any mismatch logs a warning and bails hydration entirely for the affected component, discarding the server DOM and re-rendering it. Svelte walks the existing DOM by node index using compiled code — cheapest of the four at runtime, least forgiving of mismatches.</p>
+
+        <h3>How resumability differs</h3>
+        <p>Qwik's resumability is a structurally different answer, not just a faster hydration:</p>
+        <ul>
+          <li>Hydration re-executes component functions on the client to rebuild the framework's in-memory state. Qwik instead serializes that state.</li>
+          <li>Listener locations become <code>on:click</code> attributes pointing at lazy-loaded chunk URLs.</li>
+          <li>Component boundaries are encoded as HTML comments; reactive state is JSON in a <code>&lt;script type="qwik/json"&gt;</code> block.</li>
+          <li>The first interaction downloads only the closure for that one handler — the framework picks up from the serialized state without running parent components again.</li>
+          <li>The cost lands on the wire (a larger HTML payload) and in the mental model — code has to be written so it survives serialization.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Cost</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Hydrate the full tree (default React/Vue)</td><td>Single mental model, any component can be interactive</td><td>Every component's JS must download, parse, execute</td></tr>
+              <tr><td>Selective hydration via Suspense</td><td>Hydration starts before all JS loads; click-priority</td><td>Requires Suspense boundaries authored intentionally</td></tr>
+              <tr><td>Islands (Astro)</td><td>Near-zero JS for static parts</td><td>Cross-island state sharing is hard; needs explicit signals or stores</td></tr>
+              <tr><td>RSC</td><td>Server components ship zero JS</td><td>Server runtime cost; mental split between server/client component rules</td></tr>
+              <tr><td>Resumability (Qwik)</td><td>Near-zero TTI</td><td>Larger HTML payload; framework lock-in; smaller ecosystem</td></tr>
+              <tr><td>Defer hydration (<code>client:visible</code>, lazy-hydrate)</td><td>Lower total blocking time</td><td>Click before hydrate = no-op; needs UX consideration</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>Date.now()</code> / <code>Math.random()</code> in render</p>
+            <p>The server clock and client clock differ, so the very first paint mismatches.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Conditional render on <code>typeof window</code></p>
+            <p>The server renders one branch, the client renders the other — a guaranteed mismatch.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Locale-dependent formatting</p>
+            <p><code>toLocaleString()</code> and <code>Intl.DateTimeFormat</code> without an explicit <code>timeZone</code> produce different output in Node than in the browser.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Invalid HTML nesting</p>
+            <p>A <code>&lt;div&gt;</code> inside a <code>&lt;p&gt;</code>, or a missing <code>&lt;tbody&gt;</code>. The browser parser auto-corrects it; the framework's vnode tree doesn't, so a mismatch follows.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Browser extensions injecting attributes</p>
+            <p>Grammarly and password managers add <code>data-*</code> attributes before hydration runs. React 18 tolerates attribute-only mismatches; older versions don't.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Reading <code>localStorage</code> during render</p>
+            <p>Only available on the client. Common in theme switchers, and a guaranteed first-paint mismatch.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Stale CDN HTML + a fresh JS bundle</p>
+            <p>A deployed bundle expecting new props meets cached HTML from yesterday's render.</p>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Accepted escape hatches</p>
+            <p>Render the dynamic part only after mount (<code>useEffect</code> + a state flag), gate it with <code>&lt;ClientOnly&gt;</code> (Nuxt) or <code>client:only</code> (Astro), or annotate the one offending element with <code>suppressHydrationWarning</code> (React) — one level deep and explicitly a silencer, not a fix.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Hydration bridges two contradictory requirements: show something fast and let crawlers read it (favors HTML from the server), and behave like an app (favors a client-side component tree with state and listeners). Without hydration, the only way to satisfy both was to render twice — once as HTML, once as a fresh client mount — and let the client mount visibly clobber the server output. Hydration makes that second mount adopt the first, cutting the flash and the duplicate DOM allocation.</p>
+        <p>At a deeper level, it exists because the browser's HTML parser and a JS framework's vnode/Fiber tree don't share an internal representation. Hydration is the protocol that reconciles those two representations onto a single set of DOM nodes.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 210" role="img" aria-labelledby="bridgeTitle bridgeDesc" width="560" style="max-width:100%">
+            <title id="bridgeTitle">Two representations, one set of DOM nodes</title>
+            <desc id="bridgeDesc">A browser DOM tree built from parsed HTML and a framework component tree built from Fiber or vnode structures point separately into the same set of shared DOM nodes. Hydration is the walk that lines the two up.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="20" y="20" width="200" height="70" rx="8" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="120" y="48" fill="var(--text)" text-anchor="middle">Browser DOM tree</text>
+              <text x="120" y="68" fill="var(--text-faint)" text-anchor="middle" font-size="12">built by the HTML parser</text>
+
+              <rect x="340" y="20" width="200" height="70" rx="8" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="440" y="48" fill="var(--text)" text-anchor="middle">Framework component tree</text>
+              <text x="440" y="68" fill="var(--text-faint)" text-anchor="middle" font-size="12">Fiber / vnode / instances</text>
+
+              <line x1="120" y1="90" x2="220" y2="150" stroke="var(--accent)"/>
+              <line x1="440" y1="90" x2="340" y2="150" stroke="var(--accent)"/>
+
+              <rect x="180" y="150" width="200" height="46" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="280" y="178" fill="var(--accent)" text-anchor="middle">Shared DOM nodes — hydrated</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Two trees, built by two different systems, that must agree on one set of live DOM nodes. Hydration is the walk that proves — or fixes — that agreement.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative — serialize the full framework state on the server and ship it so no re-execution is needed — is what Qwik does. Mainstream frameworks didn't start there because serializing arbitrary JS closures, class instances, and effect graphs is hard: React render functions can close over module-scope variables, third-party hooks, and provider context with no clean JSON form. Re-executing the same code on both sides and reaching the same state is the path of least resistance — no serialization protocol to design.</p>
+        <p>The two-pass render fallback exists for a similar reason. React could try to patch individual nodes on mismatch, but the reconciler's invariants assume the tree is consistent. Once that invariant is lost in a subtree, throwing it away and re-rendering is the only safe move.</p>
+        <p>Selective hydration via Suspense exists because all-or-nothing didn't scale: one slow <code>&lt;Comments&gt;</code> component shouldn't block the rest of the page from becoming interactive. Suspense boundaries give the framework a natural unit at which to split the work.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of mid-2026 the frontier has moved past "hydrate everything." React Server Components are the default in the Next.js App Router, Astro's island model is the recommended path for content sites, and Qwik has shown near-zero TTI is possible at the cost of a different programming model. Every modern framework roadmap is now dominated by <em>how to ship less hydration</em>, not how to make hydration faster. Understanding the mechanism still matters, because every design choice in those newer models — what counts as a client boundary, what gets serialized, when listeners attach — only makes sense once you know what hydration actually does and what it costs.</p>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Try it yourself</p>
+            <ul>
+              <li>Measure the gap between FCP and TTI on a real app with the browser's Performance panel — is hydration the dominant cost, or is it bundle parse time?</li>
+              <li>Force a mismatch (e.g. <code>{new Date().toString()}</code> in a server component) and read the dev-overlay output.</li>
+              <li>Compare bundle sizes for the same page as (a) all client components, (b) RSC + minimal <code>'use client'</code> leaves, (c) an Astro island.</li>
+              <li>Inspect a Qwik page's HTML payload size — is the serialized state worth the FCP cost on a slow network?</li>
+              <li>Throttle the network and click inside a not-yet-hydrated Suspense boundary to confirm React prioritizes it.</li>
+              <li>The <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/hydration/code" target="_blank" rel="noopener">code folder</a> has a runnable SSR + <code>hydrateRoot</code> demo that exercises a deliberate mismatch and shows the recovery.</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

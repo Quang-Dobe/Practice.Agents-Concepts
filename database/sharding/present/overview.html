@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sharding · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sharding</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sharding</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/sharding/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sharding</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Your database is fine until it isn't. One day a table has 500 million rows, the disk is full, and one primary machine can't keep up with writes.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Sharding chops the data horizontally. Every row still looks the same, but rows live on different machines based on a routing rule — usually a hash of <code>user_id</code> or a range of dates. Each machine only sees its own slice, called a
+              <span class="term">shard</span>
+              <span class="term__gloss">one physical database holding a slice of the data</span>.
+              You scale by adding more boxes instead of buying one bigger box.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture one giant filing cabinet in an office. It works fine until the office has ten thousand employees — now it won't fit in the room, and three people are always queued at the drawers.</p>
+        <p>So you buy ten smaller cabinets, one per hallway, and make a rule: last names A–C live in cabinet 1, D–F in cabinet 2, and so on. Anyone looking up a folder checks the rule, walks to the right cabinet, and pulls the file. Nobody ever opens all ten cabinets to find one folder.</p>
+        <p>That rule is the
+          <span class="term">shard key</span>
+          <span class="term__gloss">the column value that decides which machine a row lives on — e.g. user_id</span>.
+          The cabinets are the shards. The person who knows the rule and walks you to the right cabinet is the
+          <span class="term">router</span>
+          <span class="term__gloss">the component that maps a query to the right shard, called the routing layer</span>.
+          Every cabinet has the same drawer layout — the same schema — they just hold different folders.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[New record arrives] --> B{Router checks the shard key}
+    B -->|"A-C"| C1[(Cabinet 1)]
+    B -->|"D-F"| C2[(Cabinet 2)]
+    B -->|"G-I"| C3[(Cabinet 3)]
+    B -->|"..."| C4[(Cabinet N)]
+          </pre>
+          <figcaption class="diagram__caption">The filing-cabinet rule, drawn once: the router reads the key and walks straight to the one cabinet that owns it.</figcaption>
+        </figure>
+
+        <p>The whole game is picking a key where the folders spread out evenly, so most lookups only ever touch one cabinet.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not replication.</strong> Replication makes copies of the same data on many nodes, for read scale or failover. Sharding puts <em>different</em> data on different nodes.</li>
+              <li><strong>Not vertical partitioning.</strong> Vertical partitioning splits a table by columns (move a big blob column to its own table). Sharding splits by rows.</li>
+              <li><strong>Not the same as table partitioning.</strong> Postgres/MySQL "partitions" usually live on the same server, same disk, same process. Sharding spans multiple servers.</li>
+              <li><strong>Not free horizontal scaling.</strong> It buys throughput at the cost of cross-shard joins, distributed transactions, and rebalancing pain.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>One primary node can't absorb the write rate, even after vertical scaling.</li>
+              <li>The working dataset no longer fits in RAM on one machine and cache hit rates are collapsing.</li>
+              <li>You need geographic locality — EU users on EU shards, US on US — for latency or data residency.</li>
+              <li>Tenants are naturally isolated, like a multi-tenant SaaS where one customer's data rarely mixes with another's.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Your database fits on one box and the real problem is a missing index. Fix the index.</li>
+              <li>You need ACID transactions spanning many rows of unrelated entities — distributed transactions are slow and fragile.</li>
+              <li>Your workload is heavily analytical, with big joins across the whole dataset. Reach for a warehouse or columnar store instead.</li>
+              <li>You're under 100 GB of hot data. The operational tax almost certainly costs more than a bigger instance.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Shard</dt><dd>One physical database holding a slice of the data.</dd></div>
+          <div><dt>Shard key</dt><dd>The column whose value decides which shard a row goes to (e.g. user_id).</dd></div>
+          <div><dt>Routing layer</dt><dd>The component that maps a query to the right shard — client, proxy, or the database itself.</dd></div>
+          <div><dt>Hash sharding</dt><dd><code>shard = hash(key) % N</code>. Even distribution, bad for range scans.</dd></div>
+          <div><dt>Range sharding</dt><dd><code>shard = lookup(key in [lo, hi])</code>. Great for range scans, prone to hotspots.</dd></div>
+          <div><dt>Directory / lookup sharding</dt><dd>A separate table maps each key to a shard. Flexible, but the lookup itself becomes a bottleneck.</dd></div>
+          <div><dt>Hotspot</dt><dd>One shard getting disproportionate traffic — e.g. sharding by country when 60% of users are in one country.</dd></div>
+          <div><dt>Resharding</dt><dd>Redistributing data when shards are added or removed. The hardest part of operating a sharded system.</dd></div>
+          <div><dt>Cross-shard query</dt><dd>A query that must touch more than one shard. Slow, hard to keep transactional, easy to get wrong.</dd></div>
+        </dl>
+
+        <!-- WHAT'S NEXT -->
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

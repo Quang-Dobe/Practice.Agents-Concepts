@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Service Mesh · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Service Mesh</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Service Mesh</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/service-mesh/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Service Mesh</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A service mesh is a programmable network layer for east-west (service-to-service) traffic: a
+          <span class="term">data plane</span>
+          <span class="term__gloss">identity-aware proxies that sit in the request path and actually carry traffic</span>
+          of proxies in the request path, plus a control plane that configures those proxies from the side.</p>
+        <ul>
+          <li><strong>Core idea.</strong> The data plane terminates and re-originates every connection so it can enforce mTLS, weighted routing, retries, timeouts, circuit breaking, rate limiting, and per-request telemetry — without the app speaking the mesh's API.</li>
+          <li><strong>Building blocks.</strong> Sidecar proxy, per-node proxy (ambient), control plane, the xDS discovery protocol, SPIFFE identity, and a set of CRDs.</li>
+          <li><strong>Family.</strong> The control plane translates high-level intent — Kubernetes CRDs like <code>VirtualService</code>, <code>PeerAuthentication</code>, or the Gateway API's <code>HTTPRoute</code> — into proxy config, and ships it over a streaming gRPC API.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Sidecar proxy</dt><dd>Historically an Envoy container co-located with the app in the same pod, sharing its network namespace. Intercepts inbound and outbound TCP via iptables <code>REDIRECT</code> rules installed by an <code>istio-init</code> init container.</dd></div>
+          <div><dt>Per-node proxy (ambient)</dt><dd>In Istio Ambient (GA November 2024) the L4 proxy is <strong>ztunnel</strong>, a Rust process running once per node as a DaemonSet. L7 features are opt-in via a <em>waypoint proxy</em> (Envoy) deployed per namespace or service account.</dd></div>
+          <div><dt>Control plane</dt><dd>Istio's <code>istiod</code> — Pilot, Citadel, and Galley merged in 1.5+. It watches the Kubernetes API, computes proxy config, signs workload certificates, and serves xDS.</dd></div>
+          <div><dt>xDS</dt><dd>The discovery API family Envoy speaks: LDS (Listeners), RDS (Routes), CDS (Clusters), EDS (Endpoints), SDS (Secrets), aggregated onto one ordered gRPC stream by ADS. Standard xDS ships the whole state each time; delta xDS sends only diffs.</dd></div>
+          <div><dt>SPIFFE identity</dt><dd>Every workload gets an ID like <code>spiffe://cluster.local/ns/default/sa/orders</code>, baked into an X.509 SVID the proxy presents during the mTLS handshake.</dd></div>
+          <div><dt>CRDs</dt><dd><code>VirtualService</code> / <code>DestinationRule</code> (Istio), <code>ServiceProfile</code> (Linkerd), or the vendor-neutral <strong>Gateway API</strong> with <code>HTTPRoute</code> / <code>GRPCRoute</code> — the direction the ecosystem is converging toward.</dd></div>
+        </dl>
+
+        <p>A mesh belongs to a wider family of <strong>out-of-process networking layers</strong>: API gateways (north-south, single edge concentrator — Kong, Envoy Gateway), plain L4 load balancers (no L7 awareness), and library-based equivalents that live inside the app process (gRPC interceptors, Twitter's Finagle, Spring Cloud). CNI plugins (Cilium, Calico) sit one layer below, at L3/L4 — though Cilium has been climbing the stack with its own eBPF-based mesh, blurring the line. A mesh is the option that's polyglot, transparent to the app, and centrally configurable, at the cost of being an extra distributed system you have to operate.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>In Kubernetes, a mesh runs at four distinct places:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">1 · Sidecar pod</div><p>An Envoy container inside every application pod. <code>istio-init</code> redirects all outbound TCP to port <code>15001</code> and inbound TCP to port <code>15006</code>; Envoy runs as UID <code>1337</code>, which iptables skips to avoid a redirect loop.</p></div>
+          <div class="card"><div class="card__title">2 · Ambient per-node</div><p><strong>ztunnel</strong> runs as a per-node DaemonSet in <code>istio-system</code>, picks up pod traffic via a CNI plugin, and tunnels it over <strong>HBONE</strong> (HTTP/2 CONNECT on port <code>15008</code> carrying mTLS). L7 features live in per-namespace waypoint proxies.</p></div>
+          <div class="card"><div class="card__title">3 · Control plane</div><p><code>istiod</code> runs in <code>istio-system</code>, typically 2-3 replicas behind a headless service, watching every namespace it's responsible for.</p></div>
+          <div class="card"><div class="card__title">4 · Meshes you'll meet</div><p><strong>Istio</strong> (the reference, ships in GCP/AKS/OpenShift), <strong>Linkerd</strong> (CNCF graduated, Rust proxy), <strong>Consul Connect</strong> (first-class on VMs, not just K8s), <strong>Cilium Service Mesh</strong> (eBPF-first). AWS App Mesh and Kuma round out the field — App Mesh is deprecated, EOL September 2026.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    CP["Control plane — istiod (2-3 replicas)"]
+    subgraph N1["Node 1"]
+      direction TB
+      SC1["Sidecar mode: Envoy in every pod"]
+    end
+    subgraph N2["Node 2"]
+      direction TB
+      SC2["Ambient mode: one ztunnel per node"]
+      WP["Waypoint proxy — opt-in L7 policy"]
+      SC2 --> WP
+    end
+    CP -.->|xDS config and certs| SC1
+    CP -.->|xDS config and certs| SC2
+    SC1 <-->|mTLS| SC2
+          </pre>
+          <figcaption class="diagram__caption">Sidecar mode puts one Envoy per pod; ambient mode puts one ztunnel per node and adds an optional waypoint proxy for L7 policy. Either way, the same control plane configures both.</figcaption>
+        </figure>
+
+        <p>Supporting ecosystem: <strong>identity</strong> comes from SPIFFE/SPIRE, cert-manager (with <code>istio-csr</code>), or Vault PKI; <strong>observability</strong> from Prometheus + Grafana for mesh metrics, Jaeger / Tempo / Zipkin for traces, and Kiali for the topology view; <strong>L7 policy</strong> from Open Policy Agent via Envoy's <code>ext_authz</code> filter or Istio's <code>AuthorizationPolicy</code>; and the <strong>API surface</strong> is converging on the Kubernetes Gateway API (GA 1.0, October 2023, with <code>GAMMA</code> extensions for mesh) instead of vendor-specific CRDs.</p>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You run 10+ services across 2+ languages and observability has gone inconsistent — each team picked its own metrics library.</li>
+              <li>Zero-trust is a compliance requirement: every internal call must be mTLS with rotating identities, and you can't mandate one framework.</li>
+              <li>You need progressive delivery — header-based routing, weighted canaries, fault injection — without coupling it to deploy tooling.</li>
+              <li>You run multi-cluster or hybrid (VM + Kubernetes) and need one identity and routing layer.</li>
+              <li>A platform team already exists and can operate one more distributed system.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You run fewer than ~8 services. The control plane is more moving parts than the workload.</li>
+              <li>Latency is the product (HFT, real-time bidding, sub-millisecond gaming) — even Linkerd's ~0.8&nbsp;ms p99 sidecar overhead is too much.</li>
+              <li>Your team is monolingual on a managed framework (Spring Cloud, .NET Aspire) that already gives you mTLS, retries, and tracing.</li>
+              <li>There's no platform engineering capacity — a mesh's failure modes (config push storms, control-plane OOM, cert-rotation stalls) need someone who understands xDS.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>The term was coined around 2016 inside Buoyant, describing Linkerd 1.x — a JVM proxy modeled on Twitter's Finagle. Envoy, open-sourced by Lyft in May 2017, gave the industry a fast, configurable C++ proxy; Google, IBM, and Lyft launched Istio later that year on top of it. The sidecar pattern made the polyglot story practical, and Kubernetes' pod abstraction made it cheap to deploy.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk the end-to-end lifecycle of one request, <code>orders → payments</code>, in sidecar mode:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Pod startup.</span> A mutating admission webhook (<code>istio-sidecar-injector</code>) rewrites the pod spec at creation, adding an <code>istio-init</code> init container and an <code>istio-proxy</code> sidecar.</li>
+          <li><span class="steps__title">Traffic capture.</span> <code>istio-init</code> runs iptables rules: outbound traffic is redirected to port <code>15001</code>, inbound to <code>15006</code>; packets owned by UID <code>1337</code> (Envoy) bypass redirection.</li>
+          <li><span class="steps__title">Config bootstrap.</span> The sidecar opens a long-lived gRPC stream to <code>istiod:15012</code> and subscribes via <span class="term" data-gloss="Aggregated Discovery Service — bundles the xDS streams into one ordered feed">ADS</span>. It receives, in order: CDS, then EDS, then LDS, then RDS, then SDS — this order is mandated by the xDS spec, since listeners must not reference routes that haven't arrived yet.</li>
+          <li><span class="steps__title">mTLS material.</span> The proxy uses its Kubernetes service-account JWT to request an X.509 SVID from istiod's CA, encoding a
+            <span class="term">SPIFFE identity</span>
+            <span class="term__gloss">a workload's cryptographic identity, e.g. spiffe://cluster.local/ns/orders/sa/orders-sa</span>.
+            Default lifetime is <strong>24 hours</strong>; the proxy renews once 80% has elapsed (~19 hours), and SDS pushes the new cert in-memory — no restart.</li>
+          <li><span class="steps__title">Request path.</span> The app calls <code>http://payments:8080</code>. The kernel routes the connection to local port <code>15001</code>. Envoy looks up the original destination, matches the <code>payments</code> cluster, picks an endpoint (round-robin by default), and opens an mTLS connection to the destination pod's port <code>15006</code>, presenting its SVID.</li>
+          <li><span class="steps__title">Destination side.</span> The peer's inbound listener on <code>15006</code> terminates mTLS, checks the SPIFFE ID against any <code>AuthorizationPolicy</code>, and forwards plaintext over loopback to the app's real port.</li>
+          <li><span class="steps__title">Telemetry.</span> Both sides emit Prometheus metrics (<code>istio_requests_total</code>, <code>istio_request_duration_milliseconds</code>) and optional trace spans carrying B3 or W3C <code>traceparent</code> headers.</li>
+        </ol>
+        <p>Ambient mode swaps step 2 for a CNI redirect into the node's ztunnel, and step 5 for an HBONE tunnel between node-local ztunnels — with a detour through a
+          <span class="term">waypoint proxy</span>
+          <span class="term__gloss">an optional per-namespace Envoy that adds L7 policy in ambient mode</span>
+          if one is configured.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant OA as Orders app
+    participant OP as Orders sidecar
+    participant CP as istiod
+    participant PP as Payments sidecar
+    participant PA as Payments app
+    OP->>CP: subscribe via ADS (CDS, EDS, LDS, RDS, SDS)
+    CP-->>OP: cluster, route, and cert config
+    OA->>OP: plain HTTP call to payments
+    OP->>OP: iptables redirect intercepts the call
+    OP->>PP: mTLS connection, SPIFFE identity presented
+    PP->>PP: validate identity against AuthorizationPolicy
+    PP->>PA: forward plaintext over loopback
+    PA-->>PP: response
+    PP-->>OP: response over mTLS
+    OP-->>OA: response
+    OP--)CP: metrics and trace spans (async)
+          </pre>
+          <figcaption class="diagram__caption">One request through the mesh: config arrives before traffic does, the call itself never leaves mTLS, and telemetry flows back out of band.</figcaption>
+        </figure>
+
+        <h3>Traffic-shaping example</h3>
+        <p>A 90/10 canary on the <code>payments</code> service, with retries and outlier detection, illustrative only — the runnable demo lives in <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/service-mesh/code" target="_blank" rel="noopener">the code folder</a>:</p>
+        <pre><code>trafficPolicy:
+  outlierDetection:
+    consecutive5xxErrors: 5
+    interval: 30s
+    baseEjectionTime: 30s
+    maxEjectionPercent: 50
+---
+route:
+  - destination: { host: payments, subset: v1 }
+    weight: 90
+  - destination: { host: payments, subset: v2 }
+    weight: 10
+retries:
+  attempts: 3
+  perTryTimeout: 2s
+  retryOn: 5xx,reset,connect-failure</code></pre>
+        <p><code>istiod</code> turns this into a CDS update (two clusters, one per subset) plus an RDS update (the weighted route and retry policy), pushes both over the existing ADS stream, and Envoy hot-applies them — no restart, no dropped connections.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Sidecar per pod</td><td>Strong isolation, per-pod identity, no node-shared blast radius</td><td>~50–150 MB RAM and 0.1 vCPU per pod; ~1 ms p50 latency per hop</td></tr>
+              <tr><td>Ambient / per-node</td><td>Lower aggregate footprint, no app-pod restarts on mesh upgrade</td><td>Node-level blast radius, weaker tenant isolation, newer code paths</td></tr>
+              <tr><td>Envoy data plane (Istio)</td><td>Richest feature set: WASM filters, ext_authz, every L7 protocol</td><td>Higher memory and CPU than Rust proxies; steeper config surface</td></tr>
+              <tr><td>Rust micro-proxy (Linkerd)</td><td>~0.8 ms p99 overhead, ~1.2% network overhead in 100-service benchmarks</td><td>Smaller feature set, no WASM, fewer protocols</td></tr>
+              <tr><td>Vendor CRDs (Istio API)</td><td>Mature, very expressive</td><td>Lock-in; Gateway API is the portable successor</td></tr>
+              <tr><td>Library / Finagle-style</td><td>Zero hop, in-process — lowest latency</td><td>Polyglot pain; upgrading the library across 40 repos</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">istiod CPU saturation</p>
+            <p>Every Service or Endpoint change triggers a fresh xDS push to every connected proxy. In a 5,000-pod cluster with rapid scale events, istiod CPU spikes and config propagation delay climbs from sub-second to tens of seconds.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">istiod OOM</p>
+            <p>Config size grows with services × namespaces. Without <code>Sidecar</code> resources scoping each proxy's visibility, every sidecar gets every cluster's config.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Cold-start cert failure</p>
+            <p>A sidecar starts before istiod is ready, or before its CA cache warms, and fails its SDS bootstrap. The app pod is up but every outbound call returns connection refused on port <code>15001</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Init container ordering bugs</p>
+            <p>App init containers that need network egress run before <code>istio-init</code> finishes, so their traffic isn't redirected and they hit raw cluster DNS or fail outright.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Retry storms</p>
+            <p>A <code>retries.attempts: 3</code> policy on every hop of a 4-deep call chain multiplies into 81 attempts under a downstream brownout, amplifying the outage instead of absorbing it.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">mTLS strict-mode rollouts</p>
+            <p>Flipping <code>PeerAuthentication</code> to <code>STRICT</code> while one workload is still un-meshed silently kills its traffic.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>A service mesh exists to enforce the <strong>single-responsibility principle at the network layer</strong>. Microservices fragmented a monolith's shared concerns — auth, retries, observability — into N copies that drift apart. A mesh re-centralizes them as a platform capability, the same way Kubernetes re-centralized process scheduling, and lets security teams enforce zero-trust at L7 without waiting for every application team to ship the right SDK upgrade.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 260" role="img" aria-labelledby="dupTitle dupDesc" width="560" style="max-width:100%">
+            <title id="dupTitle">Duplicated plumbing versus centralized plumbing</title>
+            <desc id="dupDesc">Without a mesh, three services each reimplement their own TLS, retry, and metrics code. With a mesh, all three share one uniform sidecar layer configured by a single control plane.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">Without a mesh — three copies of the same plumbing</text>
+              <g>
+                <rect x="10"  y="34" width="150" height="70" rx="8" fill="none" stroke="var(--border)"/>
+                <rect x="190" y="34" width="150" height="70" rx="8" fill="none" stroke="var(--border)"/>
+                <rect x="370" y="34" width="150" height="70" rx="8" fill="none" stroke="var(--border)"/>
+                <text x="85"  y="50" fill="var(--text)" text-anchor="middle">Orders</text>
+                <text x="265" y="50" fill="var(--text)" text-anchor="middle">Payments</text>
+                <text x="445" y="50" fill="var(--text)" text-anchor="middle">Search</text>
+                <rect x="20"  y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="40" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">TLS</text>
+                <rect x="65"  y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="85" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">retry</text>
+                <rect x="110" y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="130" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">trace</text>
+                <rect x="200" y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="220" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">TLS</text>
+                <rect x="245" y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="265" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">retry</text>
+                <rect x="290" y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="310" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">trace</text>
+                <rect x="380" y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="400" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">TLS</text>
+                <rect x="425" y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="445" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">retry</text>
+                <rect x="470" y="58" width="40" height="18" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="490" y="71" fill="var(--danger)" text-anchor="middle" font-size="10">trace</text>
+                <text x="85"  y="94" fill="var(--text-faint)" text-anchor="middle" font-size="11">Go SDK</text>
+                <text x="265" y="94" fill="var(--text-faint)" text-anchor="middle" font-size="11">Java SDK</text>
+                <text x="445" y="94" fill="var(--text-faint)" text-anchor="middle" font-size="11">Python SDK</text>
+              </g>
+              <text x="10" y="140" fill="var(--text-muted)">With a mesh — one shared sidecar layer, one control plane</text>
+              <g>
+                <rect x="10"  y="154" width="150" height="40" rx="8" fill="none" stroke="var(--border)"/>
+                <rect x="190" y="154" width="150" height="40" rx="8" fill="none" stroke="var(--border)"/>
+                <rect x="370" y="154" width="150" height="40" rx="8" fill="none" stroke="var(--border)"/>
+                <text x="85"  y="178" fill="var(--text)" text-anchor="middle">Orders</text>
+                <text x="265" y="178" fill="var(--text)" text-anchor="middle">Payments</text>
+                <text x="445" y="178" fill="var(--text)" text-anchor="middle">Search</text>
+                <rect x="10"  y="204" width="510" height="24" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <text x="265" y="220" fill="var(--accent)" text-anchor="middle" font-size="12">sidecar: TLS · retry · trace — identical for every language</text>
+                <line x1="85"  y1="194" x2="85"  y2="204" stroke="var(--border)"/>
+                <line x1="265" y1="194" x2="265" y2="204" stroke="var(--border)"/>
+                <line x1="445" y1="194" x2="445" y2="204" stroke="var(--border)"/>
+                <rect x="200" y="238" width="160" height="20" rx="6" fill="none" stroke="var(--text-faint)" stroke-dasharray="4 3"/>
+                <text x="280" y="252" fill="var(--text-faint)" text-anchor="middle" font-size="11">control plane</text>
+                <line x1="265" y1="228" x2="280" y2="238" stroke="var(--text-faint)" stroke-dasharray="3 2"/>
+              </g>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Without a mesh, every language's SDK reimplements TLS, retries, and tracing — three drifting copies. With a mesh, one sidecar layer does it identically for all three, driven by one control plane.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The sidecar looks odd at first — why not link the proxy into the app process? Three reasons:</p>
+        <ul>
+          <li><strong>Polyglot.</strong> Linking a C++ Envoy into a Python and a Go service is two FFI nightmares; a sidecar is a binary anyone can run.</li>
+          <li><strong>Lifecycle decoupling.</strong> The proxy can be upgraded without redeploying the app, and the app can crash without taking the proxy's cert cache with it.</li>
+          <li><strong>Identity boundary.</strong> The sidecar carries its own SPIFFE identity tied to the pod's service account; in-process, identity would be tangled up with the app's own threads.</li>
+        </ul>
+        <p>The xDS / control-plane split mirrors software-defined networking's heritage: dumb-fast forwarders in the data path, smart-slow controllers managing state — the same architecture as OpenFlow or BGP-routed fabrics. The current shift to ambient mode is the industry conceding that one Envoy per pod is too expensive at scale (~150 MB × thousands of pods is real money), and that L4 security and L7 policy have different deployment cadences and can be split.</p>
+
+        <h3>Why it matters now</h3>
+        <ul>
+          <li><strong>Zero-trust mandates</strong> (Executive Order 14028, NIS2 in the EU) have made mTLS-everywhere a compliance line item, and a mesh is the cheapest way to deliver it.</li>
+          <li>The Kubernetes <strong>Gateway API GAMMA</strong> initiative is standardizing mesh routing, eroding vendor lock-in and lowering the cost of switching between Istio, Linkerd, and Cilium.</li>
+          <li><strong>AI workloads</strong> (model-serving fleets, RAG pipelines) are reviving interest in cheap mTLS and traffic mirroring; ambient mode's lower per-pod cost makes it usable for fleets of GPU pods where every gigabyte matters.</li>
+          <li>The field is consolidating: AWS App Mesh is deprecated (EOL September 2026), and the Envoy + Istio + Gateway API stack is becoming the default assumption.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

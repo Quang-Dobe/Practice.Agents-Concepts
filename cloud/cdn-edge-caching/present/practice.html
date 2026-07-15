@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CDN Edge Caching · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CDN Edge Caching</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CDN Edge Caching</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/cdn-edge-caching/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CDN Edge Caching</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>The CDN is the layer you forget exists until something breaks. It sits in front of your marketing site, your SPA's static bundle, your image uploads, your unauthenticated API endpoints, and increasingly your server-rendered HTML. Your framework's default <code>Cache-Control</code> headers already do <em>something</em> — the job in production is making sure they do the right thing.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">E-commerce</div><p>Load-bearing: product pages, category listings, image variants. A botched purge during a price change becomes a support incident within minutes.</p></div>
+          <div class="card"><div class="card__title">Media and news</div><p>Micro-caching turns a single-origin Rails or WordPress site into one that survives the front page of Hacker News.</p></div>
+          <div class="card"><div class="card__title">B2B platforms, global users</div><p>Keeps p99 latency from being dominated by transatlantic round trips to one <code>us-east-1</code> deployment.</p></div>
+          <div class="card"><div class="card__title">Inherited setups</div><p>You'll often find a half-configured CDN — enabled years ago, hit ratio stuck at 42%, nobody knows why. The skill is reading the headers and the analytics to find the cache-killer.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Fingerprint your static assets and cache them forever</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Build pipelines (Vite, webpack, esbuild) should emit content-hashed filenames (<code>app.4f2a1b.js</code>). Serve those with <code>Cache-Control: public, max-age=31536000, immutable</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Invalidation is the hardest part of caching. Fingerprinting deletes the problem — old URLs age out, new URLs are fresh by definition. <code>immutable</code> also stops browsers revalidating on every reload.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Serving <code>app.js</code> with a short TTL and purging on every deploy — you pay a global MISS storm every release.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Split browser TTL from edge TTL with <code>s-maxage</code></h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For HTML and JSON, use <code>Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=60</code>. Browsers always revalidate; the edge holds the response for 5 minutes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>You cannot purge a browser cache. Keeping the user-side TTL low means a purge actually fixes what the user sees; the edge still absorbs ~99% of origin load on hot paths.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single <code>max-age=3600</code> shared between both. After a purge, users still see stale content for up to an hour.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Use surrogate keys / cache tags for granular invalidation</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Tag responses by domain entity. A product page emits <code>Surrogate-Key: product-42 category-shoes brand-acme</code>; a price update fires one purge for <code>product-42</code>. Cloudflare Enterprise calls this <code>Cache-Tag</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without tags your only tools are "purge by URL" (enumerate every variant) or "purge everything" (cause an origin stampede). Tags invalidate exactly what a mutation touched.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A wildcard purge after every CMS edit — works small, silently becomes a self-inflicted DDoS as you grow.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Prefer soft purge plus stale-while-revalidate</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>When you purge, soft-purge (mark stale) rather than hard-purge (delete). Pair with <code>stale-while-revalidate=60</code> and <code>stale-if-error=86400</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A hard purge guarantees a MISS on the next request, and N concurrent MISSes hit origin at once. Soft purge serves stale for milliseconds while one fetch refills the entry; <code>stale-if-error</code> keeps the site up through a multi-hour origin outage on warm paths.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hard-purging hot paths during traffic spikes — exactly when you can't afford the origin RPS.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Enable origin shielding / tiered cache</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Turn on Cloudflare's Smart Tiered Cache, CloudFront's Origin Shield, or Fastly's Shielding. Pick the shield POP closest to your origin region.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without it, every one of roughly 300 edge POPs that gets a MISS goes straight to origin. With it, MISSes funnel through a handful of upper-tier POPs where coalescing works globally. Real-world origin RPS often drops 5–10× after enabling it.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Skipping it because "we already have a CDN." A flat-topology CDN can still hammer origin during a viral moment.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Strip cookies and tracking params from the cache key</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Configure the CDN to ignore <code>utm_*</code>, <code>fbclid</code>, <code>gclid</code>, and analytics cookies on cacheable paths. Use Cloudflare's Query String Sort or "ignore query string" where order doesn't matter.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every distinct query string or cookie value is a separate cache entry. Five UTM variants on one campaign multiply the key space by five. Session cookies in the key collapse hit ratio to near zero.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Letting the default "include full URL and all cookies" key persist unaudited.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Normalize <code>Vary</code> axes and never use <code>Vary: Cookie</code></h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Emit only <code>Vary: Accept-Encoding</code> and, if needed, a CDN-provided normalized header (<code>CF-Device-Type</code>, <code>CloudFront-Is-Mobile-Viewer</code>). Strip raw <code>User-Agent</code> and <code>Cookie</code> from any <code>Vary</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>Vary: User-Agent</code> produces thousands of variants. <code>Vary: Cookie</code> is the same disaster as keying on cookies — either silently destroys hit ratio.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Letting a backend framework auto-emit <code>Vary: Cookie</code> because it sets a session cookie. Strip the cookie on cacheable routes before the response leaves origin.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Cache by intent, not by extension</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Decide caching policy per route in code, with explicit <code>Cache-Control</code> headers, and a matching CDN rule. Static assets, public HTML, authenticated JSON, and personalized HTML each get a documented policy.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>"Cache everything that looks like an image" rules drift. A PDF-generation endpoint ending in <code>.pdf</code> shouldn't be cached, but a path-suffix rule will cache it anyway.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Configuring caching only in the dashboard — the next engineer has no idea the rule exists until something breaks.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Defend against cache poisoning from unkeyed inputs</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Identify every header your origin reflects into a response (<code>X-Forwarded-Host</code>, <code>X-Original-URL</code>, custom <code>X-*</code>). Either strip them at the edge, include them in the cache key, or never reflect them.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An attacker who finds an unkeyed header that changes the response can poison one cache entry that then serves their payload to every user routed to that POP.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting <code>Host</code>-like headers to build absolute URLs. If origin emits <code>&lt;link href="https://{Host}/style.css"&gt;</code>, someone will set <code>Host: evil.com</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Personalize without breaking the cache</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Push personalization out of the document. Render the shell at the edge, hydrate per-user data with a separate uncached fetch, or use ESI / edge functions to assemble fragments with independent TTLs. For binary splits (logged-in vs. anonymous, country, plan tier), compute a coarse variant key — not one per user.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Personalization is the most common reason teams declare a route "uncacheable," but almost always the cacheable 90% can be separated from the personalized 10%. Caching the shell can turn p95 from 800 ms to 40 ms even when the user-specific bit still hits origin.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Stuffing the username into the HTML and concluding the page can't be cached — inject it client-side or via an edge worker instead.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Monitor hit ratio per surface, not site-wide</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Track hit ratio bucketed by content type and route (<code>/_next/static/*</code>, <code>/api/products/*</code>, <code>/</code>). Alert when a specific bucket regresses, not when the global number wobbles. Watch origin egress, cache-key cardinality, and purge-API latency.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A site-wide 85% hit ratio can hide a freshly-deployed route sitting at 4%. Key
+              <span class="term">cardinality</span>
+              <span class="term__gloss">how many distinct cache-key values a route can produce</span>
+              silently explodes when someone adds a new query param to product links.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Watching only the single "Cache Hit Ratio" number on the vendor dashboard — it averages your wins with your losses.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>no-cache</code> as a panic button</p>
+            <p>Slapping <code>Cache-Control: no-cache, no-store</code> on every endpoint because one bug leaked private data. Now everything serves from origin and latency and bill both double. Fix the specific route, don't disable the layer.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Purge-on-every-deploy</p>
+            <p>CI runs a global purge after each release. Fine at 100 RPS, causes a coordinated MISS storm at 10k RPS. Fingerprint assets and tag dynamic content instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Cookies in the cache key by default</p>
+            <p>Vendor or framework defaults to "include all cookies"; hit ratio is mysteriously 30%. Strip session cookies on cacheable routes; whitelist only cookies that actually change rendering.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Query-string sprawl</p>
+            <p>Marketing appends <code>?utm_source=...</code> to every shared link; the CDN keys on the full query and the same article becomes 50 cache entries. Strip tracking params at the edge.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>Set-Cookie</code> leaking through cacheable responses</p>
+            <p>A login handler accidentally emits <code>Set-Cookie</code> on a cached path; some CDNs cache and serve that cookie to other users — a session-hijack vector. Strip <code>Set-Cookie</code> on cacheable responses, hard.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting heuristic caching</p>
+            <p>Origin sends no <code>Cache-Control</code>; the CDN applies a heuristic TTL (often 10% of <code>Last-Modified</code> age) and caches something never meant to be cached. Always send explicit headers from origin.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Treating the CDN as a free database</p>
+            <p>Storing API responses with 24-hour TTLs and using purges as writes. Works until purge latency, eventual consistency, and key cardinality bite at once. If you need a key-value store, use one.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">
+              <span class="term">Web cache deception</span>
+              <span class="term__gloss">an attacker tricks a cache into storing a private response by disguising the URL as a static asset</span>
+            </p>
+            <p>An attacker requests <code>/profile/account.css</code> — the framework returns the user's profile, the CDN sees a <code>.css</code> extension and caches it, and the attacker fetches it from another session. Match cache rules to content-type, not URL suffix.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">News site under a traffic spike</div>
+            <p>A regional newspaper's story trends nationally. Origin is a single Rails monolith. Fastly runs micro-caching at a 10-second TTL on article HTML, surrogate keys per article ID, and <code>stale-while-revalidate=60</code>. Traffic jumps from 200 to 80k RPS but lands on origin as ~6 RPS thanks to coalescing and tiered cache.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">E-commerce product catalog</div>
+            <p>A mid-size retailer tags product pages with <code>Surrogate-Key: product-{id} category-{slug}</code>. Inventory updates fire one tag purge per affected SKU. Soft purge plus <code>stale-if-error=3600</code> means a midnight origin deploy doesn't take the store down.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">SaaS dashboard, global users</div>
+            <p>An authenticated dashboard is mostly uncacheable, so the team splits the shell HTML (edge-cached, 5-minute TTL, anonymous variant only) from <code>/api/me</code> (never cached). An edge worker injects the display name client-side. P95 page load drops from 1.2 s to 180 ms in APAC.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Public API with API keys</div>
+            <p>A developer API serves the same data to many clients with per-key rate limits. The cache key includes only the path and sorted query; the API-key header is unkeyed and used only for auth/rate-limit at the edge. Hit ratio is above 95%, origin sees ~3% of public traffic.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Video segment delivery</div>
+            <p>A streaming service serves HLS segments (<code>segment-00042.ts</code>) with year-long TTLs and fingerprinted manifests. Origin shielding via CloudFront Origin Shield cuts origin egress by ~95%.</p>
+          </div>
+        </div>
+
+        <!-- COMPARISON DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Hard["Hard purge"]
+      H1[Object deleted now]
+      H2[Next request is a guaranteed MISS]
+      H3[N concurrent requests all hit origin]
+    end
+    subgraph Soft["Soft purge + stale-while-revalidate"]
+      S1[Object flagged stale, not deleted]
+      S2[Stale copy served instantly]
+      S3[One background fetch refills it]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Same goal, opposite blast radius: hard purge trades a guaranteed stampede for certainty; soft purge trades a moment of staleness for a smooth refill.</figcaption>
+        </figure>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Hit ratio per route bucket</strong> is monitored, with alerts on regressions per bucket, not just the global average.</li>
+              <li><strong>Cache-key cardinality</strong> is tracked or audited; new query params and headers in the key trigger a review.</li>
+              <li><strong>Origin egress and origin RPS</strong> are graphed alongside CDN traffic — a divergence is the first signal of a cache-killer deploy.</li>
+              <li><strong>Purge propagation latency</strong> has been measured under load, not just read off the vendor's marketing page.</li>
+              <li><strong><code>Set-Cookie</code> on cacheable paths</strong> is impossible by construction (middleware strips it) or asserted in tests.</li>
+              <li><strong>Reflected headers</strong> (<code>Host</code>, <code>X-Forwarded-*</code>, custom) are either stripped at the edge or included in the key — write down which.</li>
+              <li><strong>Stale-if-error</strong> is configured on critical paths; a contrived origin outage in staging confirms the site still serves.</li>
+              <li><strong>Onboarding doc</strong> explains: how to set cache headers, how to issue a purge, who owns surrogate-key tagging, and the Slack channel that pages when hit ratio drops.</li>
+              <li><strong>Cost model:</strong> the team knows the per-GB egress price, the purge API rate limits, and which features add a line item.</li>
+              <li><strong>Security review</strong> has confirmed no cacheable route returns user-private data — tested by requesting the same URL with two sessions and diffing.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Static assets only.</span> A CDN goes in front of static assets and the team calls it done. Hit ratio is fine because the framework already fingerprints JS/CSS.</li>
+          <li><span class="steps__title">HTML enters the picture.</span> Someone wants to cache HTML too — usually because TTFB in a far region is embarrassing. That's when the team meets <code>Vary</code>, session cookies, and the first cache-key foot-gun.</li>
+          <li><span class="steps__title">URL purges to tag-based purges.</span> Teams put this off because tagging means touching every controller. They do it the day a routine CMS edit triggers a 30-second origin overload, or a security review flags a stale price shown after an inventory update. Surrogate keys force a design decision: which entities own which cached views — hard to add later, easy to bake in early.</li>
+          <li><span class="steps__title">The edge becomes programmable.</span> At scale, edge workers compute custom cache keys, ESI assembles personalized pages from cached fragments, and "origin" increasingly means a write path plus cold-storage backup. The instinct shifts from "what can I cache?" to "what specifically can I <em>not</em> cache, and why?"</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.rfc-editor.org/rfc/rfc9111" rel="noopener">RFC 9111: HTTP Caching</a> — the spec. Read at least sections 4 (constructing responses from caches) and 5 (header definitions); everything vendors do is a flavor of this.</li>
+          <li><a href="https://portswigger.net/web-security/web-cache-poisoning" rel="noopener">PortSwigger: Web Cache Poisoning</a> — James Kettle's research. Will make you paranoid in a productive way.</li>
+          <li><a href="https://www.fastly.com/documentation/guides/full-site-delivery/purging/working-with-surrogate-keys/" rel="noopener">Fastly: Working with surrogate keys</a> — the canonical pattern for granular invalidation, even off Fastly.</li>
+          <li><a href="https://developers.cloudflare.com/cache/how-to/tiered-cache/" rel="noopener">Cloudflare: Tiered Cache</a> — a readable explanation of origin shielding mechanics that applies to every CDN.</li>
+          <li><a href="https://www.fastly.com/documentation/guides/concepts/cache/stale/" rel="noopener">Fastly blog: stale-while-revalidate</a> — the directive that quietly does most of the resilience work in a production cache setup.</li>
+          <li><a href="https://web.dev/articles/http-cache" rel="noopener">Google Web Fundamentals: HTTP caching</a> — Jake Archibald's pragmatic guide; the "immutable fingerprinted vs. always-revalidated" framing is the right mental model for most teams.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/cdn-edge-caching/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

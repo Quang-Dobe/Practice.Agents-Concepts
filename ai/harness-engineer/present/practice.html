@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harness Engineer · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Harness Engineer</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Harness Engineer</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/harness-engineer/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Harness Engineer</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>This is the layer you end up writing once a notebook prototype graduates to a service real users hit. The pattern is consistent everywhere it shows up: one process per agent run, the model call is a small slice of a turn, and 70–80% of the code is everything else — retries, schemas, traces, budgets, checkpoints. If you're reasoning about "why did the agent loop forever last Tuesday at 3am," you're a harness engineer whether your title says so or not.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Coding-agent product</div><p>Claude Code, Cursor, Codex CLI, Devin. Owns the shell, file IO, diff application, and the long-running session that survives a crashed worker.</p></div>
+          <div class="card"><div class="card__title">Customer-support / ops agent</div><p>Sits between the chat gateway and the ticket, Slack, or Stripe tools inside a SaaS backend. Owns permissions and audit trails.</p></div>
+          <div class="card"><div class="card__title">Internal data agent</div><p>Decides whether the model is allowed to run a <code>DELETE</code> against the warehouse — the harness is the permission boundary.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Own the control loop explicitly</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Write the loop and its stopping conditions in your own code. Even on LangGraph or the Agents SDK, the routing of "tool call vs. final answer vs. hand-off" should be your code, not framework magic.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>When a run misbehaves at 2am, you need to read one function and know exactly what happened. Frameworks change minor versions and quietly shift loop semantics; your on-call shift doesn't have that luxury.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>agent.run(task)</code> as a black box, with step counts, retries, and budgets configured only through YAML.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Treat tools as a versioned API surface</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Give each tool a stable name, a JSON schema, a docstring written for the model, a typed return shape, and a version. Add new tools; never silently change an argument shape.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Tool-call schema drift is one of the most-cited production failure modes — an n8n February 2026 post-mortem traces a whole outage to it. Once the model has cached behavior around a tool, a shape change produces malformed-but-plausible calls, not clean errors.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Renaming <code>search_docs(query)</code> to <code>search_docs(q, top_k)</code> in place because "the model will figure it out."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Assemble context in named, replaceable slices</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Build the prompt from explicit slots — system, tool catalog, memory slice, scratchpad, user message — each produced by its own function and testable on its own. Reserve a fixed output budget; compact once the input crosses a threshold.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>When recall drops, you need to A/B one slice — swap the retrieval, say — without rebuilding the whole prompt. MemU's 2026 measurement of roughly 2% context retention loss per step makes the slice that owns compaction the highest-impact thing to tune.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single 600-line f-string nobody dares refactor.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Deterministic where possible, model where necessary</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>If a step can be a regex, a SQL query, or a typed function, make it that. Reserve the model for steps that genuinely need judgment.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every model call costs latency, money, and a chance of hallucination. Production coding-agent harnesses push parsing, file globbing, and diff application out of the model entirely.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Asking the model to "extract the JSON" from a string you already control.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Checkpoint every state transition</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Persist <code>(thread_id, step, state)</code> after every tool call and every model response, in a real store — Postgres, Redis Streams, a LangGraph checkpointer, Temporal — not in-process memory.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Worker pods get rescheduled. A 40-step run that loses state on minute 12 costs more than the entire day's infrastructure bill. Checkpointing also enables human-in-the-loop pauses for free.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Keeping the conversation in a Python list on a single worker.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Small reversible tools beat big "do anything" tools</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Prefer <code>read_file</code>, <code>write_file</code>, <code>run_tests</code>, <code>apply_patch</code> over a single <code>do_engineering_task(description)</code>. Favor reversible side effects, with idempotency keys, over irreversible ones.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The Replit July 2025 incident — an agent ran <code>DROP DATABASE</code> against production despite a freeze — is the canonical case for narrow tools with an explicit
+              <span class="term">blast radius</span>
+              <span class="term__gloss">how much damage one tool call can do if it goes wrong</span>.
+              Big tools also confuse the model: it picks the broad one "to be safe."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single <code>execute(command)</code> tool with shell access and no allowlist.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Validate tool arguments before invocation</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>JSON-schema-validate every tool call, coerce types, and reject a mismatch with a structured error the model can read. Do the same for outputs that claim to be JSON.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Individual tool calls fail 3–15% of the time in production (per Atlan's 2026 anti-pattern report), and most failures are malformed arguments, not bad logic. A validator turns silent corruption into a recoverable loop step.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>json.loads(model_output)</code> wrapped in a bare <code>try/except</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Idempotency keys on every state-mutating tool</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pass <code>request_id = f"{thread_id}:{step}:{call_id}"</code> to every write tool, and have tools dedupe on it.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Retries aren't optional in distributed systems. Without idempotency, an exponential backoff sends two payments. This is the single most common money-losing bug in agent products.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We'll add idempotency later" — by the time you need it, you have a customer-facing incident.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Budgets are hard caps, not metrics</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Enforce <code>max_steps</code>, <code>max_tokens</code>, <code>max_wall_clock</code>, and <code>max_dollars_per_task</code> inside the loop. On breach, transition to a graceful-stop branch that returns a partial answer plus a trace link.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>AutoGPT-style runaway loops still happen in 2026 — they just look like a Stripe bill instead of a news story. Budgets bound the worst case.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Logging token spend to a dashboard and trusting yourself to notice.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Evals are the harness's regression suite, not the model's</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Maintain a corpus of golden traces — input, expected tool-call sequence, final state — and replay it nightly. Gate prompt and tool changes on the diff against this corpus, not on vibes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The model is a moving target you don't control; your harness is yours. Most regressions you'll ship are tool-schema changes and prompt edits — both eval-catchable.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"It worked on the demo task" as a release criterion.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Trace everything with span IDs the model never sees</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>One OTEL span per model call, per tool call, per decision. Persist inputs and outputs. Generate a trace ID at ingress and propagate it — but never paste trace data into the model's context.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A new engineer should be able to open a trace and replay any production run locally in under five minutes. Mixing observability data into the conversation pollutes context and burns tokens.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>print()</code> statements and hoping for the best.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Adopt MCP instead of inventing a tool protocol</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Expose tools over MCP so the same tool server works across Claude, GPT, and Gemini harnesses, and across your own products.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Tool sprawl is the dominant ongoing cost in a maturing agent codebase. MCP standardizes the contract the same way LSP did for editors. Rebuilding a worse version internally pays nothing back.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A bespoke <code>tools.yaml</code> format that only your harness can read.</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Mono["Single agent, one tool list"]
+      M1["All 20+ tools visible on every call"]
+      M2["Accuracy drops sharply past about 15 tools"]
+    end
+    subgraph Sub["Subagents, scoped allowlists"]
+      S1["Reviewer sees Read, Grep, Glob only"]
+      S2["Implementer gets full write access"]
+      S3["Each call sees a smaller, relevant tool set"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">The fix for tool sprawl isn't fewer tools overall — it's scoping which tools each subagent can see, enforced in code rather than in the prompt.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Framework owns the loop</p>
+            <p>Code reads <code>crew.kickoff()</code> and the actual control flow lives inside a vendor's decorator stack. Failures become unsearchable. Better: keep the loop and stopping conditions in your repo; let the framework own state and traces if you want, not the routing.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Unbounded scratchpad</p>
+            <p>Every turn appends, nothing compacts, and eventually a 200k-token context costs several dollars a turn while the model forgets the original task. Better: a compaction policy triggered at a fraction of the window, using templated state — decisions, open questions, facts — rather than free-form summarization.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Tool sprawl in one registry</p>
+            <p>50 tools advertised on every call. Token bloat plus model confusion — accuracy drops sharply past roughly 15 tools in published benchmarks. Better: <span class="term" data-gloss="showing the model only the tools relevant to its current phase, instead of the whole catalog every time">progressive disclosure</span> — subagents or phase-specific tool subsets, as in Claude Code's per-subagent tool lists.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Mutating tools without idempotency</p>
+            <p>A retry sends two emails, double-charges a card, opens two tickets. Better: request IDs flowed by the harness, deduped at the tool boundary.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">"It worked once" as a test</p>
+            <p>No replayable trace, no golden corpus, no regression suite. The next prompt edit silently breaks production. Better: a trace replayer plus 20–100 golden cases gated in CI.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Observability inside the conversation</p>
+            <p>Stack traces and span IDs pasted into tool results. The model latches onto the noise, cost balloons, and the prompt-injection surface grows. Better: structured logs out-of-band; the model sees only what it needs to reason with.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting model JSON</p>
+            <p><code>json.loads</code> with no schema validation and no repair loop. Better: validate against a JSON schema; on failure, return a structured error and let the model self-correct once before failing the turn.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Reinventing MCP</p>
+            <p>A custom tool-discovery protocol because "ours is simpler." Six months later there are three half-built versions and no shared tools across products. Better: adopt MCP and contribute upstream.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Coding agent at IDE scale (Cursor, Windsurf)</div>
+            <p>An editor plugin plus a cloud harness. Codebase indexing sits behind a tool — semantic search, symbol lookup — instead of being stuffed into context. Speculative tool calls are pre-warmed against the <span class="term" data-gloss="the model's cached attention state from previous tokens, reused so a new call doesn't reprocess the whole prompt">KV cache</span> so an applied edit feels instant. <em>Lesson:</em> treat the index as a service, not as context — context is the most expensive memory tier you own.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Long-running autonomous coder (Devin, SWE-agent variants)</div>
+            <p>Explicit Plan → Execute → Verify phases. A strong model plans with a small tool set; a cheaper model executes with a wide tool set; a verifier runs the test suite and gates progress. <em>Lesson:</em> splitting planning from execution keeps a 200-step run from drifting — the verifier is the only honest stopping condition.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Agentic coding CLI (Claude Code, Codex CLI)</div>
+            <p>Subagents each get their own context window and tool allowlist — <code>Read, Grep, Glob</code> for a reviewer, full write access for an implementer. A <code>/compact</code> command surfaces compaction as a user-visible action instead of hiding it. <em>Lesson:</em> tool permissioning belongs at the subagent boundary, enforced in code, not in the system prompt — prompts are advisory, allowlists aren't.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Customer-support agent in a B2B SaaS backend</div>
+            <p>A LangGraph state machine with about 8 tools — search the knowledge base, look up a user, create a ticket, refund within a set limit — plus human-in-the-loop approval above that limit, and full OTEL tracing to Langfuse. <em>Lesson:</em> the moment a tool spends money, the harness needs an approval queue and an audit log — that's what turns a demo into a regulated workflow.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Internal data analyst agent</div>
+            <p>A SQL tool against a read-replica only, with a query allowlist and a row-count cap. The harness rewrites generated SQL through a validator before running it. <em>Lesson:</em> the safest write tool is no write tool — if the read-only version solves the task, ship that and stop.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> are you emitting per-turn metrics — success rate, p95 step count, p95 tokens, p95 wall-clock, tool-call failure rate per tool, and cost per <em>successful</em> task?</li>
+              <li><strong>Tracing:</strong> can a new engineer pull any production trace ID and replay it locally in under five minutes?</li>
+              <li><strong>Failure handling:</strong> is there a tested path for "the model provider returns 503 for 90 seconds" and for "a tool times out mid-turn"? Does the agent resume, or fail cleanly?</li>
+              <li><strong>Idempotency:</strong> have you forced a duplicate request ID against every state-mutating tool and confirmed there's no double side-effect?</li>
+              <li><strong>Loop safety:</strong> are <code>max_steps</code>, <code>max_tokens</code>, <code>max_wall_clock</code>, and <code>max_dollars_per_task</code> enforced inside the loop, not just logged?</li>
+              <li><strong>Security:</strong> does each tool have a capability scope tied to the caller's identity? Is tool output treated as untrusted, prompt-injection-screened text?</li>
+              <li><strong>Cost:</strong> what's the cost-per-success on your top 5 task types? Which tool's tokens dominate?</li>
+              <li><strong>Evals:</strong> is the golden-trace suite wired into CI and blocking on regression?</li>
+              <li><strong>Onboarding:</strong> can a new engineer point at one file and say "this is the control loop"? Can they add a tool without editing more than two files?</li>
+              <li><strong>Documentation:</strong> is the tool catalog auto-generated from schemas, so it can't drift from the code?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Single file.</span> One model call, a <code>while</code> loop, two tools, an in-memory message list. This is the right starting point — building a platform too early is its own anti-pattern.</li>
+          <li><span class="steps__title">Survive a deploy.</span> Sessions need to outlive a redeploy. In-memory state becomes a Redis or Postgres checkpoint, and the worker becomes a queue consumer instead of an HTTP handler. OTEL tracing usually gets adopted right around here, because without it the first production bug is unsolvable.</li>
+          <li><span class="steps__title">Tool federation.</span> The tool registry, once a Python dict, becomes an MCP server — often several — the moment a second product or team wants the same tool.</li>
+          <li><span class="steps__title">Split into subagents.</span> The monolithic agent splits into subagents with scoped tool allowlists, not because anyone wanted multi-agent architecture but because the tool catalog hit around 20 items and accuracy started dropping. At this point the harness looks less like a script and more like a small distributed system — a control plane, durable workers, a tool plane, an eval plane, an observability plane — with its own SLO.</li>
+        </ol>
+        <p>The lesson worth internalizing early: every harness that reaches production ends up here. Build the first version simply, but pick abstractions — named context slices, idempotent tools, explicit budgets, schema-validated calls — that hold up as the system grows.</p>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://openai.com/index/harness-engineering/" rel="noopener">Harness engineering: leveraging Codex in an agent-first world</a> — the OpenAI post that named the discipline; read for the <code>Agent = Model + Harness</code> framing and the loop primitives.</li>
+          <li><a href="https://martinfowler.com/articles/harness-engineering.html" rel="noopener">Harness engineering for coding agent users</a> (Martin Fowler / Birgitta Böckeler) — the canonical writeup outside the labs, strongest on how harness choices show up in everyday coding-agent use.</li>
+          <li><a href="https://www.penligent.ai/hackinglabs/inside-claude-code-the-architecture-behind-tools-memory-hooks-and-mcp/" rel="noopener">Inside Claude Code — the architecture behind tools, memory, hooks, and MCP</a> — a concrete reference architecture: five-layer compaction, a permission classifier, subagent allowlists.</li>
+          <li><a href="https://atlan.com/know/agent-harness-failures-anti-patterns/" rel="noopener">AI agent harness failures: 13 anti-patterns and root causes</a> (Atlan, 2026) — a failure taxonomy with named post-mortems, including the Replit <code>DROP DATABASE</code> incident and the n8n schema-drift outage.</li>
+          <li><a href="https://github.com/ai-boost/awesome-harness-engineering" rel="noopener">Awesome Harness Engineering</a> — a curated index of tools, patterns, evals, MCP servers, and observability backends.</li>
+          <li><a href="https://modelcontextprotocol.io" rel="noopener">Model Context Protocol specification</a> — the tool protocol itself; read the spec before writing a custom one.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/harness-engineer/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

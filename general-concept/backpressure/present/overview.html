@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backpressure · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Backpressure</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Backpressure</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/backpressure/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Backpressure</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A producer makes data and a consumer processes it. They almost never run at the same speed. Backpressure is the family of techniques that handle that mismatch on purpose, instead of letting memory balloon, latency spike, or the whole process crash.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>This shows up everywhere: network sockets, message queues, streams, UI event loops. If you've ever watched a Kafka consumer fall hours behind, or seen a Node.js stream eat all your RAM, you've met the absence of backpressure.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a busy restaurant kitchen on a Friday night. Waiters (the
+          <span class="term">producers</span>
+          <span class="term__gloss">whatever makes the data</span>)
+          keep firing tickets at the line cook (the
+          <span class="term">consumer</span>
+          <span class="term__gloss">whatever processes the data</span>).
+          The cook can only plate so many dishes a minute. When tickets arrive faster than plates leave, the kitchen has exactly four moves — and they are the same four moves every backpressure-aware system has:</p>
+
+        <ul>
+          <li><strong>Buffer.</strong> Clip the tickets to a rail. Works until the rail's <span class="term" data-gloss="the buffer threshold that triggers a slowdown signal">high-water mark</span> is full. Then what?</li>
+          <li><strong>Drop.</strong> Toss the new tickets in the bin. The customer never eats, but the kitchen survives.</li>
+          <li><strong>Block.</strong> Tell the waiters to stop taking orders until the cook catches up. The dining room queues at the door.</li>
+          <li><strong>Signal slowdown.</strong> Wave the waiters off: bring three tickets at a time, not thirty. The pace adjusts right at the source.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    T["Tickets arrive faster than plates leave"] --> D{What can the kitchen do?}
+    D --> B1["Buffer — pile tickets on the rail"]
+    D --> B2["Drop — bin the new tickets"]
+    D --> B3["Block — waiters stop taking orders"]
+    D --> B4["Signal — ask for 3 tickets at a time"]
+    B4 --> R["Producer paces itself: reactive backpressure"]
+          </pre>
+          <figcaption class="diagram__caption">Four moves, one mismatch. Only the fourth is a real conversation between the two sides — the rest just happen to you.</figcaption>
+        </figure>
+
+        <p>That fourth option is
+          <span class="term">reactive backpressure</span>
+          <span class="term__gloss">the consumer states its real appetite, and the producer respects it</span>.
+          The first three happen whether or not anyone designed for them, and usually in their worst form: silent drops, out-of-memory kills, latency nobody can explain.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not rate limiting.</strong> Rate limiting caps a producer from the outside ("max 100 req/sec"). Backpressure is the consumer's own voice from the inside ("I can take 7 more right now").</li>
+              <li><strong>Not load shedding.</strong> Load shedding is one specific response — drop — taken under stress. Backpressure is the broader conversation that decides whether to shed at all.</li>
+              <li><strong>Not a queue.</strong> A queue is just the buffer option. Backpressure is what you do when that queue fills up.</li>
+              <li><strong>Not retry logic.</strong> A retry pushes work back into the system. Backpressure tries to stop pushing so much in, in the first place.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You stream data between services and the consumer's speed varies (DB writers, downstream APIs, batch ML inference).</li>
+              <li>You read large files or network responses chunk-by-chunk on a constrained worker.</li>
+              <li>You build a message-driven system where one slow subscriber must not poison the whole topic.</li>
+              <li>A producer is "fire and forget" but the consumer cannot be.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It's request/response and the client already waits synchronously — TCP and the call stack give you this for free.</li>
+              <li>It's a tiny in-memory pipeline where producer and consumer demonstrably run at the same speed.</li>
+              <li>It's a one-shot batch job that finishes in seconds; the engineering cost outweighs the risk.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Producer / Publisher</dt><dd>The source of data.</dd></div>
+          <div><dt>Consumer / Subscriber</dt><dd>The sink that processes it.</dd></div>
+          <div><dt>Buffer</dt><dd>Memory that holds in-flight items between the two.</dd></div>
+          <div><dt>Demand</dt><dd>How many items the consumer is currently willing to accept.</dd></div>
+          <div><dt>Drop / Shed</dt><dd>Discard items the system cannot handle.</dd></div>
+          <div><dt>Block</dt><dd>Pause the producer until capacity frees up.</dd></div>
+          <div><dt>Lag</dt><dd>The gap between produced and consumed positions — Kafka's favorite metric.</dd></div>
+          <div><dt>Reactive Streams</dt><dd>A cross-language spec (Java Flow, RxJS, Project Reactor) that standardizes demand-based backpressure.</dd></div>
+          <div><dt>High-water mark</dt><dd>The buffer threshold that triggers a backpressure signal.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

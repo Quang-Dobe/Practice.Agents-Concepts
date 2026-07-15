@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tokenization · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Tokenization</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Tokenization</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/tokenization/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Tokenization</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In an LLM-backed product, the tokenizer is the silent middleman on every request — it decides what you pay per call, how much chat history survives, and whether your "8k context window" really fits the document you wanted to summarize. You'll meet it in three settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">LLM-backed product</div><p>Most teams first notice the tokenizer when an accountant asks why the bill doubled after a Spanish-language launch.</p></div>
+          <div class="card"><div class="card__title">RAG pipeline</div><p>The unit of measurement for chunk size, overlap, retrieval budget, and how many passages fit in the prompt.</p></div>
+          <div class="card"><div class="card__title">Fine-tuning / pre-training</div><p>Part of the model artifact, not a preprocessing step. Swap it and you have a different model.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Pin the tokenizer to the model — and to a version</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Load tokenizer and model from the same checkpoint, in the same code path, with both versions pinned (<code>tiktoken==X.Y.Z</code>, <code>transformers==X.Y.Z</code>, model revision SHA). Treat them as one artifact.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A <code>tiktoken</code> upgrade can ship a new encoding for a new model; a <code>transformers</code> upgrade can change default chat-template behavior. Either silently changes token counts, costs, and outputs — a
+              <span class="term">tokenizer drift</span>
+              <span class="term__gloss">an unpinned tokenizer or template version quietly changing token counts and outputs underneath you</span>
+              incident.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Loading the tokenizer from one place (<code>AutoTokenizer.from_pretrained("…base")</code>) and the weights from another — a fine-tune that extended the vocabulary.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Count tokens with the exact tokenizer you will hit</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>tiktoken.encoding_for_model("gpt-4o")</code> for OpenAI, the Anthropic count-tokens API for Claude, <code>countTokens</code> for Gemini, and the model's own <code>AutoTokenizer</code> for open-weights models. Count the full wire payload — system prompt, tool schemas, function args, assistant prefill.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Cross-tokenizer estimates ("~4 characters per token") are wrong by 30–80% on code, JSON, and non-English text. Budgeting on the wrong number is how you hit <code>context_length_exceeded</code> in production while the dashboard says you had headroom.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single shared <code>count_tokens()</code> helper that uses <code>cl100k_base</code> for every provider.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Measure fertility, not character length</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For each language or format you ship, compute
+              <span class="term">fertility</span>
+              <span class="term__gloss">tokens produced per word — higher fertility means more tokens, more cost, and less usable context for the same text</span>
+              — tokens-per-word — over a real sample. Track it as a metric and compare across candidate models before locking one in.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Fertility is the difference between "Llama 3 is cheaper than GPT-4o" and "Llama 3 is cheaper than GPT-4o for English but 1.6× more expensive for Vietnamese." That's the real basis for model choice, not the headline $/Mtok.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Estimating context budgets from <code>len(text) / 4</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Budget context as input + output + overhead, with a margin</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Reserve explicit slots: system prompt (with chat-template special tokens), conversation history, retrieved context, expected output, and 5–10% slack. Truncate the oldest, lowest-value bucket first.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Cutting a prompt mid-token or mid-JSON degrades output before it even errors out. Output tokens also cost 3–5× input tokens, so under-budgeting output is the single biggest avoidable cost driver.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Setting <code>max_tokens</code> to "whatever's left" — that lets a runaway generation eat your margin.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Treat JSON, code, and whitespace as expensive</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Strip non-semantic whitespace from JSON before sending (<code>json.dumps(obj, separators=(",", ":"))</code>). Prefer compact field names in tool schemas. Expect 1.5–2× the token count of equivalent prose for code-heavy prompts.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A pretty-printed 10 KB JSON document can be 30% more tokens than its minified version — every <code>\n    </code> indent is its own token. At scale, that's real money and context you needed for the answer.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Sending <code>JSON.stringify(obj, null, 2)</code> to an API. The model doesn't care about the indentation; your bill does.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Always use the model's chat template</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Call <code>tokenizer.apply_chat_template(messages, add_generation_prompt=True)</code> (Hugging Face) or the provider's <code>messages=</code> parameter. Let the library insert <code>&lt;|im_start|&gt;</code>, <code>&lt;|eot_id|&gt;</code>, and friends.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Hand-rolling chat strings drops or duplicates special tokens, which routinely costs 5–20% in eval quality and produces the "model won't stop generating" bug.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>String-concatenating roles into a single prompt for an instruct model.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Sanitize user input before it reaches the tokenizer as "raw"</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>With Hugging Face tokenizers, set <code>add_special_tokens=False</code> for arbitrary user text and never allow special-token splitting on untrusted input. Strip or escape literal <code>&lt;|im_end|&gt;</code>-style strings.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>If special tokens are recognized inside user content, an attacker can inject <code>&lt;|im_end|&gt;&lt;|im_start|&gt;system</code> and break out of their role — a real
+              <span class="term" data-gloss="an attack that hides model instructions inside untrusted input">prompt-injection</span>
+              vector, not a theoretical one.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Passing user-supplied strings straight into a template that allows special-token interpretation.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Cache tokenization for hot paths</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Cache the encoded IDs of stable prompt parts (system prompt, few-shot examples, tool schemas). For high-RPS counting, reuse the encoder instance and consider <code>encode_batch</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>tiktoken</code> is fast (hundreds of MB/s) but not free — recreating the encoder per request is the usual culprit when token counting shows up in flame graphs. Caching also lets you line up prompt-cache hits with providers that bill less for cached prefixes.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Calling <code>tiktoken.get_encoding(...)</code> inside your request handler.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Inspect "weird" tokenizations directly</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Keep a debug utility that prints <code>(token_id, repr(token_bytes))</code> side by side. When the model misbehaves on a specific input, tokenize it first. Tools: <code>tiktokenizer.vercel.app</code>, <code>tokenizer.tokenize(text)</code>, <code>tokenizer.convert_ids_to_tokens(ids)</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Half of "the model can't do arithmetic / can't count the Rs in strawberry / mangles this name" bugs become obvious the moment you see the token boundaries. The model is doing exactly what its input implies.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Debugging output quality by tweaking the prompt before you've looked at the tokens.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Reuse a tokenizer unless you have a measured reason not to</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Start with the foundation model's tokenizer. Only train your own when pre-training from scratch (or doing heavy continued pre-training) on a domain where measured fertility is bad — typically more than 2 tokens/word — or on a non-Unicode alphabet.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A custom tokenizer is a permanent commitment: you can't mix it with off-the-shelf weights. The break-even point against just paying the fertility tax is far higher than people expect, because every dependency — LoRA adapters, eval pipelines, distillation teachers — assumes the base vocabulary.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We'll train our own tokenizer to save tokens" as a fine-tuning optimization. That's tokenizer recycling's evil twin, and it loses every time.</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Reuse["Reuse the foundation tokenizer — default"]
+      R1[Matches the pretrained weights]
+      R2[Works with every off-the-shelf tool]
+    end
+    subgraph Train["Train your own — rare"]
+      T1[Fertility over 2 tokens per word on your domain]
+      T2[Non-Unicode alphabet: protein, DNA, MIDI]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Two paths, very different commitment levels. The right column is a permanent break from the base model's weights and tooling.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The 4-chars-per-token estimator</p>
+            <p><code>len(text) // 4</code> used everywhere for budgeting. Fails silently on code, JSON, and non-English text; the bug surfaces as 429s and truncated answers in production. Use the real tokenizer.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Tokenizer recycling</p>
+            <p>Loading another model's tokenizer — often Llama's — onto a new model's weights because "BPE is BPE." Embeddings index by ID, so this is equivalent to randomly shuffling the vocabulary; perplexity explodes.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Pretty-printed prompts</p>
+            <p>Sending JSON, YAML, or code with indentation and trailing newlines because it "reads better." The model doesn't read it; it pays for every <code>\n    </code>. Minify structured payloads before sending.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trailing-space prompts</p>
+            <p>Ending a prompt with <code>"Answer: "</code> (note the space). The space gets consumed by the tokenizer, so the model has to predict the rarer no-leading-space variant of every continuation. Leave the trailing space off; the chat template handles it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Counting only the user message</p>
+            <p>Token-budget code that ignores the system prompt, tool schemas, and chat-template specials. The real wire payload is 200–2000 tokens larger than the "prompt" your code thinks it sent.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting user-supplied special tokens</p>
+            <p>Treating <code>&lt;|im_end|&gt;</code> in user input as a literal string when the tokenizer is configured to recognize specials. A prompt-injection foothold — strip or escape it, and disable special-token parsing on untrusted input.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Silent tokenizer upgrades</p>
+            <p>Letting CI bump <code>tiktoken</code> or <code>transformers</code> without re-running token-budget tests. Costs and context math change underneath you. Pin versions and snapshot token counts on a fixed eval set.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Glitch-token roulette</p>
+            <p>Including rare copy-pasted strings like <code>SolidGoldMagikarp</code> or <code>_$_$_$_$</code> in prompts. The model produces nonsense because those embeddings were never meaningfully trained. Sanitize prompts and flag low-frequency tokens.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Multilingual SaaS chatbot</div>
+            <p>A B2B support product expands from English to Spanish, Polish, and Japanese. The English 8k context budget was tuned for ~6k characters of history; Polish blows that to ~10k characters in the same token budget, so older messages get silently dropped. <em>Lesson:</em> context windows are language-dependent — measure fertility per locale, or switch to a tokenizer with better non-English fertility (<code>o200k_base</code> and Gemini beat <code>cl100k_base</code> here).</p>
+          </div>
+          <div class="card">
+            <div class="card__title">RAG over a code repo</div>
+            <p>An engineering assistant chunks source files by token count with <code>cl100k_base</code>, retrieves top-k, and stuffs them into the prompt — then chunk boundaries start cutting through function bodies. <em>Lesson:</em> tokenize-then-chunk on raw code makes nonsensical splits; chunk on syntax boundaries and measure in tokens only for budgeting.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">High-volume classification pipeline</div>
+            <p>A content-moderation system runs millions of short messages a day through a small LLM. Naive <code>tiktoken.get_encoding()</code> per call becomes a CPU bottleneck. <em>Lesson:</em> reuse encoder instances, batch with <code>encode_batch</code>, cache counts on the message hash — cut CPU usage by 40% at no quality cost.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Fine-tuning a domain model</div>
+            <p>A legal-tech team fine-tunes Llama 3 on contracts and debates a custom tokenizer for "legal jargon." Measured fertility on their corpus is 1.4 tokens/word — well within normal range. <em>Lesson:</em> fine-tuning rarely justifies a new tokenizer; the engineering cost dwarfs the inference savings.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Agent with tool-calling</div>
+            <p>An agent emits JSON tool calls; logs show a spike in <code>max_tokens</code> truncations on one tool whose schema uses verbose field names (<code>customerEmailAddress</code>, <code>shippingDestinationCountryCode</code>). <em>Lesson:</em> schema field names tokenize on every call — shorter snake_case keys cut 15–25% of tool-call tokens at zero functional cost.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li>Tokenizer and model versions are pinned together and tested as one artifact.</li>
+              <li>A token-count metric is exported per request, split by system / user / output / tool-call.</li>
+              <li>Fertility (tokens-per-character) is tracked per language and format in monitoring.</li>
+              <li>Context-budget logic accounts for system prompt, tool schemas, chat-template specials, and expected output, with a slack margin.</li>
+              <li>User input is sanitized for special-token strings before it enters a chat template.</li>
+              <li>A cost dashboard separates input vs. output tokens and alerts on per-tenant anomalies.</li>
+              <li>A debug tool shows token-by-token splits for any prompt, and on-call has actually used it once.</li>
+              <li>Encoder instances are reused, not recreated per request, on any hot path.</li>
+              <li>A CI test asserts token counts on a snapshot of representative prompts and fails on tokenizer upgrades.</li>
+              <li>New-engineer onboarding covers "the model sees tokens, not characters" with a walkthrough of the debug tool.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Invisible.</span> One API call, no token counting, a vague sense that "long prompts cost more." The first forcing function is usually a <code>context_length_exceeded</code> error, which leads to a homemade <code>count_tokens(text)</code> helper — often using the wrong encoding for the wrong model. It holds until a second model (Claude next to GPT, or a self-hosted Llama fallback) makes the helper silently undercount by 20%.</li>
+          <li><span class="steps__title">Real budget abstraction.</span> Explicit accounting for system prompt, history, retrieved context, and output reserve. RAG pipelines drive this — chunk size, overlap, and retrieval-k all become token-denominated. Cost dashboards appear per tenant and per feature. Multilingual rollout exposes fertility gaps and forces per-language budgets or tokenizer-aware routing.</li>
+          <li><span class="steps__title">Hard dependency.</span> The team wants to fine-tune, switch foundation models, or self-host, and the tokenizer turns out to be load-bearing everywhere: prompt-cache hashes, eval snapshots, prompt-injection filters, tool schemas. Teams that pinned versions and tracked fertility from day one switch in a sprint. Teams that didn't spend a quarter chasing "the new model just feels worse" before realizing the prompts were never retuned for the new tokenizer.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://huggingface.co/docs/transformers/main/en/chat_templating" rel="noopener">Hugging Face — Chat templates</a> — the definitive guide to special-token handling; read before hand-rolling any chat string.</li>
+          <li><a href="https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb" rel="noopener">OpenAI Cookbook — How to count tokens with tiktoken</a> — canonical token-counting recipes, including the chat-message overhead formula.</li>
+          <li><a href="https://huggingface.co/blog/omarkamali/tokenization" rel="noopener">Hugging Face Blog — Tokenization is Killing our Multilingual LLM Dream</a> — concrete fertility numbers across languages; the source of the "tokenizer tax" framing.</li>
+          <li><a href="https://www.trendmicro.com/vinfo/us/security/news/cybercrime-and-digital-threats/when-tokenizers-drift-hidden-costs-and-security-risks-in-llm-deployments" rel="noopener">Trend Micro — When Tokenizers Drift</a> — cost and security angles on tokenizer version drift in production.</li>
+          <li><a href="https://huggingface.co/blog/catherinearnett/dangers-of-tokenizer-recycling" rel="noopener">Hugging Face Blog — Dangers of Tokenizer Recycling</a> — empirical evidence for why tokenizers and weights can't be swapped independently.</li>
+          <li><a href="https://arxiv.org/html/2402.01035v2" rel="noopener">arXiv — Getting the most out of your tokenizer for pre-training and domain adaptation</a> — when training a custom tokenizer actually pays off; the numbers behind "reuse unless measured otherwise."</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/tokenization/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

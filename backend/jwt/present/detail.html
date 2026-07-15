@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JWT · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">JWT</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">JWT</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/jwt/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">JWT</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A JWT is a compact, URL-safe set of <em>claims</em> — a JSON object — that has been cryptographically protected, almost always by a JSON Web Signature (JWS). The rules live across four specs, usually called
+          <span class="term">JOSE</span>
+          <span class="term__gloss">JavaScript Object Signing and Encryption — the family of specs a JWT is built from</span>:
+          RFC 7519 (the token format itself), RFC 7515 (the signing layer, JWS), RFC 7518 (the algorithm registry, JWA), and RFC 7517 (the key format, JWK). In practice "JWT" almost always means a JWS in <strong>Compact Serialization</strong> — three base64url segments separated by dots.</p>
+
+        <ul>
+          <li><strong>Core idea.</strong> Sign a small JSON claims set so any verifier can trust it with one cryptographic check, no callback to the issuer.</li>
+          <li><strong>Building blocks.</strong> A JOSE header, a claims payload, and a signature — see below.</li>
+          <li><strong>Family.</strong> One format inside JOSE, which competes with PASETO (no algorithm choice), Macaroons (caveat-based), and classic opaque tokens backed by a server-side store.</li>
+        </ul>
+
+        <dl class="vocab">
+          <div><dt>JOSE header</dt><dd>JSON describing how the token is protected. Required: <code>alg</code>. Common optional: <code>typ</code> ("JWT"), <code>kid</code> (key id), <code>jku</code> (JWKS URL), <code>cty</code> (content type, for nested JWTs).</dd></div>
+          <div><dt>Claims set (payload)</dt><dd>Three buckets: <strong>registered</strong> (IANA three-letter names — <code>iss</code>, <code>sub</code>, <code>aud</code>, <code>exp</code>, <code>nbf</code>, <code>iat</code>, <code>jti</code>), <strong>public</strong> (registered in IANA's claims registry, or a collision-resistant URI), and <strong>private</strong> (anything else two parties agree on, e.g. <code>role</code>, <code>tenant_id</code> — no collision guarantee).</dd></div>
+          <div><dt>Signature</dt><dd>Bytes from <code>SIGN(alg, key, header_b64 + "." + payload_b64)</code>. Base64url is base64 with <code>+</code>→<code>-</code>, <code>/</code>→<code>_</code>, no padding.</dd></div>
+          <div><dt>JWE (rare)</dt><dd>Encrypts the payload with key-wrapping + AEAD — five segments instead of three. Needed only when confidentiality, not just integrity, matters.</dd></div>
+        </dl>
+
+        <p>Inside OAuth 2.0, JWT is one possible format for access tokens — RFC 9068 formalizes it as a profile — and it is the <strong>mandatory</strong> format for OpenID Connect ID tokens.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>JWT sits at the <strong>application / auth layer</strong>, carried over HTTP, gRPC metadata, or message-queue headers. An identity provider or auth service issues it; every resource server, gateway, or sidecar that needs to authorize a request verifies it. The token itself is stateless data — it lives wherever the client keeps it.</p>
+
+        <div class="card-grid">
+          <div class="card"><div class="card__title">OAuth 2.0 / OIDC</div><p>Access tokens from Auth0, Okta, Keycloak, Cognito, Entra ID, Google Identity; the OIDC <code>id_token</code> is always a JWT.</p></div>
+          <div class="card"><div class="card__title">Service-to-service</div><p>Sidecar meshes (Istio, Linkerd) and gateways (Kong, Envoy) validate JWTs at the edge so downstream services trust pre-authenticated requests.</p></div>
+          <div class="card"><div class="card__title">Workload identity</div><p>Kubernetes service-account tokens, GitHub Actions OIDC, AWS IRSA, HashiCorp Vault JWT auth — federation without long-lived keys.</p></div>
+          <div class="card"><div class="card__title">Magic links</div><p>Short-lived, single-use JWTs in URLs for password-reset and login flows — with real caveats, see Failure modes.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    IdP["Identity provider / auth service — issues JWTs"]
+    IdP --> GW["API gateway / edge (Kong, Envoy)"]
+    IdP --> MESH["Service mesh sidecar (Istio, Linkerd)"]
+    IdP --> RS["Resource server — verifies locally via JWKS"]
+    IdP --> K8S["Kubernetes API server (service-account tokens)"]
+    IdP --> CI["CI/CD workload identity (GitHub Actions OIDC, AWS IRSA)"]
+          </pre>
+          <figcaption class="diagram__caption">One issuer, many independent verifiers — none of them call back to the issuer on every request.</figcaption>
+        </figure>
+
+        <p>Common tooling: <code>Microsoft.IdentityModel.Tokens</code> / <code>System.IdentityModel.Tokens.Jwt</code> (.NET), <code>jjwt</code> / Nimbus JOSE+JWT (Java), <code>jsonwebtoken</code> / <code>jose</code> (Node.js), <code>PyJWT</code> / <code>authlib</code> (Python), <code>golang-jwt/jwt</code> (Go) — plus jwt.io for quick decoding.</p>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You run a horizontally scaled, stateless API and want to skip a shared session store.</li>
+              <li>You operate a federated identity boundary — issuer and verifier are different services, maybe different organizations.</li>
+              <li>Tokens are short-lived (minutes, not days), so no instant revocation is acceptable.</li>
+              <li>You need a workload-identity primitive (Kubernetes, CI/CD OIDC).</li>
+              <li>Downstream services need to read claims (roles, tenant, scopes) without calling back to the IdP.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You need immediate revocation on logout (banking, admin consoles, compliance-driven systems).</li>
+              <li>The token must live for days or weeks — that's an unrevocable bearer credential.</li>
+              <li>Your app is a classic monolith with one web tier — cookies + a session table are less code and easier to debug.</li>
+              <li>You want confidential data in the token. JWS is signed, not encrypted.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>JWT was first drafted in late 2010 and standardized as RFC 7519 in May 2015, alongside the rest of JOSE. It grew out of two pressures: SAML assertions were XML-heavy and painful for browsers and mobile, and OAuth 2.0 (RFC 6749, 2012) deliberately left token format unspecified. JWT filled that gap with a compact, JSON-native, URL-safe format that fits naturally into <code>Authorization: Bearer</code> headers.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>A signed JWT round trip, end to end:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Authenticate.</span> The client authenticates to the authorization server (password, refresh token, authorization code, client credentials, …).</li>
+          <li><span class="steps__title">Build claims.</span> E.g. <code>{"iss":"https://auth.example.com","sub":"user_123","aud":"api.example.com","exp":1735689600,"iat":1735686000,"jti":"8f3...","scope":"read:orders"}</code>.</li>
+          <li><span class="steps__title">Build header.</span> E.g. <code>{"alg":"RS256","typ":"JWT","kid":"2026-01-key"}</code>. The
+            <span class="term" data-gloss="key identifier — a header field that tells the verifier which of the issuer's several published keys to use">kid</span>
+            lets verifiers pick the right key during rotation.</li>
+          <li><span class="steps__title">Encode and sign.</span> Base64url-encode header and payload, join with a dot, sign with the private (or shared) key.</li>
+          <li><span class="steps__title">Return the token.</span> The client stores it and sends it as <code>Authorization: Bearer &lt;jwt&gt;</code> on every call.</li>
+          <li><span class="steps__title">Validate, in order.</span> Split on dots (reject if not 3 segments) → enforce an <strong>algorithm allow-list</strong> locally (never trust the header's <code>alg</code> alone) → look up the key by <code>kid</code> from a cached JWKS → verify the signature → check <code>exp &gt; now</code> (30–60s <span class="term" data-gloss="a small allowance for the issuer's and verifier's clocks not being perfectly in sync">clock-skew leeway</span>) → check <code>nbf</code> if present → check <code>iss</code> exact match → check <code>aud</code> contains this server's identifier → apply application-level authorization on scope/roles.</li>
+          <li><span class="steps__title">Any check fails → 401.</span> Skipping a single one of these is a CVE waiting to happen.</li>
+          <li><span class="steps__title">Refresh on expiry.</span> The client trades a long-lived, opaque, server-side, revocable <strong>refresh token</strong> for a new access JWT — the standard fix for JWT's weak revocation story.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant A as Auth Server
+    participant R as Resource Server
+    C->>A: Authenticate
+    A->>A: Build claims + header, sign
+    A-->>C: Signed JWT (3 segments)
+    C->>R: Request with Authorization header (Bearer jwt)
+    R->>R: Parse - enforce alg allow-list
+    R->>R: Look up key by kid in cached JWKS
+    R->>R: Verify signature, exp, nbf, iss, aud
+    alt all checks pass
+        R-->>C: 200 - claims trusted, no DB call
+    else any check fails
+        R-->>C: 401 Unauthorized
+    end
+          </pre>
+          <figcaption class="diagram__caption">One token, issued once, verified locally by every resource server — no callback to the auth server on the request path.</figcaption>
+        </figure>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>HS256 (HMAC-SHA-256, symmetric)</td><td>Fast, simple, one secret</td><td>Every verifier holds the signing secret; one compromise forges any token. Only viable when issuer == verifier.</td></tr>
+              <tr><td>RS256 / ES256 (asymmetric)</td><td>Verifiers only need the public key; safe to publish via JWKS; clean issuer/verifier separation</td><td>Slower signing, larger signatures, more key management. ES256 is smaller and faster than RS256 at equivalent security.</td></tr>
+              <tr><td>Stateless JWT</td><td>No session store, no shared DB, horizontal scale trivial</td><td>Revocation is hard; token bloat in every request; payload visible to client.</td></tr>
+              <tr><td>Short <code>exp</code> (5–15 min) + refresh token</td><td>Limits the blast radius of a stolen token</td><td>Extra round trip to refresh; refresh token itself becomes the long-lived secret.</td></tr>
+              <tr><td>Putting roles/claims in the token</td><td>Downstream services skip an IdP call per request</td><td>Stale data — role changes don't propagate until the token expires.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>alg: none</code> accepted</p>
+            <p>The spec lists "none" as a valid algorithm; a naive verifier that honors the header skips signature verification entirely. Cause: trusting <code>header.alg</code> instead of an allow-list.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">HS256/RS256 algorithm confusion</p>
+            <p>Server is configured for RS256 but its verifier picks the algorithm from the header. Attacker sends <code>alg: HS256</code> and signs the forged token using the server's <strong>public</strong> key as the HMAC secret — the server verifies it as valid HMAC. Full auth bypass. Cause: dynamic algorithm selection from the header.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Weak HMAC secret</p>
+            <p>HS256 with a short or human-chosen secret is brute-forceable offline once you have any valid token. Cause: secret under 256 bits of entropy.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Missing <code>aud</code> check</p>
+            <p>A token issued for service A is replayed against service B that shares the issuer. Cause: verifier skipped the audience claim.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Missing <code>iss</code> check</p>
+            <p>A token from a rogue issuer, signed with a key the verifier happens to trust, is accepted. Cause: JWKS configured for multiple issuers without binding.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Sensitive data in the payload</p>
+            <p>SSNs, emails, internal IDs leak because someone assumed "signed" meant "encrypted." Cause: confusing JWS with JWE.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">JWT in the URL</p>
+            <p>Magic links and OAuth implicit-flow fragments end up in browser history, Referer headers, and server access logs. Cause: convenience over hygiene.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Oversized tokens</p>
+            <p>Packing every permission as a claim grows tokens to 4–8 KB, blowing HTTP header limits and inviting cache poisoning. Cause: using JWT as a permissions database.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Clock skew and stale <code>kid</code></p>
+            <p>A verifier with a fast clock rejects freshly issued tokens (no <code>leeway</code> configured). During key rotation, a verifier with no <code>kid</code> or no JWKS refresh-on-miss tries the old key against a new token.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>JWT exists because <strong>distributed systems need a way for one service to trust an assertion made by another service without calling back to the source on every request</strong>. The pre-JWT options were a shared session store (couples services, becomes the bottleneck), SAML (XML, heavyweight, browser-hostile), or opaque tokens with introspection (a network round trip per request). A signed, self-describing token collapses identity propagation to a local cryptographic check — that is the entire value proposition.</p>
+
+        <h3>Why it looks the way it does</h3>
+        <p>Three design choices are worth understanding. First, why three base64url segments instead of a binary format like CBOR/COSE? JOSE optimized for the HTTP/browser world circa 2013 — URL-safe, header-safe, copy-pasteable, JSON-debuggable. CBOR Web Tokens (CWT, RFC 8392) exist for constrained environments like IoT with the same idea in binary form.</p>
+
+        <p>Second — and this is the one worth drawing — why is asymmetric signing a first-class option?</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 800 210" role="img" aria-labelledby="keysTitle keysDesc" width="800" style="max-width:100%">
+            <title id="keysTitle">Symmetric vs. asymmetric signing</title>
+            <desc id="keysDesc">With HS256, the issuer and every verifier hold the same shared secret, so leaking it anywhere lets anyone forge tokens. With RS256 or ES256, only the issuer holds the private key; every verifier holds just the public key fetched from a JWKS endpoint, and a leaked public key alone cannot be used to forge tokens.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="190" y="24" text-anchor="middle" fill="var(--warn)">HS256 — one shared secret</text>
+              <rect x="20" y="50" width="150" height="70" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+              <text x="95" y="90" text-anchor="middle">Issuer 🔑</text>
+              <rect x="220" y="50" width="150" height="70" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+              <text x="295" y="90" text-anchor="middle">Verifier 🔑</text>
+              <text x="195" y="45" text-anchor="middle" font-size="16" fill="var(--warn)">↔</text>
+              <text x="610" y="24" text-anchor="middle" fill="var(--accent)">RS256 / ES256 — key pair</text>
+              <rect x="440" y="50" width="150" height="70" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="515" y="82" text-anchor="middle">Issuer</text>
+              <text x="515" y="100" text-anchor="middle">🔒 private key</text>
+              <rect x="630" y="34" width="150" height="46" rx="8" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="705" y="62" text-anchor="middle" font-size="12">Verifier A 🔓 public key</text>
+              <rect x="630" y="90" width="150" height="46" rx="8" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="705" y="118" text-anchor="middle" font-size="12">Verifier B 🔓 public key</text>
+              <text x="600" y="60" font-size="16" fill="var(--accent)">→</text>
+              <text x="600" y="115" font-size="16" fill="var(--accent)">→</text>
+              <text x="10" y="150" font-size="12" fill="var(--text-muted)">Leak the HS256 secret anywhere → forge tokens both ways.</text>
+              <text x="10" y="170" font-size="12" fill="var(--text-muted)">Leak an RS256/ES256 public key → nothing; only the private key can sign.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">One issuer, many verifiers in different trust domains — the deployment shape that makes asymmetric signing worth its cost.</figcaption>
+        </figure>
+
+        <p>The issuer publishes a
+          <span class="term">JWKS</span>
+          <span class="term__gloss">JSON Web Key Set — the issuer's public keys, published at a well-known URL so any verifier can fetch them</span>
+          at <code>/.well-known/jwks.json</code>; anyone can verify without ever holding a secret. This is what makes OIDC and workload identity federation work.</p>
+
+        <p>Third, why short expiry plus refresh tokens instead of a real revocation list? Because a revocation list re-introduces the stateful lookup JWT was designed to avoid. The compromise: tokens are short enough that the revocation window is acceptable, and the refresh token — which <em>is</em> stateful and revocable — carries the long-lived trust. It's an explicit, named trade-off, not an accident.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, JWT is the dominant access-token format across OAuth 2.0 and OIDC deployments, and the substrate for workload identity federation (GitHub Actions OIDC, AWS IRSA, GCP Workload Identity, SPIFFE). The interesting movement is <em>around</em> JWT, not away from it: sender-constrained tokens (DPoP, RFC 9449) and mTLS-bound tokens (RFC 8705) are tightening the bearer-token model. PASETO and Biscuit exist as opinionated alternatives but haven't displaced JWT in the enterprise stack.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

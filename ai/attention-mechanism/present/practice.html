@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attention Mechanism · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Attention Mechanism</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Attention Mechanism</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/attention-mechanism/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Attention Mechanism</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~12 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical LLM serving stack, attention isn't the code you write — it's the code you call. You import <code>torch.nn.functional.scaled_dot_product_attention</code>, or launch <code>vllm serve meta-llama/Llama-3.1-8B-Instruct</code>, and the kernel choice, masking, and KV-cache layout are all decided by libraries whose authors have spent years on a single softmax. The day-to-day skill is not deriving softmax — it's reading a model card, recognizing which attention variant it uses, and predicting how that variant behaves under your traffic.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Training</div><p>A fine-tuning job OOMs at 8k context, or loss looks great but generations are gibberish because the causal mask was off by one.</p></div>
+          <div class="card"><div class="card__title">Inference</div><p>p99 latency doubles when one user pastes a 50k-token document, because its KV-cache just evicted every other request.</p></div>
+          <div class="card"><div class="card__title">Model selection</div><p>Choosing between a Llama-3 70B with grouped-query attention and a Mistral with sliding-window attention — the right call depends on whether your traffic is many short prompts or few long ones.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Use a fused kernel — never hand-write the matmul-softmax-matmul</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Call <code>F.scaled_dot_product_attention</code> (PyTorch 2.0+) or FlashAttention-2/3 directly. <span class="term">SDPA</span><span class="term__gloss">PyTorch's fused attention op — auto-dispatches to FlashAttention, memory-efficient attention, or cuDNN</span> picks the right backend for the shapes and dtype.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The naive <code>softmax(Q @ K.T / √d) @ V</code> materializes an <code>n × n</code> activation that hits accelerator memory twice. FlashAttention tiles the computation in fast on-chip memory, cutting memory traffic 5–10× and delivering a 2–4× wall-clock speedup past 2k tokens.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Shipping a "from scratch" attention class in production. It's correct, slow, and OOMs at exactly the context length your users will hit.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Pick the right kernel for the right shape</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use FlashAttention-2/3 or SDPA for training and prefill. For decode (one new query token against a long cache), use PagedAttention via vLLM or TensorRT-LLM.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>FlashAttention is tuned for query and key counts that are close in size. During decode there's exactly one query token against a growing cache, which makes a generic kernel bound by cache reads — PagedAttention's block-table design wins there.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using a training-time kernel for decode, then being puzzled that tokens/sec is 5× worse than vLLM on the same hardware.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Treat the KV cache as your real memory budget</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Compute <code>2 · n_layers · n_kv_heads · d_head · seq_len · batch · dtype_bytes</code> before deploying. For a 70B Llama at 32k context, batch 8, fp16, 8 KV groups, that's already tens of GB.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Decode is bound by cache reads, not compute. Cache size — not parameter count — sets your max batch and max context on a given GPU.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Sizing GPUs for model weights alone, then discovering at peak load that one 100k-token conversation evicts every other request.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Use GQA or MQA for serving</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pick base models that ship with grouped-query or multi-query attention (Llama-3, Qwen-2.5, Mistral). They share key/value heads across query heads, shrinking the KV cache 4–8× for a minor quality cost.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Full multi-head attention with dozens of KV heads makes long-context serving too expensive to run economically. GQA with 8 groups is the de facto standard for exactly that reason.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Fine-tuning a full-MHA model for production serving when a GQA variant of similar quality already exists.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Match positional encoding between training and inference</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>If the model trained with RoPE at base frequency 10000 and 8k context, and you want to serve at 32k, apply NTK-aware scaling or YaRN — and check quality on a held-out set at the extended length.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Position encoding is the quiet failure mode of long context. A model can produce fluent but factually drifting output past its training length, with no loss spike to warn you.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Bumping <code>max_position_embeddings</code> in the config and calling it done. The model never saw those rotations during training.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Get the masks right — and test them</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Write a unit test that runs the same prompt with different right-padding and checks for identical logits at the real positions. Do the same for causal masking: predicting token <code>i</code> from the prefix should match predicting it from the full sequence, bit for bit.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A broken padding mask feeds softmax a row of all <code>−∞</code>, producing NaN. A broken causal mask leaks one future token — invisible in loss curves, catastrophic for sampling quality.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting a custom mask because "the loss went down." Both of these bugs lower loss while breaking generation.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Watch for fp16/bf16 softmax overflow</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Prefer bf16 over fp16 where the hardware supports it (Ampere+, TPU v3+). Rely on kernels that subtract the row max inside softmax — FlashAttention and SDPA already do this.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Raw logits at <code>d_k=128</code> can reach magnitudes that overflow fp16 (above 65504). The result is NaN that propagates through the rest of training.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A hand-rolled <code>softmax(scores)</code> in fp16 without the row-max subtraction trick.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Place dropout after the softmax, not after the output projection</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Apply attention dropout to the softmax output (the weights), as in the original transformer, and use it sparingly — modern LLMs often set it to 0.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Dropout on attention weights randomly rebalances which positions get attended to, acting as a regularizer. Dropping the output projection afterward is a different, weaker effect.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Putting dropout in three different places "for safety." It usually hurts, especially during fine-tuning.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Use continuous batching for serving, not static batches</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run vLLM, SGLang, or TGI with <span class="term">continuous batching</span><span class="term__gloss">new requests join the running batch at the next decode step; finished ones free their cache slots immediately</span> enabled.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Static batching idles the GPU while the longest generation in the batch finishes. Continuous batching plus PagedAttention is what gets vLLM to 3–5× the throughput of a plain <code>generate()</code> loop.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Building a "batch of 8, wait, return" service. You'll be CPU-idle on long generations and GPU-idle on short ones.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Reach for efficient or linear variants only when the quadratic cost actually hurts</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default to full attention. Move to sliding-window (Mistral), sparse local+global (Longformer/BigBird), low-rank (Linformer), kernelized (Performer), or hybrid SSM (Jamba, Zamba) only when profiling shows attention dominates runtime <em>and</em> sequences are long enough for the quadratic cost to be the bottleneck.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>On most modern LLMs the feed-forward network dominates FLOPs at the lengths people actually use. Optimizing attention you weren't bottlenecked on trades quality for no throughput gain.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Adopting Performer because a blog post called it linear. Below roughly 16k tokens the constant factors and quality regressions usually erase the asymptotic win.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Debug with attention maps, but don't over-interpret them</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>When a model misbehaves, visualize the <code>n × n</code> weight matrix per head on a representative input. Look for the canonical patterns: diagonal (local), a vertical stripe on position 0 (<span class="term">attention sink</span><span class="term__gloss">the first token absorbing far more attention mass than its content warrants</span>), or block-diagonal (document structure).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Many production bugs — a wrong tokenizer, a doubled BOS token, a lost separator — show up immediately as a strange attention map before they show up in eval metrics.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Concluding "head 7 is the coreference head" from one example. Head specialization is real but noisy — claims need probing across many inputs.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Profile attention versus the feed-forward network before optimizing</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>torch.profiler</code> or NVIDIA Nsight to measure where time actually goes. On a Llama-3-8B at 4k context, attention is often under 30% of forward time — the feed-forward network and QKV projections dominate.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>"Optimize attention" is the default instinct because attention is the famous part. The real cost picture rarely matches the fame.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Spending a week swapping kernels for a 5% speedup on a layer that was only 20% of runtime.</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Q["Choose an attention kernel"] --> A{"Training or prefill (n_q ≈ n_k)?"}
+    A -- yes --> F["FlashAttention-2/3 or SDPA"]
+    A -- no --> B{"Decode: one new query vs long KV cache?"}
+    B -- yes --> P["PagedAttention — vLLM / TensorRT-LLM"]
+          </pre>
+          <figcaption class="diagram__caption">The kernel decision that matters most in practice: training and prefill favor FlashAttention-style kernels; decode favors cache-aware ones like PagedAttention.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The hand-rolled attention class</p>
+            <p>An explicit <code>Q @ K.T / sqrt(d)</code> module. Looks educational, OOMs at 8k context, runs 3× slower than SDPA. Replace it with <code>F.scaled_dot_product_attention</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Per-request KV-cache allocation</p>
+            <p>Allocating a fresh contiguous cache tensor per request wastes 60–80% of GPU memory to fragmentation and over-allocation. Use PagedAttention via vLLM instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Padding-as-mask confusion</p>
+            <p>Building the mask from <code>input_ids != pad_token_id</code> but forgetting the causal triangle, or the reverse. The two must be combined into one mask, built once per batch.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">RoPE without scaling at extended context</p>
+            <p>Loading a 4k-trained checkpoint and setting <code>max_position_embeddings=32768</code> with no theta or NTK adjustment. Generations stay fluent and quietly go wrong. Use YaRN, NTK-aware scaling, or fine-tune at the target length.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Dropping attention dropout into a pretrained model</p>
+            <p>Adding non-zero dropout during fine-tuning of a model pretrained with zero shifts every layer's activation statistics and destabilizes training. Match the pretraining config.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting loss curves to catch mask bugs</p>
+            <p>A causal mask that leaks one future token <em>lowers</em> loss. The bug only surfaces at autoregressive sampling — always add a parity test with and without future tokens visible.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Optimizing attention when the FFN is the bottleneck</p>
+            <p>Swapping kernels and quantizing QKV while the gated MLP is 60% of forward time. Profile before optimizing.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Treating "linear attention" as a free win</p>
+            <p>Performer, Linformer, and friends trade exactness for asymptotics. Below roughly 16k tokens the constants lose, and quality regressions on recall-heavy tasks (needle-in-a-haystack, multi-hop QA) are well documented.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">LLM serving at a SaaS company</div>
+            <p>A team serves a 70B chat model with mixed-length traffic (median 500 tokens, p99 32k) via vLLM with PagedAttention and continuous batching on H100s. <em>Lesson:</em> the main quality regression came not from the kernel but from a tokenizer mismatch that broke RoPE position alignment after a system-prompt update.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Fine-tuning for a vertical</div>
+            <p>A startup LoRA-fine-tunes Llama-3-8B on legal documents averaging 12k tokens, training with FlashAttention-2 in bf16 and document-packing with cross-document attention masked off. <em>Lesson:</em> document-boundary masks are easy to get wrong, and the symptom is content "leaking" from one document into another's answer.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Long-context retrieval system</div>
+            <p>A team builds a 200k-context QA system and finds the "lost-in-the-middle" pattern — answers in the middle 50% of context are retrieved poorly. <em>Lesson:</em> this is partly an attention-sink artifact, and reordering retrieved chunks to the start or end measurably improves accuracy with no model change.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">On-device vision encoder</div>
+            <p>A mobile app runs a small ViT for on-device classification, using INT8 quantization and a sliding-window variant to keep activations under 50 MB. <em>Lesson:</em> quantizing the softmax inputs directly is far more fragile than quantizing the QKV projections; the team kept softmax in fp16 and quantized the rest.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li>KV-cache memory budget computed and checked against <code>nvidia-smi</code> at expected max batch and max context?</li>
+              <li>Attention kernel chosen explicitly (SDPA / FlashAttention / PagedAttention) and benchmarked against the alternative on real shapes?</li>
+              <li>Causal-mask parity test in CI: same prompt, with and without future tokens visible, identical logits?</li>
+              <li>Padding-mask test in CI: different right-padding lengths produce identical logits at real positions?</li>
+              <li>Position-encoding strategy matches between checkpoint and serving config (RoPE base, scaling factor, max length)?</li>
+              <li>Continuous batching enabled in the serving runtime, with the cache-eviction policy documented?</li>
+              <li>p99 latency measured at a realistic long-context tail, not just the median?</li>
+              <li>Attention-vs-FFN time split profiled at least once, so the next optimization targets the real bottleneck?</li>
+              <li>Eval suite includes a long-context probe (needle-in-a-haystack or equivalent) at the deployed max length?</li>
+              <li>A new engineer can answer, on day one: which attention variant does our model use, and what's our KV-cache headroom at peak load?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Naive start.</span> <code>transformers.AutoModelForCausalLM</code> and a <code>generate()</code> loop. This works up to roughly one GPU and a few requests per second.</li>
+          <li><span class="steps__title">First migration — the serving engine.</span> Static batching is leaving 70% of the GPU idle, so the team moves to vLLM or TGI and learns the words "PagedAttention" and "KV cache" the hard way.</li>
+          <li><span class="steps__title">Second migration — context length.</span> The product wants 128k, the model was trained at 8k. The team evaluates RoPE scaling and discovers the gap between "the model accepts 128k tokens" and "the model is useful at 128k tokens." The fix is continued pretraining at the target length, or a shorter effective context with a smarter retrieval layer.</li>
+          <li><span class="steps__title">Third evolution — architecture.</span> If the workload keeps growing, the team moves to a GQA/MQA model if it doesn't already have one, or to a hybrid attention+SSM model (Jamba, Granite-4) to cap the quadratic cost. By now attention isn't code the team writes — it's a property they select, configure, and monitor. The dominant cost turns out to be memory bandwidth on the KV cache, not FLOPs, and that fact reshapes every downstream decision.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://arxiv.org/abs/2307.08691" rel="noopener">FlashAttention-2 paper (Dao, 2023)</a> — the kernel that made long-context training economical; read the IO-complexity analysis.</li>
+          <li><a href="https://arxiv.org/abs/2309.06180" rel="noopener">vLLM / PagedAttention paper (SOSP 2023)</a> — the OS-virtual-memory analogy applied to the KV cache; the foundation of modern LLM serving.</li>
+          <li><a href="https://arxiv.org/abs/2305.13245" rel="noopener">GQA paper (Ainslie et al., 2023)</a> — why every modern open model uses grouped-query attention, with the quality/cost curves.</li>
+          <li><a href="https://arxiv.org/abs/2309.00071" rel="noopener">YaRN: Efficient Context Window Extension of LLMs (Peng et al., 2023)</a> — the canonical reference for extending RoPE-trained models past their training length.</li>
+          <li><a href="https://arxiv.org/abs/2307.03172" rel="noopener">Lost in the Middle (Liu et al., 2023)</a> — an empirical study of long-context attention failure modes; required reading before shipping a RAG system.</li>
+          <li><a href="https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html" rel="noopener">PyTorch <code>scaled_dot_product_attention</code> docs</a> — the one API you'll actually call; understand its dispatch rules and when each backend is selected.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/attention-mechanism/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

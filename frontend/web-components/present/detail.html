@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Components · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Web Components</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Web Components</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/web-components/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Web Components</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>"Web Components" is not one spec. It is a suite of three W3C/WHATWG specifications that together let you define, isolate, and stamp out reusable custom HTML elements.</p>
+        <ul>
+          <li><strong>Custom Elements v1</strong> — WHATWG HTML Standard §4.13. Defines <code>customElements.define()</code>, the
+            <span class="term">reaction queue</span>
+            <span class="term__gloss">the internal FIFO queue that runs each lifecycle callback in the order its triggering event happened</span>,
+            and the four lifecycle callbacks.</li>
+          <li><strong>Shadow DOM v1</strong> — WHATWG DOM Standard §4.8, wired into the HTML parser. Defines <code>attachShadow()</code>, <code>ShadowRoot</code>, event retargeting, and the composed tree.</li>
+          <li><strong>HTML <code>template</code></strong> — WHATWG HTML Standard §4.12.3. Parses to an inert <code>DocumentFragment</code> that never renders and whose scripts never run.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>HTMLElement subclass</dt><dd>Every element is a class extending <code>HTMLElement</code>. Its constructor runs at creation time; mutating the DOM inside the constructor is illegal — the spec throws <code>NotSupportedError</code>.</dd></div>
+          <div><dt>CustomElementRegistry</dt><dd>The global <code>window.customElements</code> object. Owns <code>define(name, ctor, options?)</code>, <code>get()</code>, <code>whenDefined()</code>, and <code>upgrade()</code>. A tag registers once; its name must contain a hyphen.</dd></div>
+          <div><dt>Shadow root</dt><dd>A <code>DocumentFragment</code>-like node from <code>element.attachShadow({ mode })</code>. Its subtree is the <em>shadow tree</em>; the element's own children are the <em>light tree</em>. The <em>composed tree</em> is what the browser paints.</dd></div>
+          <div><dt><code>&lt;slot&gt;</code></dt><dd>A placeholder in the shadow tree that projects light-DOM children into a spot. Default (<code>&lt;slot&gt;</code>) or named (<code>&lt;slot name="header"&gt;</code>).</dd></div>
+          <div><dt><code>&lt;template&gt;</code></dt><dd>Inert markup container; <code>template.content</code> is a <code>DocumentFragment</code> you <code>cloneNode(true)</code> to stamp instances cheaply.</dd></div>
+          <div><dt>ElementInternals</dt><dd>From <code>this.attachInternals()</code>. Exposes form association, ARIA reflection, and custom validity (WebKit shipped this in Safari 16.4).</dd></div>
+        </dl>
+
+        <p>Web Components sit in the family of <strong>encapsulated UI primitives</strong>. The closest relatives are framework components (React, Vue, Svelte, Solid) — compile-time abstractions the browser never sees — and iframes, which are process-level isolation with their own document. The niche Web Components own is <em>runtime, standards-based, cross-framework</em> encapsulation: the browser itself understands the tag, so the same <code>my-widget</code> renders identical DOM inside React, Vue, or a static <code>.html</code> file.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Purely client-side, at the DOM layer — one rung above the parser, one rung below any framework's virtual DOM. A custom element is a real <code>Node</code> in the document tree: the browser dispatches events to it, applies CSS to its host box, and calls its lifecycle callbacks synchronously as part of the DOM mutation algorithm. A server-rendered variant exists too: <strong>Declarative Shadow DOM</strong> lets the parser build a shadow root straight from a <code>template shadowrootmode="open"</code> child, moving first paint into the HTML byte stream — no JavaScript required.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Parser["HTML parser"] --> CE["Custom Element — a real Node in the DOM tree"]
+    FW["Framework virtual DOM (React, Vue, Angular) — optional layer above"] --> CE
+    CE --> Composed["Composed tree — light DOM flattened into slots"]
+    DSD["Declarative Shadow DOM — shadow root built at parse time, no JS"] --> Composed
+    Composed --> Paint["Browser paint"]
+          </pre>
+          <figcaption class="diagram__caption">A custom element sits one rung above the parser and one rung below any framework's virtual DOM — a real node the browser itself understands.</figcaption>
+        </figure>
+
+        <p>Where you'll actually see the tags running:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Vendor design systems</div><p>Adobe Spectrum, Microsoft Fluent UI, SAP UI5, and GitHub's ongoing Primer migration ship components as tag libraries.</p></div>
+          <div class="card"><div class="card__title">Cross-framework platforms</div><p>Salesforce Lightning Web Components (LWC) — a whole enterprise app framework built on literal custom elements. Ionic's <code>ion-button</code> renders the same in Angular, React, and Vue.</p></div>
+          <div class="card"><div class="card__title">Progressive enhancement</div><p>GitHub.com uses tags like <code>relative-time</code>, <code>clipboard-copy</code>, and <code>details-menu</code> layered on top of server-rendered HTML.</p></div>
+          <div class="card"><div class="card__title">General UI kits</div><p>Shoelace / Web Awesome work with any framework or none. YouTube desktop, built on the Polymer library, still ships hundreds of <code>yt-*</code> tags.</p></div>
+        </div>
+
+        <p>Tooling around the specs: <strong>Lit</strong> (~5 KB, the most common authoring library), <strong>Stencil</strong> (compiles TSX to custom elements), and <strong>FAST</strong> for authoring; <code>@lit-labs/ssr</code>, Enhance, WebC, and Astro's built-in support for SSR; <code>@open-wc/testing</code>, Web Test Runner, and Playwright for testing; <code>@lit/react</code>, Angular's <code>CUSTOM_ELEMENTS_SCHEMA</code>, and Vue's <code>compilerOptions.isCustomElement</code> for framework interop.</p>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>The same widget must ship into multiple framework contexts or unknown host pages — embeds, checkouts, chat widgets.</li>
+              <li>You're building a design system with a 3+ year lifespan across teams that won't agree on one framework.</li>
+              <li>You need hard style isolation — third-party CSS on the page must not touch your widget.</li>
+              <li>You want a framework-free island on an otherwise static page and refuse to add a bundler.</li>
+              <li>The team is comfortable with DOM APIs and doesn't need JSX-level ergonomics for internal state.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The app is single-framework and staying that way — you'll fight the framework's own idioms at every boundary.</li>
+              <li>You need rich SSR with streaming and fine-grained hydration — Next.js, Remix, and SvelteKit are still ahead here.</li>
+              <li>You need to pass complex objects as attributes — attributes are strings; that's exactly where framework interop breaks.</li>
+              <li>The team is small, junior, and moving fast — vanilla Web Components mean hand-building change detection, templating, and state.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Web Components began around 2011 as a Google project. The original v0 specs shipped only in Chrome with awkward ergonomics (<code>document.registerElement</code>, a <code>createdCallback</code> naming style). <strong>Custom Elements v1</strong> and <strong>Shadow DOM v1</strong> were redesigned in 2016 through cross-vendor agreement — Safari shipped v1 that year, Firefox followed in 2018 (release 63), and Edge inherited support in 2020 when it switched to Chromium.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>The life of a custom element, from source HTML to torn-down node:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Registration.</span> <code>customElements.define('x-foo', XFoo)</code> checks the name — must contain a hyphen, be lowercase, and not be a reserved name — then schedules an <em>upgrade</em> for every matching tag already parsed anywhere in the document.</li>
+          <li><span class="steps__title">Parsing.</span> If the tag is undefined when the parser meets it, the parser creates a plain placeholder element with the right tag but no behavior. It matches the
+            <span class="term" data-gloss="CSS pseudo-class selecting any custom element that hasn't been upgraded yet">:not(:defined)</span>
+            CSS pseudo-class.</li>
+          <li><span class="steps__title">Upgrade.</span> Once <code>define()</code> runs — now or later — the browser walks the placeholder, runs the constructor with <code>new.target === XFoo</code>, and swaps in the real prototype.</li>
+          <li><span class="steps__title">connectedCallback.</span> Fires when the element lands in a document with a browsing context. It fires <em>every</em> time it's (re)inserted, including on an <code>appendChild</code> move — not idempotent, so check <code>this.isConnected</code>.</li>
+          <li><span class="steps__title">attributeChangedCallback.</span> Fires only for names listed in the static <code>observedAttributes</code> getter — the browser skips everything else as a performance optimization. Runs synchronously inside the mutation algorithm.</li>
+          <li><span class="steps__title">adoptedCallback.</span> Fires on <code>document.adoptNode()</code> — moving an element between, say, an iframe and the main document. Rare in practice.</li>
+          <li><span class="steps__title">disconnectedCallback.</span> Fires on removal from the tree. Not called on page unload — use it to tear down listeners, timers, and observers.</li>
+          <li><span class="steps__title">Shadow attachment and paint.</span> Usually inside the constructor: <code>this.attachShadow({ mode: 'open' })</code> — <code>mode</code> is permanent for the element's life. The browser flattens light DOM into slots to build the
+            <span class="term">composed tree</span>
+            <span class="term__gloss">the flattened tree of light-DOM nodes projected into shadow slots — what the browser actually paints</span>,
+            then paints. Events dispatched inside the shadow tree are retargeted to the host as they cross the boundary, unless dispatched with <code>composed: true</code>.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Undefined: parser meets the tag before define() runs
+    Undefined --> Upgraded: customElements.define() matches the name
+    Upgraded --> Connected: connectedCallback fires — inserted into a document
+    Connected --> Disconnected: disconnectedCallback fires — removed from the tree
+    Disconnected --> Connected: re-inserted — connectedCallback fires again
+    Connected --> Connected: attributeChangedCallback — only for observed attributes
+          </pre>
+          <figcaption class="diagram__caption">The states a custom element moves through. Re-insertion is common — moving a node with <code>appendChild</code> runs a full disconnect-then-reconnect cycle.</figcaption>
+        </figure>
+
+        <p>Waiting for a definition without racing the parser:</p>
+        <pre><code>await customElements.whenDefined('x-foo');
+// The class is registered globally now.
+// Any existing &lt;x-foo&gt; in the DOM has been (or is being) upgraded.</code></pre>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Open shadow root</td><td>DevTools introspection; testable via <code>el.shadowRoot</code>; <code>composedPath()</code> works</td><td>No true encapsulation — anyone with a reference can crawl inside</td></tr>
+              <tr><td>Closed shadow root</td><td>External code can't reach <code>shadowRoot</code>; events hide their internal path</td><td>Your own tests, a11y tools, and framework wrappers also lose access. Not a security boundary.</td></tr>
+              <tr><td>Autonomous element (<code>class X extends HTMLElement</code>)</td><td>Cross-browser, clean semantics</td><td>You re-implement built-in behavior (focus, ARIA)</td></tr>
+              <tr><td>Customized built-in (<code>button is="x-btn"</code>)</td><td>Inherits accessibility and semantics of the base tag</td><td>Safari/WebKit refuses to implement it — a long-open bug, still unresolved as of 2026; needs a polyfill</td></tr>
+              <tr><td>Shadow DOM styling</td><td>Guaranteed isolation: <code>:host</code>, <code>::part</code>, <code>::slotted</code></td><td>Global design tokens must travel through CSS custom properties, which do pierce the boundary</td></tr>
+              <tr><td>Slots</td><td>Cheap composition; host keeps ownership of children</td><td>Slotted nodes can't be selected past their first level — <code>::slotted(a b)</code> is invalid, simple selectors only</td></tr>
+              <tr><td>Attributes as API</td><td>Serializable, HTML-native, work with SSR</td><td>Only strings; complex data needs properties</td></tr>
+              <tr><td>Properties as API</td><td>Any JS value, no serialization cost</td><td>Invisible to HTML; must be set from JS after upgrade</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Touching <code>this</code> before <code>super()</code></p>
+            <p>Throws <code>ReferenceError</code> immediately — a direct consequence of extending <code>HTMLElement</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">DOM work in the constructor</p>
+            <p>Adding children before <code>connectedCallback</code> throws <code>NotSupportedError</code> — the spec forbids DOM mutation that early.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>connectedCallback</code> fires more than once</p>
+            <p>Moving the element with <code>appendChild</code> runs disconnect then reconnect. It is not idempotent — check <code>this.isConnected</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>attributeChangedCallback</code> never fires</p>
+            <p>You forgot the static <code>observedAttributes</code> getter — the browser skips callbacks for anything not listed there.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Attribute vs. property drift</p>
+            <p>The outside sets <code>el.checked = true</code>, the reflected attribute never updates, and a framework re-render clobbers the state. Cause: no reflection wiring.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Style leaks through the slot</p>
+            <p>Slotted content lives in the light DOM, so the page's global CSS still styles it. Not a bug — but often surprising the first time.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Closed roots and accessibility tools</p>
+            <p>Some screen readers have historically failed to reach into closed shadow roots. Use open unless you have an actual threat model to defend against.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">
+              <span class="term" data-gloss="Flash Of Unstyled Content — the tag briefly renders as plain markup before its class registers">FOUC</span>
+              before upgrade
+            </p>
+            <p>Undefined elements render as unstyled inline boxes. Fix with a <code>:not(:defined) { visibility: hidden }</code> rule in a global stylesheet.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Global registry collision</p>
+            <p>Two copies of the same library both call <code>define('x-foo', ...)</code> — the second call throws. Scoped Custom Element Registries, still in progress, will fix this.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Because the browser is the only durable runtime on the web, and every earlier attempt at reusable UI — Backbone views, Dojo widgets, Angular 1 directives, React 15 mixins — died along with its framework. The specs answer three first-principles concerns:</p>
+        <ul>
+          <li><strong>Encapsulation</strong> — isolate styles and DOM so composition scales past a handful of components.</li>
+          <li><strong>Interoperability</strong> — a plain HTML tag is understood everywhere, by definition.</li>
+          <li><strong>Longevity</strong> — standards outlive frameworks; a tag defined today still works after the next framework generation turns over.</li>
+        </ul>
+
+        <h3>Why it looks the way it does</h3>
+        <p>Two choices look strange until you see the alternative.</p>
+        <p><strong>Hyphen-required tag names.</strong> The obvious alternative was a registry of reserved words. The committee picked the hyphen rule instead, so the HTML parser can decide at parse time — with zero lookup — whether a tag might be custom, and keep the un-hyphenated space free for future built-in elements forever. Cheap, forward-compatible, no ambiguity.</p>
+        <p><strong>Shadow DOM instead of CSS-only scoping.</strong> A CSS-only system (like Vue's <code>style scoped</code>) would have shipped faster and stayed simpler. It was rejected because it doesn't scope DOM <em>queries</em> — <code>document.querySelector('button')</code> would still reach inside the widget. Shadow DOM gives a real tree boundary, at the cost of one extra concept: composed tree vs. flat tree.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 580 240" role="img" aria-labelledby="scopeTitle scopeDesc" width="580" style="max-width:100%">
+            <title id="scopeTitle">CSS-only scoping vs. Shadow DOM</title>
+            <desc id="scopeDesc">A page script querying for a button. With CSS-only scoping the query reaches the button inside the widget. With Shadow DOM the query is blocked at the shadow boundary and never reaches the button.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+              <text x="135" y="22" fill="var(--text-muted)" text-anchor="middle">CSS-only scoping</text>
+              <rect x="10" y="30" width="250" height="180" rx="8" fill="none" stroke="var(--border)"/>
+              <rect x="40" y="80" width="190" height="100" rx="8" fill="none" stroke="var(--border)" stroke-dasharray="4 3"/>
+              <text x="135" y="74" fill="var(--text-faint)" text-anchor="middle" font-size="11">widget (CSS boundary only)</text>
+              <rect x="90" y="115" width="90" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="135" y="136" fill="var(--accent)" text-anchor="middle">button</text>
+              <line x1="135" y1="40" x2="135" y2="112" stroke="var(--text-muted)"/>
+              <path d="M 135 112 L 130 102 L 140 102 Z" fill="var(--text-muted)"/>
+              <text x="135" y="196" fill="var(--danger)" text-anchor="middle" font-size="11">found — a DOM query reaches straight in</text>
+
+              <text x="445" y="22" fill="var(--text-muted)" text-anchor="middle">Shadow DOM</text>
+              <rect x="320" y="30" width="250" height="180" rx="8" fill="none" stroke="var(--border)"/>
+              <rect x="350" y="80" width="190" height="100" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="3"/>
+              <text x="445" y="74" fill="var(--text-faint)" text-anchor="middle" font-size="11">shadow tree (real boundary)</text>
+              <rect x="400" y="115" width="90" height="34" rx="6" fill="var(--bg-elev-2)" stroke="var(--accent)"/>
+              <text x="445" y="136" fill="var(--accent)" text-anchor="middle">button</text>
+              <line x1="445" y1="40" x2="445" y2="76" stroke="var(--text-muted)"/>
+              <g stroke="var(--danger)" stroke-width="2.5">
+                <line x1="439" y1="78" x2="451" y2="90"/>
+                <line x1="451" y1="78" x2="439" y2="90"/>
+              </g>
+              <text x="445" y="196" fill="var(--success)" text-anchor="middle" font-size="11">blocked — the query never crosses the boundary</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">CSS-only scoping stops style rules, not DOM queries. Shadow DOM stops both — the reason the committee picked a real tree boundary over a lighter CSS-only design.</figcaption>
+        </figure>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026 the ecosystem crossed two lines that used to be blockers. <strong>React 19</strong> finally assigns matching properties instead of stringifying every prop to an attribute, closing the biggest framework-interop complaint. <strong>Declarative Shadow DOM</strong> reached Baseline "newly available" on 2024-02-20 and is expected at Baseline "widely available" by mid-2026, closing the SSR gap that once made Web Components a poor fit for content-first sites. Meanwhile design-system consolidation — Adobe Spectrum, Fluent, SAP UI5, GitHub Primer's ongoing migration — has quietly made custom elements the default currency of cross-framework UI at large companies.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

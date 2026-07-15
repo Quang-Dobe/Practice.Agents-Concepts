@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embeddings — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Embeddings</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Embeddings</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/embeddings/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>ai</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Embeddings</span>
+        </nav>
+
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">ai</span>
+            <span class="badge">vectors</span>
+            <span class="badge">semantic search</span>
+            <span class="badge">RAG</span>
+          </div>
+          <h1 class="hero__title">Embeddings</h1>
+          <p class="hero__tagline">A fixed-length list of numbers that places a piece of meaning at a spot on a giant invisible map, so "near" means "similar in meaning."</p>
+        </header>
+
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">384–3072</div><div class="stat__label">typical vector dimensions</div></div>
+          <div class="stat"><div class="stat__num">2013</div><div class="stat__label">word2vec makes dense vectors mainstream</div></div>
+          <div class="stat"><div class="stat__num">70%+</div><div class="stat__label">of RAG failures start in retrieval, not the LLM</div></div>
+          <div class="stat"><div class="stat__num">~5 min</div><div class="stat__label">to read all four pages</div></div>
+        </div>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 480 260" role="img" aria-labelledby="spaceTitle spaceDesc" width="480" style="max-width:100%">
+            <title id="spaceTitle">A slice of embedding space</title>
+            <desc id="spaceDesc">A two-dimensional plane where each dot is a piece of text. Cooking-related texts cluster in the lower left, murder-mystery texts cluster in the upper right, and a text that mixes both ideas sits between the two clusters. A dashed circle around one point marks the radius a nearest-neighbor search would check.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+              <rect x="8" y="8" width="464" height="244" rx="10" fill="none" stroke="var(--border)"/>
+              <text x="16" y="26" fill="var(--text-faint)">"near" in this space = similar meaning</text>
+
+              <circle cx="70" cy="200" r="46" fill="none" stroke="var(--border)" stroke-dasharray="4 4"/>
+
+              <circle cx="70" cy="200" r="6" fill="var(--accent)"/>
+              <circle cx="98" cy="215" r="6" fill="var(--accent)"/>
+              <circle cx="58" cy="222" r="6" fill="var(--accent)"/>
+              <circle cx="112" cy="182" r="6" fill="var(--accent)"/>
+              <text x="40" y="240" fill="var(--text-muted)">cooking</text>
+
+              <circle cx="372" cy="60" r="6" fill="var(--text-muted)"/>
+              <circle cx="398" cy="78" r="6" fill="var(--text-muted)"/>
+              <circle cx="414" cy="48" r="6" fill="var(--text-muted)"/>
+              <circle cx="352" cy="90" r="6" fill="var(--text-muted)"/>
+              <text x="336" y="30" fill="var(--text-muted)">murder mysteries</text>
+
+              <circle cx="250" cy="150" r="6" fill="var(--warn)"/>
+              <text x="205" y="174" fill="var(--text-faint)">half-cookbook,</text>
+              <text x="205" y="188" fill="var(--text-faint)">half-memoir</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Meaning becomes geometry: related text lands close together, unrelated text lands far apart.</figcaption>
+        </figure>
+
+        <p>Each dot above is one piece of text turned into a <span class="term" data-gloss="a fixed-length list of numbers, typically a few hundred to a few thousand entries">vector</span>. Its spot on the map comes from what it means, not from a filename or an ID.</p>
+
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the mental model, and what this is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: what it is, where it lives, when to use it, how it works, and why it exists.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Real-world best practices, anti-patterns, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already comfortable with vectors and cosine similarity? Jump straight to Detail or Practice.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

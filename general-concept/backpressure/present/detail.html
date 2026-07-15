@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backpressure · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Backpressure</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Backpressure</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/backpressure/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Backpressure</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~9 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Backpressure is <strong>feedback-driven flow control between an asynchronous producer and an asynchronous consumer</strong>, where the consumer's real processing capacity is propagated upstream so the producer adjusts its emission rate. It is a property of the protocol running <em>between</em> two stages, not a property of either stage alone.</p>
+        <ul>
+          <li><strong>Core idea.</strong> The feedback travels backward, hop by hop, until it reaches the original source — that's what separates it from ordinary flow control, where the answer to "how much can I send?" doesn't have to travel anywhere.</li>
+          <li><strong>The formal contract.</strong> The Reactive Streams spec (1.0.3, 2017) states it in one line: the total <code>onNext</code> signals a Publisher emits must never exceed the total elements the Subscriber requested via <code>Subscription.request(n)</code>.</li>
+          <li><strong>Family.</strong> It's the demand-based branch of <span class="term">flow control</span> <span class="term__gloss">the broader family of techniques that keep a fast side from overrunning a slow side</span>, alongside congestion control (network-wide, e.g. TCP Reno, BBR), rate limiting (open-loop caps at the edge), and load shedding (degraded modes under overload).</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Producer / Publisher</dt><dd>The source. Emits items asynchronously.</dd></div>
+          <div><dt>Consumer / Subscriber</dt><dd>The sink. Has finite processing capacity per unit time.</dd></div>
+          <div><dt>Channel / Subscription</dt><dd>The two-way link — data flows down, demand or credit flows up.</dd></div>
+          <div><dt>Demand (credit, window)</dt><dd>An integer the consumer publishes for items it's currently willing to accept. The producer treats it as a hard ceiling.</dd></div>
+          <div><dt>Buffer / queue</dt><dd>Bounded memory between the two. Its size and high-water mark decide when the demand signal fires.</dd></div>
+          <div><dt>Strategy</dt><dd>What happens when demand is zero and items keep arriving: buffer, drop, block, or signal-upstream.</dd></div>
+          <div><dt>Termination signals</dt><dd><code>onComplete</code> (done), <code>onError</code> (failed), <code>cancel</code> (consumer walked away). No backpressure protocol is complete without these.</dd></div>
+        </dl>
+        <p>The two dominant mechanism families across this landscape are <strong>window-based</strong> (TCP's receive window, HTTP/2's <code>WINDOW_UPDATE</code>) and <strong>credit-based / demand-based</strong> (Reactive Streams' <code>request(n)</code>, on-chip interconnects, InfiniBand). Both bound in-flight units by a number the receiver controls; they differ in where the bookkeeping lives and how granular the unit is — bytes versus logical messages.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Backpressure appears at every layer where an asynchronous boundary exists between two components running at different speeds — whether or not anyone designed for it there.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Transport layer</div><p>TCP's receive window, advertised in every ACK. HTTP/2 and gRPC layer per-stream and per-connection windows on top, default initial window 65,535 bytes.</p></div>
+          <div class="card"><div class="card__title">Runtime & stream libraries</div><p>Node.js streams, Java Flow API, Project Reactor, RxJS, Akka Streams — each with its own demand model.</p></div>
+          <div class="card"><div class="card__title">Message brokers</div><p>Kafka consumer pull, RabbitMQ prefetch (<code>basic.qos</code>), Pulsar receiver queue size, NATS JetStream max-ack-pending.</p></div>
+          <div class="card"><div class="card__title">In-process & UI</div><p>Go bounded channels, Rust <code>tokio::sync::mpsc</code>, Java <code>BlockingQueue</code>, and browser frame scheduling / scroll throttling.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App["Two components running at different speeds"]
+    App --> A["Transport — TCP receive window, HTTP/2 WINDOW_UPDATE, gRPC isReady()"]
+    App --> B["Runtime & stream libs — Reactor, RxJava Flowable, Node streams, Akka Streams"]
+    App --> C["Message brokers — Kafka poll, RabbitMQ prefetch, Pulsar receiver queue"]
+    App --> D["In-process & UI — Go channels, tokio mpsc, BlockingQueue, frame scheduling"]
+    A --> S[(The mismatch has to land somewhere)]
+    B --> S
+    C --> S
+    D --> S
+          </pre>
+          <figcaption class="diagram__caption">Four places the same decision gets made. If two components exchange items at different speeds, there's a backpressure decision there — designed or not.</figcaption>
+        </figure>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>There's an asynchronous boundary — queue, channel, socket — where producer and consumer run on independent schedules.</li>
+              <li>The producer rate is unbounded or bursty (event streams, IoT telemetry, log tailing, change-data-capture).</li>
+              <li>The consumer's cost per item is variable (DB writes, downstream HTTP calls, ML inference).</li>
+              <li>You care about bounded memory more than zero data loss — the system has to keep running.</li>
+              <li>You're chaining stages: without end-to-end demand, the slowest stage's signal stops at its own input and earlier stages keep allocating.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The pipeline is synchronous request/response — the call stack already is your backpressure.</li>
+              <li>The producer is strictly slower than the consumer in all realistic conditions.</li>
+              <li>The data is inherently lossy and time-sensitive (live video frames, mouse positions) — a fixed buffer with drop-latest is simpler than a full demand protocol.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Rule of thumb</p>
+            <p>If you're tempted to reach for an unbounded queue "for now" — stop. That isn't backpressure, that's a memory leak with a polite name.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>A demand-based pipeline — the Reactive Streams model — cycles through five stages for a single subscription:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Subscribe.</span> The consumer calls <code>publisher.subscribe(subscriber)</code>. The publisher hands back a control handle via <code>onSubscribe(subscription)</code>. No data flows yet.</li>
+          <li><span class="steps__title">Initial demand.</span> The subscriber calls <code>subscription.request(n)</code> — say, <code>request(32)</code>. That's the credit grant.</li>
+          <li><span class="steps__title">Bounded emission.</span> The publisher emits up to 32 <code>onNext(item)</code> calls. It must never exceed outstanding demand — if its own source can't be slowed (clock ticks, mouse events), it has to buffer or drop internally to respect the bound.</li>
+          <li><span class="steps__title">Replenishment.</span> As the subscriber works through items, it issues further <code>request(k)</code> calls. Batched demand keeps the channel full without a round-trip per item.</li>
+          <li><span class="steps__title">Termination.</span> The publisher emits <code>onComplete()</code> or <code>onError(t)</code> — or the subscriber calls <code>subscription.cancel()</code> and the publisher releases its resources.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant S as Subscriber
+    participant P as Publisher
+    S->>P: subscribe()
+    P-->>S: onSubscribe(subscription)
+    S->>P: request(32)
+    loop while demand remains
+        P-->>S: onNext(item)
+    end
+    S->>P: request(k) — replenish
+    P-->>S: onComplete() / onError()
+          </pre>
+          <figcaption class="diagram__caption">The Reactive Streams demand cycle — the publisher may never send more than the subscriber has asked for.</figcaption>
+        </figure>
+
+        <h3>How different systems do it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">TCP</div><p>Receiver advertises <code>rwnd</code> in every ACK; sender keeps in-flight bytes ≤ <code>min(rwnd, cwnd)</code>. Window scaling (RFC 7323) lifts the original 16-bit cap to 1 GiB.</p></div>
+          <div class="card"><div class="card__title">HTTP/2 & gRPC</div><p>Per-stream and per-connection windows over TCP, default initial window 65,535 bytes. The receiver sends <code>WINDOW_UPDATE</code> frames to extend the budget; gRPC adds <code>isReady()</code> so app code can pause before the wire even engages.</p></div>
+          <div class="card"><div class="card__title">Node.js streams</div><p><code>write()</code> returns <code>false</code> once the internal buffer crosses <code>highWaterMark</code> (default 16 KiB for byte streams, 16 items in object mode). Returning <code>false</code> is only advisory — a well-behaved producer calls <code>pause()</code> and resumes on <code>drain</code>.</p></div>
+          <div class="card"><div class="card__title">Kafka</div><p>Brokers never push. Consumers call <code>poll(duration)</code>, pulling up to <code>max.poll.records</code> (default 500) per partition assignment. Backpressure is implicit in poll cadence; the cost is consumer <span class="term" data-gloss="the gap between produced and consumed offsets">lag</span>.</p></div>
+          <div class="card"><div class="card__title">Akka Streams</div><p>The runtime negotiates Pull/Push GraphStage signals automatically. User code declares the graph; it never writes <code>request(n)</code> by hand.</p></div>
+        </div>
+
+        <p>Where the mismatch lands if nobody chooses deliberately: memory (grows without bound), latency (queues stretch into
+          <span class="term">bufferbloat</span>
+          <span class="term__gloss">a buffer big enough that throughput looks fine while p99 latency quietly explodes</span>),
+          or the floor (drops, crashes). The table below is exactly that set of choices, laid out gain-versus-give-up.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gained</th><th scope="col">Given up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Buffer unbounded</td><td>Never lose data, never block</td><td>Unbounded memory; latency grows with queue depth (bufferbloat)</td></tr>
+              <tr><td>Buffer bounded</td><td>Bounded memory, smooths short bursts</td><td>Must pick a strategy at the boundary; tuning required</td></tr>
+              <tr><td>Drop (newest or oldest)</td><td>Constant memory, low latency, lossy by design</td><td>Loses data; needs consumer tolerance for gaps</td></tr>
+              <tr><td>Block producer</td><td>Lossless, simple to reason about</td><td>Backpropagates stalls; risks deadlock if producer holds shared resources</td></tr>
+              <tr><td>Signal upstream (demand)</td><td>Lossless, lets the producer decide what to do with its own source</td><td>Requires cooperation from every stage; adds protocol complexity</td></tr>
+              <tr><td>Push (observable)</td><td>Low per-item overhead, natural for events</td><td>Hard to add backpressure later; requires a consumer-side buffer</td></tr>
+              <tr><td>Pull (iterator, Kafka)</td><td>Backpressure is automatic</td><td>Per-item round-trip cost unless batched; consumer must remember to ask</td></tr>
+              <tr><td>Credit-based (bytes/messages)</td><td>Tight buffer bounds at every hop</td><td>Bookkeeping per hop; harder across high-RTT links</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Unbounded queue</p>
+            <p>The producer fills it forever; the process OOMs eventually. Cause: choosing a queue without choosing a bound.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Bufferbloat</p>
+            <p>Bounded but huge. Throughput looks fine; p99 latency is awful. Cause: confusing buffering with absorption.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Silent drop</p>
+            <p>An <code>Observable</code> or a UDP socket discards under load with no metric. Cause: no observability around the drop path.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Head-of-line blocking</p>
+            <p>One slow consumer on a shared channel stalls everyone else. Cause: applying backpressure at the wrong granularity — connection instead of stream.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Deadlock via cyclic demand</p>
+            <p>A waits on B's demand, B waits on A's. Cause: a graph with cycles and no buffered cut-edge.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Demand storm</p>
+            <p>The subscriber calls <code>request(1)</code> per item; network round-trip time dominates. Cause: not batching the demand signal.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Lag without alerts</p>
+            <p>A Kafka consumer slows; messages are still durable; the alert fires hours later. Cause: monitoring throughput instead of lag.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>highWaterMark</code> ignored</p>
+            <p>Node.js code writes in a loop without checking <code>write()</code>'s return value. Cause: the API is advisory, not enforcing.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Two asynchronous components running at different rates is the default case in distributed systems, not the exception. Without a feedback channel, the mismatch has exactly three places to land: memory, latency, or the floor. Backpressure is the engineering decision to make that landing site explicit and bounded, rather than letting it emerge on its own.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 220" role="img" aria-labelledby="landTitle landDesc" width="560" style="max-width:100%">
+            <title id="landTitle">Where the speed mismatch lands</title>
+            <desc id="landDesc">Without backpressure, a fast producer's excess work makes a buffer keep growing until it lands in memory, latency, or silent drops. With backpressure, a valve paces the producer to the consumer's demand instead.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="22" fill="var(--text-muted)">Without backpressure</text>
+              <rect x="10" y="34" width="90" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="55" y="56" fill="var(--accent)" text-anchor="middle">Producer</text>
+              <line x1="104" y1="51" x2="220" y2="51" stroke="var(--border)"/>
+              <rect x="224" y="30" width="130" height="42" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="289" y="47" fill="var(--danger)" text-anchor="middle">buffer keeps</text>
+              <text x="289" y="63" fill="var(--danger)" text-anchor="middle">growing</text>
+              <line x1="358" y1="51" x2="402" y2="51" stroke="var(--border)"/>
+              <text x="406" y="40" fill="var(--danger)">memory ↑</text>
+              <text x="406" y="56" fill="var(--danger)">latency ↑</text>
+              <text x="406" y="72" fill="var(--danger)">drops</text>
+
+              <text x="10" y="122" fill="var(--text-muted)">With backpressure</text>
+              <rect x="10" y="134" width="90" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="55" y="156" fill="var(--accent)" text-anchor="middle">Producer</text>
+              <path d="M104 151 L148 151 L160 141 L160 161 Z" fill="var(--text-faint)"/>
+              <text x="154" y="182" fill="var(--text-faint)" font-size="11">valve</text>
+              <line x1="170" y1="151" x2="280" y2="151" stroke="var(--border)"/>
+              <rect x="284" y="134" width="90" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="329" y="156" fill="var(--accent)" text-anchor="middle">Consumer</text>
+              <path d="M329 170 Q220 208 100 170" fill="none" stroke="var(--info)" stroke-dasharray="4 3"/>
+              <text x="215" y="212" fill="var(--info)" text-anchor="middle" font-size="12">demand: "send N more"</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Backpressure caps how much of the mismatch a buffer has to absorb, by letting the consumer's real appetite set the pace.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative to a demand signal is <strong>rate-based control</strong>: tell the producer "emit at most N items/sec" and let it self-regulate. That works well when capacity is stable, which is why it dominates ingress rate limiting at API gateways. It works poorly <em>inside</em> a pipeline, because consumer capacity is rarely constant — a DB writer's throughput depends on the row, the index state, lock contention, GC pauses. A demand signal tracks instantaneous capacity automatically; a rate cap needs re-tuning every time conditions change.</p>
+        <p>The second deliberate choice is <strong>lossless by default</strong>. The Reactive Streams spec forbids a publisher from exceeding requested demand even for sources that can't be slowed down (clock ticks). That forces the publisher's author to confront the lossy/lossless question at the source, instead of letting it leak downstream as an unhandled overflow. The price is more code at the producer; the gain is that every later stage can assume the invariant holds.</p>
+        <p>The third is <strong>batched credit grants</strong> — <code>request(n)</code> for n greater than 1, TCP windows measured in kilobytes rather than bytes. A stop-and-wait protocol where every item needs its own round trip is correct but painfully slow on any link with real latency. Batching amortizes the control overhead — the same reason Kafka consumers fetch records per poll, not one at a time.</p>
+
+        <h3>Why it matters now</h3>
+        <p>Three trends in 2026 keep this in front of working engineers. Streaming-first architectures — Kafka, Pulsar, Flink, the wider change-data-capture stack — are mainstream, not specialist tooling, and every one of them is a backpressure problem wearing a product's clothes. LLM and agent pipelines add a new instance: a token stream from one model feeding another, retrieval feeding generation, an agent's step queue — the exact shape of an asynchronous boundary where unbounded buffering shows up as an OOM in production. And on the edge and in serverless, per-instance memory limits are tighter (128–512 MiB on many platforms), so getting this wrong now means the platform kills your process rather than just slowing it down.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

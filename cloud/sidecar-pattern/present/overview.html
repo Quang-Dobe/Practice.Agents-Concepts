@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sidecar Pattern · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sidecar Pattern</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sidecar Pattern</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/sidecar-pattern/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sidecar Pattern</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A sidecar is a helper container that runs next to your application, in the same deployment unit, sharing its lifecycle and its network. It takes over chores that aren't your app's actual job.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Instead of every service re-implementing log shipping, retries, or
+              <span class="term" data-gloss="mutual TLS — both sides of a connection prove their identity with certificates">mTLS</span>,
+              you attach a small purpose-built container that does it. The app doesn't know the sidecar exists. A platform team can swap, upgrade, or standardize the sidecar across hundreds of services without touching a line of application code. This is the backbone of modern service meshes (Istio, Linkerd) and, as of Kubernetes v1.33, a first-class part of the platform itself.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a motorcycle with a sidecar. The motorcycle is your app — fast, focused, doing one thing. The sidecar is a small attached cabin that goes everywhere the motorcycle goes. It can't drive on its own. It shares the same fuel tank and the same destination. But it carries the stuff the rider doesn't want to deal with.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 220" role="img" aria-labelledby="mmTitle mmDesc" width="560" style="max-width:100%">
+            <title id="mmTitle">Motorcycle and sidecar, side by side</title>
+            <desc id="mmDesc">A motorcycle labeled app container pulls a smaller attached sidecar cabin labeled sidecar container. Both sit on one shared platform labeled Pod, and only the sidecar's exhaust pipe reaches the outside network.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- shared platform -->
+              <rect x="10" y="150" width="480" height="14" rx="7" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="250" y="196" fill="var(--text-faint)" text-anchor="middle" font-size="12">shared Pod — same network, same volumes, same lifecycle</text>
+
+              <!-- motorcycle body (app) -->
+              <rect x="40" y="70" width="220" height="70" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="150" y="100" fill="var(--accent)" text-anchor="middle" font-weight="bold">App container</text>
+              <text x="150" y="120" fill="var(--text-muted)" text-anchor="middle" font-size="12">the rider — does the real job</text>
+
+              <!-- strut connecting the two -->
+              <rect x="260" y="98" width="30" height="14" fill="none" stroke="var(--text-faint)"/>
+
+              <!-- sidecar cabin -->
+              <rect x="290" y="90" width="150" height="60" rx="10" fill="var(--bg-elev-2)" stroke="var(--text-muted)"/>
+              <text x="365" y="115" fill="var(--text)" text-anchor="middle" font-weight="bold" font-size="12">Sidecar container</text>
+              <text x="365" y="133" fill="var(--text-faint)" text-anchor="middle" font-size="11">TLS · logs · secrets · retries</text>
+
+              <!-- wheels -->
+              <circle cx="90" cy="150" r="14" fill="none" stroke="var(--border)"/>
+              <circle cx="230" cy="150" r="14" fill="none" stroke="var(--border)"/>
+              <circle cx="365" cy="150" r="14" fill="none" stroke="var(--border)"/>
+
+              <!-- exhaust to the outside world -->
+              <line x1="440" y1="120" x2="510" y2="120" stroke="var(--text-muted)" marker-end="url(#arrow)"/>
+              <text x="475" y="105" fill="var(--text-muted)" text-anchor="middle" font-size="11">the outside world</text>
+              <defs>
+                <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 z" fill="var(--text-muted)"/>
+                </marker>
+              </defs>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The app rides; the sidecar carries what the rider doesn't want to handle, and only the sidecar touches the road past the Pod's edge.</figcaption>
+        </figure>
+
+        <p>In Kubernetes terms, the "motorcycle + sidecar" is a single Pod with two containers. They share an IP address, they share volumes, and they live and die together. Your app container talks to <code>localhost:port</code> and the sidecar handles the messy outside world: TLS handshakes, log forwarding, fetching secrets, retrying failed downstream calls. This is
+          <span class="term">cross-cutting concern</span>
+          <span class="term__gloss">a capability every service needs — logging, auth, tracing — but that no single team owns</span>
+          territory. If you've used Istio, every Pod gets an Envoy proxy
+          <span class="term" data-gloss="the mesh control plane automatically adding a sidecar to every Pod via an admission webhook">injected</span>
+          as a sidecar, and that proxy is what actually speaks to the network — your service just talks to localhost.</p>
+
+        <p>Since Kubernetes v1.33 there's also a
+          <span class="term">native sidecar</span>
+          <span class="term__gloss">an init container with restartPolicy: Always that the scheduler treats as a true, long-running sidecar</span>:
+          it starts before your app and only stops after your app has exited, instead of being torn down alongside it.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a separate microservice.</strong> A microservice has its own lifecycle and scales on its own. A sidecar is glued to its parent — same lifecycle, same scaling.</li>
+              <li><strong>Not an init container (the plain kind).</strong> A plain init container runs once and exits before the main container starts; a sidecar runs for the whole life of the Pod.</li>
+              <li><strong>Not the ambassador pattern.</strong> Ambassadors specifically proxy outbound calls. Sidecar is the umbrella term and covers more than just proxying.</li>
+              <li><strong>Not the adapter pattern.</strong> Adapters normalize the main container's output for external consumers — again, narrower than sidecar.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You want consistent mTLS, retries, and traffic shaping across many services without touching any of their code (mesh proxies like Envoy).</li>
+              <li>You want to ship logs or metrics without bloating the app image (Fluent Bit, Promtail, OpenTelemetry Collector).</li>
+              <li>You need short-lived secrets pulled and rotated at runtime, not baked into the image (Vault Agent, cloud secret managers).</li>
+              <li>You want to add features to a legacy app you cannot or will not rewrite.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Your workload is a single small service — a library import is simpler than another container.</li>
+              <li>Resource overhead matters more than uniformity. Each sidecar adds CPU, memory, and a network hop.</li>
+              <li>The "cross-cutting" concern is actually domain logic. Business rules belong in the app, not the sidecar.</li>
+              <li>You're on serverless functions where you don't control the runtime — you literally cannot attach one.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Pod</dt><dd>Kubernetes' smallest deployable unit — a group of containers that share network and storage.</dd></div>
+          <div><dt>Service mesh</dt><dd>A layer that handles service-to-service networking, usually built on sidecar proxies.</dd></div>
+          <div><dt>Envoy</dt><dd>The most common proxy used as a service-mesh sidecar.</dd></div>
+          <div><dt>mTLS</dt><dd>Mutual TLS — both sides of a connection authenticate with certificates.</dd></div>
+          <div><dt>Init container</dt><dd>A container that runs to completion before the main container starts. Not a sidecar by itself.</dd></div>
+          <div><dt>Native sidecar</dt><dd>Kubernetes v1.33+ feature — an init container with <code>restartPolicy: Always</code> that the scheduler treats as a true sidecar.</dd></div>
+          <div><dt>Injection</dt><dd>The mesh control plane automatically adding a sidecar to every Pod via an admission webhook.</dd></div>
+          <div><dt>Cross-cutting concern</dt><dd>A capability (logging, auth, tracing) needed everywhere but owned by nobody in particular.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

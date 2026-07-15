@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connection Pooling · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Connection Pooling</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Connection Pooling</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/connection-pooling/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Connection Pooling</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Opening a database connection is expensive. Connection pooling opens a handful of connections up front, hands them out to callers, and puts them back on the shelf when done — instead of opening and closing one for every single request.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>A TCP handshake, a TLS handshake, a login, and session setup add up to 20–100ms of pure overhead before a query even runs. If a web app opened a fresh connection per request, most of the request budget would go to saying hello. A pool opens N connections once, then lets callers <span class="term">acquire</span><span class="term__gloss">borrow a connection from the pool — also called "checkout"</span> one, use it, and <span class="term">release</span><span class="term__gloss">return it to the pool when done — also called "checkin"</span> it. Faster responses, and a database that stops sweating under load.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a busy hotel with one concierge desk on the top floor. Every guest needs the concierge, but the concierge has to walk down each time — slow, and the elevator gets clogged.</p>
+
+        <p>The fix: hire ten concierges, station them permanently in the lobby, and hand guests a numbered ticket. A guest walks up, grabs whichever concierge is free, gets an answer, and hands the concierge back for the next guest. If all ten are busy, the guest waits in a short line. At 3am when traffic dies down, most concierges just stand by, ready.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 260" role="img" aria-labelledby="hotelTitle hotelDesc" width="560" style="max-width:100%">
+            <title id="hotelTitle">The hotel-lobby mental model</title>
+            <desc id="hotelDesc">A lobby holds a fixed number of concierges. Guests with numbered tickets take any free concierge, get help, and release them back to the lobby; extra guests wait in a short line.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="16" y="24" fill="var(--text-muted)">Lobby = the pool (5 concierges on duty)</text>
+              <rect x="16" y="36" width="528" height="90" rx="10" fill="none" stroke="var(--border)"/>
+              <!-- 5 concierges: 3 busy (accent), 2 free (border only) -->
+              <g>
+                <circle cx="60"  cy="81" r="26" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="60"  y="86" fill="var(--accent)" text-anchor="middle">busy</text>
+                <circle cx="150" cy="81" r="26" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="150" y="86" fill="var(--accent)" text-anchor="middle">busy</text>
+                <circle cx="240" cy="81" r="26" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="240" y="86" fill="var(--accent)" text-anchor="middle">busy</text>
+                <circle cx="330" cy="81" r="26" fill="none" stroke="var(--border)"/><text x="330" y="86" fill="var(--text-muted)" text-anchor="middle">free</text>
+                <circle cx="420" cy="81" r="26" fill="none" stroke="var(--border)"/><text x="420" y="86" fill="var(--text-muted)" text-anchor="middle">free</text>
+              </g>
+              <text x="500" y="86" fill="var(--text-faint)" font-size="12" text-anchor="middle">×5</text>
+
+              <text x="16" y="150" fill="var(--text-muted)">Guests with numbered tickets (your app's callers)</text>
+              <rect x="16" y="162" width="54" height="34" rx="6" fill="var(--info-soft)" stroke="var(--info)"/><text x="43" y="184" fill="var(--info)" text-anchor="middle" font-size="12">#1</text>
+              <rect x="82" y="162" width="54" height="34" rx="6" fill="var(--info-soft)" stroke="var(--info)"/><text x="109" y="184" fill="var(--info)" text-anchor="middle" font-size="12">#2</text>
+              <rect x="148" y="162" width="54" height="34" rx="6" fill="none" stroke="var(--border)" stroke-dasharray="4 3"/><text x="175" y="184" fill="var(--text-faint)" text-anchor="middle" font-size="12">#3 waits</text>
+
+              <path d="M60 128 L60 160" stroke="var(--border)" fill="none" marker-end="url(#arrowOv)"/>
+              <path d="M150 128 L150 160" stroke="var(--border)" fill="none" marker-end="url(#arrowOv)"/>
+              <defs>
+                <marker id="arrowOv" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M0 0 L10 5 L0 10 z" fill="var(--border)"/>
+                </marker>
+              </defs>
+
+              <text x="16" y="230" fill="var(--text-faint)" font-size="12">Free concierge → acquire. All busy → wait for a release, or give up after a timeout.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The pool is the lobby. The concierges are open connections. Your app code is the guest with the ticket — the driver hides the ticket dispenser.</figcaption>
+        </figure>
+
+        <p>The interesting knobs fall straight out of the analogy: how many concierges to keep on duty, how long a guest waits before giving up, and whether a concierge who dozed off gets checked before being handed to the next guest.</p>
+
+        <p>Two ideas will matter later. A <span class="term">connection leak</span><span class="term__gloss">code that acquires a connection and never releases it — the classic pool-killer bug</span> is a guest who walks off with the concierge and never sends them back. And code that can't keep its own lobby staffed — a serverless function, for instance — leans on an <span class="term" data-gloss="a separate process, like PgBouncer or RDS Proxy, that pools connections on behalf of many small apps">external pooler</span> to do the hiring for it.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a cache.</strong> Caches store query <em>results</em>. Pools store the <em>pipes</em> you send queries through.</li>
+              <li><strong>Not a load balancer.</strong> A pool sits inside one app talking to one database (or one cluster endpoint). It doesn't decide which database to hit.</li>
+              <li><strong>Not HTTP keep-alive</strong> — though it's the cousin. Keep-alive reuses a TCP connection for HTTP; a connection pool reuses a full, authenticated database session.</li>
+              <li><strong>Not free.</strong> A pool is state. Misconfigured, it becomes the bottleneck it was meant to fix.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Any web service or API talks to a relational database under real traffic.</li>
+              <li>Long-running workers fire many small queries — a fresh connection per query would dominate cost.</li>
+              <li>Serverless functions sit behind a pooler like PgBouncer or RDS Proxy, since the functions can't hold a pool themselves.</li>
+              <li>"Open connection" shows up hot in a flamegraph of any client library.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>A one-shot CLI script runs one query and exits — open, query, close, done.</li>
+              <li>Traffic is extremely low, and a single connection covers everything.</li>
+              <li>Each caller genuinely needs isolated session state (temp tables, session variables) and can't tolerate a reused connection — unless the pool explicitly resets sessions.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Pool</dt><dd>The collection of reusable connections.</dd></div>
+          <div><dt>Min / max pool size</dt><dd>The floor and ceiling on how many connections stay open.</dd></div>
+          <div><dt>Acquire (checkout)</dt><dd>Borrowing a connection from the pool.</dd></div>
+          <div><dt>Release (checkin)</dt><dd>Returning it when done.</dd></div>
+          <div><dt>Connection lifetime</dt><dd>How long a connection may live before it's retired.</dd></div>
+          <div><dt>Idle timeout</dt><dd>How long an unused connection sits before the pool closes it.</dd></div>
+          <div><dt>Acquire timeout</dt><dd>How long a caller waits for a free connection before failing.</dd></div>
+          <div><dt>Validation / liveness check</dt><dd>A ping (e.g. <code>SELECT 1</code>) that confirms a connection is still alive before it's lent out.</dd></div>
+          <div><dt>External pooler</dt><dd>A separate process (PgBouncer, RDS Proxy) that pools on behalf of many apps.</dd></div>
+          <div><dt>Connection leak</dt><dd>Code that acquires a connection but never releases it — the classic pool-killer bug.</dd></div>
+        </dl>
+
+        <!-- WHAT'S NEXT -->
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

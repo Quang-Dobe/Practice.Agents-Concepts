@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Service Worker · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Service Worker</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Service Worker</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/service-worker/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Service Worker</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A Service Worker is a small script the browser runs in the background, separate from any tab, that watches every network request your page makes and decides how to answer it.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>You register it once. After that it sits between your page and the network: it can serve a request from a cache, change it, or just let it pass through untouched. That one power is what makes web apps feel "app-like" — instant loads, working offline, push notifications, and background sync — without shipping a native app. It is the official, standards-track way to control the network layer in the browser.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture every request your page makes — an image, a script, a JSON call — as a letter dropped in a mailbox. Without a Service Worker the letter goes straight to the network. With one installed, you have a personal mail clerk who reads the address first and picks one of three answers:</p>
+        <ul>
+          <li>"I already have a copy in the filing cabinet — here you go." (cache hit)</li>
+          <li>"Let me run to the post office and bring back the reply." (network pass-through)</li>
+          <li>"The post office is closed today; here is last week's copy with a note." (offline fallback)</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[Page sends a request] --> B{Service Worker reads the address}
+    B -- have a copy --> C[Answer from cache]
+    B -- no copy --> D[Go fetch from the network]
+    B -- network is down --> E[Hand back a stored fallback]
+          </pre>
+          <figcaption class="diagram__caption">The clerk's three answers, drawn once so the words above are easy to picture.</figcaption>
+        </figure>
+
+        <p>The clerk only ever looks at the envelope. It cannot read what is inside your house — no DOM, no <code>window</code>, no <code>document</code> — and it never blocks the page while it works. Its authority is limited to the
+          <span class="term">scope</span>
+          <span class="term__gloss">the URL prefix the worker is allowed to answer requests for</span>:
+          a worker registered at the site root can see every request; one tucked into a subfolder only sees requests under that subfolder.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a <span class="term" data-gloss="a background thread that belongs to one page and offloads CPU work">Web Worker</span>.</strong> A Web Worker also runs off the main thread, but it belongs to a single page and exists to offload CPU work. A Service Worker outlives any page and exists to intercept network traffic.</li>
+              <li><strong>Not the Cache API.</strong> The Cache API is a key/value store of request/response pairs. Service Workers use it heavily, but the cache works fine without a Service Worker, and a worker can ignore the cache entirely.</li>
+              <li><strong>Not Application Cache (AppCache).</strong> AppCache was the previous attempt at offline web. It is deprecated and removed. Service Workers replaced it.</li>
+              <li><strong>Not a server.</strong> It runs on the user's own device, inside their browser, scoped to one origin.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You want the app to open and render something useful with no network connection.</li>
+              <li>You need fine-grained caching that HTTP cache headers can't express — stale-while-revalidate, cache-first for shells, network-first for APIs.</li>
+              <li>You need to receive push notifications when the site isn't open.</li>
+              <li>You want background sync — retrying a failed <code>POST</code> once the user is back online.</li>
+              <li>You are building a Progressive Web App and need an installable, offline-capable shell.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The site is a single static landing page with no offline needs — HTTP caching is enough.</li>
+              <li>You need to touch the DOM in the background. Workers can't; use a Web Worker plus <code>postMessage</code> instead.</li>
+              <li>You have no HTTPS and can't get a certificate. Workers only run over HTTPS, except on <code>localhost</code> for development.</li>
+              <li>You need synchronous access to page state. The worker is event-driven and decoupled by design.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Registration</dt><dd>The one-time call from a page — <code>navigator.serviceWorker.register('/sw.js')</code> — that tells the browser to install this script.</dd></div>
+          <div><dt>Scope</dt><dd>The URL prefix the worker controls. A worker at <code>/sw.js</code> controls everything under <code>/</code>; one at <code>/app/sw.js</code> controls only <code>/app/</code>.</dd></div>
+          <div><dt>Lifecycle states</dt><dd><code>parsed</code>, <code>installing</code>, <code>installed</code> (waiting), <code>activating</code>, <code>activated</code>, <code>redundant</code>.</dd></div>
+          <div><dt>install event</dt><dd>Fires once per worker version; the place to pre-populate caches.</dd></div>
+          <div><dt>activate event</dt><dd>Fires when this worker is about to take control; the place to clean up old caches.</dd></div>
+          <div><dt>fetch event</dt><dd>Fires for every network request inside scope; where the "mail clerk" makes its decision.</dd></div>
+          <div><dt>Controlled client</dt><dd>A page (tab, iframe) currently governed by an active worker.</dd></div>
+          <div><dt>Cache API</dt><dd>The <code>caches</code> global — a request/response key-value store the worker reads and writes.</dd></div>
+          <div><dt>skipWaiting / clients.claim</dt><dd>Opt-in calls that let a new worker take over immediately instead of waiting for every tab to close.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MVCC · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">MVCC</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">MVCC</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/mvcc/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">MVCC</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical SaaS backend, MVCC is the invisible substrate every ORM call relies on — and the first thing you blame when the database gets slow at 3am. You meet it for real the day a long-running cron job pins the visibility horizon and a table balloons over a weekend, or the day a payment service double-charges a customer because two requests both passed a balance check under snapshot isolation. The recurring theme: MVCC is forgiving until someone holds a transaction open too long, assumes snapshot isolation is serializable, or fights the garbage collector.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS backend</div><p>A forgotten open transaction pins the horizon; autovacuum stalls; a 200 GB table balloons to 600 GB over a weekend.</p></div>
+          <div class="card"><div class="card__title">Payments</div><p>Two requests both pass a balance check under snapshot isolation and commit independently — a double charge.</p></div>
+          <div class="card"><div class="card__title">Analytics-heavy product</div><p>A 40-minute report runs against the live OLTP primary without locking out writers — and your DBA still tells you not to.</p></div>
+          <div class="card"><div class="card__title">Distributed SQL</div><p>CockroachDB, Spanner, and YugabyteDB extend MVCC over Hybrid Logical Clock timestamps so cross-region snapshot reads are reasoned about at all.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Default to READ COMMITTED, escalate per query</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run ordinary OLTP traffic at <code>READ COMMITTED</code>. Reach for <code>REPEATABLE READ</code> only when one transaction makes several reads that must agree. Reach for <code>SERIALIZABLE</code> only for money-moving or invariant-protecting work where write skew would corrupt state.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Higher isolation levels pin snapshots longer and raise the serialization-failure rate. Paying that cost on every read wastes it; skipping it on the 1% that needs it is a bug.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Setting <code>SERIALIZABLE</code> globally "to be safe." You get <code>40001</code> storms under contention and no one knows how to retry.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Keep transactions short — milliseconds, not minutes</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Open the transaction as late as possible and commit as soon as the last write lands. Move validation, I/O, and external calls outside the begin/commit block. Target p99 transaction duration under 100ms for OLTP.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every live transaction pins the global visibility horizon. One forgotten transaction from 10 minutes ago tells the database "any dead row newer than that might still be needed" — VACUUM gives up and bloat accumulates.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Wrapping an HTTP call to a payment provider inside a database transaction. You've handed the database a multi-second pin per request.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Never hold a transaction across user think-time or external I/O</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Read data, close the transaction, let the user think, then start a <em>new</em> transaction with <code>SELECT ... FOR UPDATE</code> or an optimistic version check when they submit.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>This is the #1 cause of the
+              <span class="term">idle in transaction</span>
+              <span class="term__gloss">a connection that returned results to the app but was never told to commit or roll back — its snapshot is still pinned</span>
+              pathology. In a 200-connection pool, a handful of stalled ones can stall vacuum across the whole cluster.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>ORM patterns that auto-open a transaction on first query and leave it open until end of request. Make transaction scope explicit.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Configure <code>idle_in_transaction_session_timeout</code> aggressively</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>On Postgres, set <code>idle_in_transaction_session_timeout = '60s'</code> for service accounts, lower for interactive logins. Pair it with <code>statement_timeout</code> and a pool-side idle timeout.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>This is your seatbelt against a bug in application code or a wedged client. The session is killed, the snapshot releases, vacuum proceeds. The request fails loud instead of quietly rotting the database.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving it at the default of disabled in production — flagged by multiple cloud vendors as the single most effective Postgres tuning knob for OLTP.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Use <code>SELECT ... FOR UPDATE</code> for read-modify-write on one row</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>When the logic is "read a row, decide, then update it," use <code>SELECT ... FOR UPDATE</code> inside the transaction. Use <code>FOR UPDATE SKIP LOCKED</code> for queue-style workers grabbing the next job.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Plain snapshot isolation lets two transactions both read the same balance, both decide it's sufficient, both deduct, both commit. <code>FOR UPDATE</code> opts that one row into pessimistic locking instead.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Reaching for <code>SERIALIZABLE</code> when one well-placed <code>FOR UPDATE</code> would do. Row locks are cheap and predictable; SSI's false-positive aborts are not.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Prefer upsert over check-then-insert</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>INSERT ... ON CONFLICT (key) DO UPDATE</code> in Postgres, <code>INSERT ... ON DUPLICATE KEY UPDATE</code> in MySQL, or <code>MERGE</code> where supported — one statement, no gap.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>"Does the row exist? No? Insert it." is two statements with a snapshot gap between them. Under snapshot isolation, two concurrent sessions can both pass the existence check and both try to insert — a race.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>if not exists: insert()</code> in application code. It's a bug under every isolation level except true serializable.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Treat serialization failures as a first-class control-flow case</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Wrap any <code>SERIALIZABLE</code> (and ideally <code>REPEATABLE READ</code>) transaction in a bounded retry loop with backoff. Postgres SQLSTATE <code>40001</code> and <code>40P01</code> (deadlock) are expected outcomes, not bugs.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>SSI achieves serializability by aborting one transaction in any dangerous structure. If the app doesn't retry, the user sees an error for what is actually normal protocol behaviour.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Logging <code>40001</code> as an error and paging on-call. It's informational at low rates — alarm on the <em>rate</em>, not the event.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Chunk bulk updates into bounded batches</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For an update touching millions of rows, loop over 5,000–50,000 rows per transaction with a stable key window (<code>WHERE id BETWEEN ? AND ?</code>), committing between batches.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>One transaction updating 100M rows writes 100M new versions, marks 100M dead, and holds a horizon pin for hours — doubling table size and blocking vacuum the whole time.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"It's a one-time migration, who cares" — that one-time migration is what pages you at 3am.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Don't UPDATE columns that didn't change</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Omit unchanged columns from the <code>UPDATE</code> set list, or check dirty-tracking in your ORM.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Postgres's HOT optimisation skips index updates only if no indexed column changed and the new row fits the same page. Rewriting every column defeats it and forces a full secondary-index update per row.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"Update the whole row, it's simpler" — simple to write, expensive to vacuum.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Leave autovacuum on, but tune it per table</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Lower <code>autovacuum_vacuum_scale_factor</code> from the 0.2 default to 0.05 or 0.02 on hot tables. Raise <code>autovacuum_vacuum_cost_limit</code> from the 200 default to 1000+ on SSD-backed systems.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>20% dead is fine for a 1M-row table (a minute of vacuum) and catastrophic for a 1B-row table (an hour of churn). Vacuum isn't the enemy — <em>late</em> vacuum is.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Disabling autovacuum "to save I/O during business hours." You pay double at 2am when the anti-wraparound vacuum kicks in and can't be cancelled.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Route long analytical queries off the OLTP primary</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Send 30-second-plus reporting queries to a read replica, a logical-decoding subscriber, or a separate analytics store. Reserve the primary for sub-second OLTP.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A long query on the primary pins the horizon just like a long write does — vacuum can't reclaim anything newer than that query's snapshot.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Running BI dashboards against the OLTP primary "because it's the freshest data" — right up until it's also the most bloated.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Know your write-skew shapes</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Before shipping a multi-row invariant (on-call rotations, ledger debit/credit, inventory across SKUs), ask: could two concurrent transactions each read the rule as satisfied and each act on a <em>different</em> row? If yes, use <code>SERIALIZABLE</code> with retry, or put the invariant on one row and lock it with <code>FOR UPDATE</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The canonical case: the rule is "at least one doctor on-call." Two doctors each check it, see two on-call, both go off-call, both commit — rule broken. Snapshot isolation can't see the conflict because they touched <em>different</em> rows.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming snapshot isolation equals serializable. It does not — <code>REPEATABLE READ</code> allows
+              <span class="term">write skew</span>
+              <span class="term__gloss">two concurrent transactions each read a shared rule as true, each change a different row, and both commit — the rule ends up broken</span>;
+              only <code>SERIALIZABLE</code> rejects it.</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM: SI allows write skew, SERIALIZABLE rejects it -->
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant T1 as Txn 1
+    participant T2 as Txn 2
+    participant Tbl as on_call table
+    T1->>Tbl: SELECT count(*) WHERE on_call = true → 2
+    T2->>Tbl: SELECT count(*) WHERE on_call = true → 2
+    T1->>Tbl: UPDATE Dr A SET on_call = false
+    T2->>Tbl: UPDATE Dr B SET on_call = false
+    alt REPEATABLE READ (snapshot isolation)
+        T1->>Tbl: COMMIT
+        T2->>Tbl: COMMIT
+        Note over Tbl: final on-call count = 0 — invariant broken (write skew)
+    else SERIALIZABLE (SSI)
+        T1->>Tbl: COMMIT
+        T2->>Tbl: COMMIT — rejected, SQLSTATE 40001
+        Note over Tbl: final on-call count = 1 — invariant held
+    end
+          </pre>
+          <figcaption class="diagram__caption">Same two transactions, same invariant — REPEATABLE READ lets the conflict through; SERIALIZABLE catches it and forces a retry.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The transactional HTTP call</p>
+            <p>Wrapping an external API request inside begin/commit. The snapshot is pinned for the full network round-trip; under load this stalls vacuum cluster-wide. Pull the I/O out of the transaction.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The "wide" UPDATE</p>
+            <p>One statement updating tens of millions of rows. Postgres bloats the table by roughly 100%; InnoDB's undo tablespace explodes. Chunk it into batches instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The ORM-rewrites-every-column UPDATE</p>
+            <p>Saving an entity rewrites all 30 columns, including the 28 unchanged ones. HOT misses, every secondary index updates per row, bloat scales with column count.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Disabling autovacuum</p>
+            <p>Done "because vacuum was causing I/O spikes." The I/O is the cost of correctness, paid daily instead of in one emergency. Tune cost limits up and scale factor down instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Catching and swallowing <code>40001</code></p>
+            <p>The app catches the serialization failure, logs it, and returns success to the user. The write never happened. Always retry; only surface a terminal failure.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>SELECT ... FOR UPDATE</code> on too broad a query</p>
+            <p><code>SELECT * FROM orders WHERE status='pending' FOR UPDATE</code> in a queue worker locks every pending row at once, serialising every worker. Use <code>LIMIT 1 ... FOR UPDATE SKIP LOCKED</code> instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting <code>count(*)</code> on a big table to be fast</p>
+            <p>There is no shortcut — every visible tuple must be visited because visibility depends on the caller's snapshot. Cache the count, or maintain a running counter.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Long-running <code>pg_dump</code> on the primary</p>
+            <p>It opens a <code>REPEATABLE READ</code> transaction for its full duration. On a high-churn 500 GB database that's hours of pinned horizon. Dump from a replica.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Payments ledger (fintech, ~2k TPS)</div>
+            <p>One row per account balance. Debits use <code>SELECT ... FOR UPDATE</code> on the contested row, then update and insert a ledger entry. SSI was tried; the false-positive abort rate at peak made p99 latency unpredictable. <em>Lesson:</em> SSI is cleaner in theory, but <code>FOR UPDATE</code> on the contested row is more operable.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multi-tenant SaaS CRM (~500 RPS, Postgres)</div>
+            <p>An 80M-row <code>customers</code> table had <code>last_seen_at</code> in an index, so HOT never fired and bloat hit 3x weekly. Dropping the index let HOT kick in; bloat stabilised under 20%. <em>Lesson:</em> every index on a hot-updated column taxes MVCC garbage collection.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Job queue on Postgres</div>
+            <p>20 workers pull from a jobs table with <code>SELECT id ... ORDER BY priority LIMIT 1 FOR UPDATE SKIP LOCKED</code>. Every worker gets a different job, no contention, no polling storm. <em>Lesson:</em> <code>SKIP LOCKED</code> turns a hard distributed-systems problem into one line of SQL.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Analytics-on-OLTP gone wrong (InnoDB)</div>
+            <p>A nightly 4-hour <code>REPEATABLE READ</code> join against the production primary grew the history list length from ~10k to over 50M; the undo tablespace hit 400 GB and replica lag spiked. <em>Lesson:</em> monitor history list length; treat sustained growth as a page-worthy incident.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Long transactions:</strong> alert on any Postgres session <code>idle in transaction</code> for over 5 minutes; page past 30 minutes.</li>
+              <li><strong>Horizon age:</strong> monitor the oldest live snapshot's age; alert above 50M, page above 200M.</li>
+              <li><strong>Bloat:</strong> chart dead-tuple percent weekly on your top-20 hottest tables.</li>
+              <li><strong>Replication slots:</strong> alert on any inactive logical slot older than an hour — it pins the horizon too.</li>
+              <li><strong>InnoDB history list length:</strong>
+                <span class="term" data-gloss="the depth of un-purged undo records — the classic sign of a stuck long transaction when it climbs">history list length</span>
+                — warn at 100k sustained, page at 1M.</li>
+              <li><strong>Serialization-failure rate:</strong> a baseline of a few <code>40001</code>s per minute is fine; a spike to thousands means a hot predicate has become contended.</li>
+              <li><strong>Deadlocks:</strong> should sit near zero in a healthy system.</li>
+              <li><strong><code>idle_in_transaction_session_timeout</code>:</strong> set on every instance, including dev and staging?</li>
+              <li><strong>Retry wrappers:</strong> does every <code>SERIALIZABLE</code> transaction sit in a retry loop?</li>
+              <li><strong>Anti-wraparound headroom (Postgres):</strong> frozen-XID age should sit well under 200M — alert at 1B, page at 1.5B.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Year one.</span> No one thinks about MVCC. The default isolation level works, the database is small, autovacuum keeps up.</li>
+          <li><span class="steps__title">Year two.</span> Tables hit ~100M rows. A 10M-row backfill in one transaction doubles the table's size overnight. The team learns about VACUUM, sets <code>idle_in_transaction_session_timeout</code>, and misdiagnoses the first <code>40001</code> as a database bug.</li>
+          <li><span class="steps__title">Year three-plus.</span> A write-skew bug ships and reaches a customer report. The postmortem reveals snapshot isolation is not serializable. The team adds <code>SELECT FOR UPDATE</code> in critical paths, retry wrappers around serializable transactions, per-table autovacuum tuning, and a replica for analytics.</li>
+          <li><span class="steps__title">The painful migration.</span> Moving from "one big OLTP database" to "OLTP + replica + analytics store." Every long query that was tolerable on the primary now needs an explicit decision about where it runs.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.postgresql.org/docs/current/routine-vacuuming.html" rel="noopener">PostgreSQL Documentation — Routine Vacuuming</a> — the canonical reference on freezing, anti-wraparound, and autovacuum knobs.</li>
+          <li><a href="https://www.cybertec-postgresql.com/en/idle_in_transaction_session_timeout-terminating-idle-transactions-in-postgresql/" rel="noopener">Cybertec — <code>idle_in_transaction_session_timeout</code> in PostgreSQL</a> — short and opinionated on exactly the failure mode the parameter prevents.</li>
+          <li><a href="https://www.percona.com/blog/2014/10/17/innodb-transaction-history-often-hides-dangerous-debt/" rel="noopener">Percona — InnoDB transaction history often hides dangerous debt</a> — the reference post on history list length.</li>
+          <li><a href="https://use-the-index-luke.com/blog/2014-09/modern-sql-beyond-relational#mvcc" rel="noopener">Markus Winand — Serializable vs. Snapshot Isolation Level</a> — a clear plain-English explanation of write skew and why SSI exists.</li>
+          <li><a href="https://blog.jcole.us/2014/04/16/the-basics-of-the-innodb-undo-logging-and-history-system/" rel="noopener">Jeremy Cole — The basics of InnoDB undo logging and history system</a> — the mental model you need if you operate MySQL.</li>
+          <li><a href="https://aws.amazon.com/blogs/database/achieve-a-high-speed-innodb-purge-on-amazon-rds-for-mysql-and-amazon-aurora-mysql/" rel="noopener">AWS — Achieve high-speed InnoDB purge on RDS/Aurora MySQL</a> — practical tuning for purge threads at scale.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/mvcc/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

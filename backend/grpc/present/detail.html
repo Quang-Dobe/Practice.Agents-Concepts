@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gRPC · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">gRPC</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">gRPC</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/grpc/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">gRPC</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>gRPC is an open-source RPC framework: it defines services and messages in Protocol Buffers, serializes them into a compact binary format, and sends them as length-prefixed messages inside HTTP/2 frames over one multiplexed connection. The call's final status arrives out of band, as HTTP/2 trailers.</p>
+        <ul>
+          <li><strong>Core idea.</strong> Agree on the contract once, generate the plumbing in every language you need.</li>
+          <li><strong>Four call shapes.</strong> Unary, server-streaming, client-streaming, bidirectional-streaming — each is just one HTTP/2 stream used a different way.</li>
+          <li><strong>Family.</strong> Schema-first RPC, alongside Apache Thrift and Cap'n Proto (and, historically, CORBA and DCE/RPC) — a different family from REST/OpenAPI or GraphQL.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Protocol Buffers (proto3 / editions)</dt><dd>The interface-definition language and binary format. Source of truth for messages, services, and field numbering.</dd></div>
+          <div><dt><code>protoc</code> + language plugins</dt><dd>The compiler that turns <code>.proto</code> files into generated stubs (client) and base classes (server) in 11+ languages.</dd></div>
+          <div><dt>HTTP/2 transport</dt><dd>Provides streams, frame multiplexing, header compression (HPACK), and trailers.</dd></div>
+          <div><dt>Length-prefixed framing</dt><dd>Each message inside a <code>DATA</code> frame is prefixed with a 5-byte header: 1 byte compression flag, 4 bytes big-endian length.</dd></div>
+          <div><dt>Channel</dt><dd>A long-lived, load-balanced abstraction over one or more HTTP/2 connections. Stubs are stateless wrappers around a channel.</dd></div>
+          <div><dt>Metadata</dt><dd>Key-value pairs carried in HTTP/2 header frames — the gRPC equivalent of HTTP headers.</dd></div>
+          <div><dt>Status model</dt><dd>17 canonical codes carried as a <code>grpc-status</code> trailer, plus optional rich detail.</dd></div>
+          <div><dt>Interceptors</dt><dd>Middleware that wraps unary or streaming calls on either side for auth, logging, tracing.</dd></div>
+        </dl>
+        <p>Compared with Thrift, gRPC fixes one transport (HTTP/2) and one serialization (Protobuf) instead of a pluggable matrix — less flexible, more interoperable. Compared with GraphQL, gRPC is method-oriented and fixed-shape: a client cannot ask for "only these fields."</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>gRPC sits at the application layer (L7). It replaces or sits alongside JSON-over-HTTP between services — it does <em>not</em> replace a message bus (Kafka, NATS), a service mesh (Envoy, Linkerd — which often carries gRPC traffic), or a database's own wire protocol.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App["Your application code"] --> RPC["gRPC — application layer (L7)"]
+    RPC --> Mesh["Service mesh sidecar (Envoy, Linkerd) — often carries gRPC frames"]
+    RPC -.->|"not replaced"| Bus[("Message bus — Kafka, NATS")]
+    RPC -.->|"not replaced"| DB[("Database wire protocol")]
+          </pre>
+          <figcaption class="diagram__caption">gRPC is the application-layer contract, not a substitute for the bus or the database's own protocol.</figcaption>
+        </figure>
+
+        <h3>Where you'll run into it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Kubernetes internals</div><p>The <code>kubelet</code> talks to the container runtime (CRI) over gRPC; CSI and CNI plugins are gRPC servers too.</p></div>
+          <div class="card"><div class="card__title">etcd</div><p>Its client protocol is gRPC.</p></div>
+          <div class="card"><div class="card__title">Envoy xDS</div><p>Control-plane configuration is streamed to sidecars over gRPC.</p></div>
+          <div class="card"><div class="card__title">ML serving</div><p>TensorFlow Serving and NVIDIA Triton expose model inference as gRPC.</p></div>
+          <div class="card"><div class="card__title">Dapr</div><p>Sidecar-to-app communication.</p></div>
+          <div class="card"><div class="card__title">Cloud APIs</div><p>Google Cloud APIs and many internal AWS services use gRPC on the wire; REST is often a generated facade on top.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Schema management:</strong> <code>protoc</code>, and <code>buf</code> for linting and breaking-change detection.</li>
+          <li><strong>.NET runtime:</strong> <code>Grpc.AspNetCore</code> (server) and <code>Grpc.Net.Client</code> (client), built on Kestrel and <code>HttpClient</code>.</li>
+          <li><strong>Other runtimes:</strong> <code>grpc-go</code>, <code>grpc-java</code>, <code>grpc-python</code>, and a shared C-core used by C++, Ruby, PHP, Python, Objective-C.</li>
+          <li><strong>Browsers:</strong> gRPC-Web plus a proxy (Envoy), or Connect-RPC as a wire-compatible alternative.</li>
+          <li><strong>Debugging:</strong> <code>grpcurl</code>, <code>grpcui</code>, Postman, Kreya, BloomRPC — all rely on <span class="term" data-gloss="a gRPC service that lets a client ask a server what methods and messages it exposes, without a local .proto file">server reflection</span>.</li>
+          <li><strong>REST bridging:</strong> <code>grpc-gateway</code> (Go), Envoy transcoding, ASP.NET's JSON transcoding.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Both ends are services you own and can regenerate clients for.</li>
+              <li>A polyglot backend needs one source of truth for contracts.</li>
+              <li>Latency or payload size is a measured cost — mobile, high-QPS internal APIs, large messages.</li>
+              <li>You need streaming (server push, telemetry, live updates) without hand-rolled WebSocket plumbing.</li>
+              <li>Deadlines and cancellation need to propagate across a call graph — hedging, tail-latency control.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The API is consumed by unknown third parties.</li>
+              <li>The primary client is a browser and you can't run a proxy.</li>
+              <li>The team has no discipline for generated code and breaking-change review.</li>
+              <li>The workload is fire-and-forget event distribution — that's a message-bus problem.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Google open-sourced gRPC in <strong>2015</strong> as the public face of <strong>Stubby</strong>, its internal RPC system already used for over a decade. The trigger was HTTP/2 (RFC 7540, May 2015) finally giving the open ecosystem a transport with multiplexing, binary framing, and header compression — exactly what Stubby had relied on internally. Before gRPC, typed cross-service calls meant Thrift (Facebook, 2007), Avro RPC, or hand-rolled JSON over HTTP.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a single unary call end to end:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Compile time.</span> <code>protoc</code> turns <code>rpc Bar(Req) returns (Resp)</code> into a client stub method and a server base class to override.</li>
+          <li><span class="steps__title">Channel setup.</span> The client opens (or reuses) an HTTP/2 connection. TLS is negotiated via ALPN's <code>h2</code> token; cleartext <code>h2c</code> is allowed on trusted networks.</li>
+          <li><span class="steps__title">Stream open.</span> A new client-initiated HTTP/2 stream is allocated. The path is <code>/&lt;package&gt;.&lt;Service&gt;/&lt;Method&gt;</code>.</li>
+          <li><span class="steps__title">Request sent.</span> <code>HEADERS</code> carry method, path, <code>content-type: application/grpc+proto</code>, and a <code>grpc-timeout</code>; <code>DATA</code> carries the length-prefixed Protobuf payload.</li>
+          <li><span class="steps__title">Server dispatch.</span> The server reads the length prefix, decodes the message, and calls the generated handler.</li>
+          <li><span class="steps__title">Response sent.</span> <code>HEADERS</code> (<code>200 OK</code>) then <code>DATA</code> frames carry the encoded response, same framing.</li>
+          <li><span class="steps__title">Trailers.</span> A second <code>HEADERS</code> frame carries <code>grpc-status</code> (0 = OK), optionally <code>grpc-message</code> and rich error details, then <code>END_STREAM</code> closes it.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant Ch as HTTP/2 stream
+    participant S as Server
+    C->>Ch: HEADERS — method, path, grpc-timeout
+    C->>Ch: DATA — length-prefixed Protobuf request
+    Ch->>S: forward headers + data, END_STREAM
+    S->>S: decode, run handler
+    S->>Ch: HEADERS — 200 OK
+    S->>Ch: DATA — encoded response
+    S->>Ch: TRAILERS — grpc-status, grpc-message
+    Ch->>C: response delivered, stream closes
+          </pre>
+          <figcaption class="diagram__caption">One unary RPC, start to finish. Status arrives last, as trailers — after the response body, not instead of it.</figcaption>
+        </figure>
+
+        <p>The four call shapes differ only in which side keeps the stream open:</p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Shape</th><th scope="col">Client DATA frames</th><th scope="col">Server DATA frames</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Unary</td><td>1</td><td>1</td></tr>
+              <tr><td>Server-stream</td><td>1</td><td>N (until server closes)</td></tr>
+              <tr><td>Client-stream</td><td>N (until client closes)</td><td>1</td></tr>
+              <tr><td>Bidi-stream</td><td>N</td><td>N (interleaved)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Why the wire format is this compact</h3>
+        <p>Every field is written as a tag — <code>(field_number &lt;&lt; 3) | wire_type</code> — followed by a value, both <span class="term" data-gloss="an integer encoding that packs small numbers into 7-bit groups with a continuation bit, so small values take one byte">varint</span>-encoded where applicable. Signed types use <strong>zig-zag</strong> pre-encoding so small negatives stay small — without it, <code>-1</code> would always take 10 bytes. Fields left at their default value are <strong>never transmitted</strong>; the receiver fills the default in. There are no field names on the wire, only numbers — which is why renaming a field is free and reusing its number is dangerous.</p>
+
+        <p>Concretely, <code>Person { string name = 1; int32 age = 2; }</code> with <code>name="Al", age=30</code> is 7 bytes:</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 580 205" role="img" aria-labelledby="wireTitle wireDesc" width="580" style="max-width:100%">
+            <title id="wireTitle">Protobuf wire encoding of one message</title>
+            <desc id="wireDesc">Six bytes encode a Person message with name Al and age 30: a tag and length byte plus two content bytes for the name field, then a tag byte and a value byte for the age field.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="25" y="24" fill="var(--text-muted)">6 bytes on the wire (tag 1 = length-delimited string, tag 2 = varint)</text>
+
+              <!-- name field group: bytes 1-4 -->
+              <line x1="25" y1="40" x2="385" y2="40" stroke="var(--accent)"/>
+              <text x="25" y="36" fill="var(--accent)" font-size="12">name (field 1)</text>
+
+              <rect x="25"  y="48" width="80" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="65"  y="79" fill="var(--accent)" text-anchor="middle" font-family="var(--font-mono)" font-size="16">0a</text>
+
+              <rect x="115" y="48" width="80" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="155" y="79" fill="var(--accent)" text-anchor="middle" font-family="var(--font-mono)" font-size="16">02</text>
+
+              <rect x="205" y="48" width="80" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="245" y="79" fill="var(--accent)" text-anchor="middle" font-family="var(--font-mono)" font-size="16">41</text>
+
+              <rect x="295" y="48" width="80" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="335" y="79" fill="var(--accent)" text-anchor="middle" font-family="var(--font-mono)" font-size="16">6c</text>
+
+              <text x="65"  y="115" fill="var(--text-faint)" text-anchor="middle" font-size="11">tag: field 1,</text>
+              <text x="65"  y="128" fill="var(--text-faint)" text-anchor="middle" font-size="11">length-delimited</text>
+              <text x="155" y="115" fill="var(--text-faint)" text-anchor="middle" font-size="11">length = 2</text>
+              <text x="245" y="115" fill="var(--text-faint)" text-anchor="middle" font-size="11">'A'</text>
+              <text x="335" y="115" fill="var(--text-faint)" text-anchor="middle" font-size="11">'l'</text>
+
+              <!-- age field group: bytes 5-6 -->
+              <line x1="395" y1="40" x2="555" y2="40" stroke="var(--info)"/>
+              <text x="395" y="36" fill="var(--info)" font-size="12">age (field 2)</text>
+
+              <rect x="395" y="48" width="80" height="50" rx="6" fill="none" stroke="var(--info)"/>
+              <text x="435" y="79" fill="var(--info)" text-anchor="middle" font-family="var(--font-mono)" font-size="16">10</text>
+
+              <rect x="475" y="48" width="80" height="50" rx="6" fill="none" stroke="var(--info)"/>
+              <text x="515" y="79" fill="var(--info)" text-anchor="middle" font-family="var(--font-mono)" font-size="16">1e</text>
+
+              <text x="435" y="115" fill="var(--text-faint)" text-anchor="middle" font-size="11">tag: field 2,</text>
+              <text x="435" y="128" fill="var(--text-faint)" text-anchor="middle" font-size="11">varint</text>
+              <text x="515" y="115" fill="var(--text-faint)" text-anchor="middle" font-size="11">30 (age)</text>
+
+              <text x="25" y="158" fill="var(--text)" font-size="13">No field names travel on the wire — only numbers.</text>
+              <text x="25" y="178" fill="var(--text)" font-size="13">Renaming "name" is free; reusing tag 1 later is not.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Field numbers, not names, carry identity on the wire — the whole reason renaming is safe and renumbering is not.</figcaption>
+        </figure>
+
+        <p><strong>Deadlines</strong> travel as the <code>grpc-timeout</code> header (e.g. <code>1500m</code> for 1500 ms). They are absolute from the caller's view: when a service receives an inbound RPC, it computes the remaining time and uses it as the default deadline for any outbound RPC made inside that handler. A downstream service can shorten a deadline; it cannot extend it. When time runs out, both sides see <code>DEADLINE_EXCEEDED</code> and in-flight work tied to that call is cancelled.</p>
+
+        <p><strong>Metadata</strong> is just HTTP/2 headers in two buckets: initial (sent with the first <code>HEADERS</code> frame) and trailing (sent with the trailers). Binary values need a <code>-bin</code> key suffix and travel base64-encoded. Auth tokens, trace context (<code>traceparent</code>), and tenant IDs are the usual passengers.</p>
+
+        <p><strong>Interceptors</strong> are typed middleware: given the inbound call and a <code>next</code> continuation, do work before, call <code>next</code>, do work after. Unary and streaming interceptors are separate types in most implementations, because the streaming form has to observe each message individually.</p>
+
+        <p><strong>Status</strong> travels as a <code>grpc-status</code> trailer, one of 17 canonical codes:</p>
+        <p><code>0</code> OK · <code>1</code> CANCELLED · <code>2</code> UNKNOWN · <code>3</code> INVALID_ARGUMENT · <code>4</code> DEADLINE_EXCEEDED · <code>5</code> NOT_FOUND · <code>6</code> ALREADY_EXISTS · <code>7</code> PERMISSION_DENIED · <code>8</code> RESOURCE_EXHAUSTED · <code>9</code> FAILED_PRECONDITION · <code>10</code> ABORTED · <code>11</code> OUT_OF_RANGE · <code>12</code> UNIMPLEMENTED · <code>13</code> INTERNAL · <code>14</code> UNAVAILABLE · <code>15</code> DATA_LOSS · <code>16</code> UNAUTHENTICATED</p>
+        <p>For richer detail, a server can pack a <code>google.rpc.Status { code, message, repeated Any details }</code> into <code>grpc-status-details-bin</code> — standard detail types include <code>BadRequest</code>, <code>RetryInfo</code>, <code>QuotaFailure</code>, <code>PreconditionFailure</code>, <code>ErrorInfo</code>, <code>DebugInfo</code>, <code>Help</code>, <code>LocalizedMessage</code>.</p>
+
+        <p><strong>Server reflection</strong> is itself a gRPC service: a bidi-streaming method that lets a client ask "what services do you expose?" and fetch the descriptors over the wire. It's how <code>grpcurl</code> can call a server with no <code>.proto</code> file on disk.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gained</th><th scope="col">Given up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Protobuf binary over JSON</td><td>Smaller payloads (often 30–50%), faster parse, schema enforcement</td><td>Not human-readable; needs tooling to inspect</td></tr>
+              <tr><td>HTTP/2 single connection</td><td>Multiplexing, fewer TCP handshakes, header compression</td><td>TCP-level head-of-line blocking still applies; one bad connection stalls all streams</td></tr>
+              <tr><td>Code generation</td><td>Strong typing, IDE autocomplete, fewer integration bugs</td><td>Build-system complexity, generated diffs in PRs, uneven plugin maturity</td></tr>
+              <tr><td>Field numbers as identity</td><td>Cheap field rename, forward/backward compatibility by construction</td><td>Accidental number reuse is a silent data-corruption bug</td></tr>
+              <tr><td>Status as trailers</td><td>Status can reflect events discovered mid-response</td><td>Some HTTP/2 proxies and L7 load balancers handle trailers poorly</td></tr>
+              <tr><td>Streaming as first-class</td><td>No WebSocket upgrade dance; backpressure via flow control</td><td>Streams hold server resources; lifecycle is harder than request/response</td></tr>
+              <tr><td>Method-oriented contract</td><td>Predictable, typed, refactor-friendly</td><td>Each new query shape needs a new RPC; no field-selection like GraphQL</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Single channel saturation</p>
+            <p>All streams share one TCP connection; hitting <code>MAX_CONCURRENT_STREAMS</code> (often 100) or saturating one L4 hop queues new RPCs. Fix: subchannels, multiple channels, client-side load balancing.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Load balancer mis-routing</p>
+            <p>An L4 load balancer pins a TCP connection to one backend, so it sends 100% of a client's traffic to one pod. gRPC needs an L7-aware LB or client-side load balancing.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Field number reuse</p>
+            <p>Deleting a field and reusing its number in a later schema silently corrupts old data. Mitigation: <code>reserved 4;</code> in the <code>.proto</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Missing trailer handling at a proxy</p>
+            <p>Older proxies or middleboxes that don't forward HTTP/2 trailers make every call look hung, or return <code>UNKNOWN</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">No deadline set</p>
+            <p>A client with no deadline plus a slow server pins server resources indefinitely — threads or goroutines pile up.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>UNAVAILABLE</code> on cold start</p>
+            <p>TLS handshake plus name resolution race with the first RPC. Mitigation: explicit channel warmup, or retry with backoff.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Browser unreachability</p>
+            <p>Forgetting that browsers can't speak native gRPC, then discovering it at integration time.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>The problem gRPC solves: typed, low-overhead, cross-language service calls at scale. Every hop in a microservice graph pays for serialization, transport, and contract drift. JSON over HTTP/1.1 makes all three worse — text parsing costs CPU, HTTP/1.1 forces one connection per request or head-of-line-blocked pipelining, and the contract lives in tribal knowledge or an OpenAPI file that quietly drifts from the server. gRPC folds contract, transport, and code generation into one pipeline.</p>
+
+        <h3>Why it looks the way it does</h3>
+        <ul>
+          <li><strong>HTTP/2, not raw TCP.</strong> The open internet already lets HTTP/2 through firewalls and proxies for the web — riding on top gets free transit. A custom TCP protocol gets blocked almost everywhere.</li>
+          <li><strong>Protobuf, not JSON or MessagePack.</strong> Protobuf's wire format is meaningless without the schema, which forces teams to keep the schema honest. JSON's self-describing nature is exactly what lets contracts rot. MessagePack is compact but has no schema either.</li>
+          <li><strong>Field numbers, not field names.</strong> Names cost bytes on every field of every message, and renaming is a routine refactor. Numbers decouple wire identity from source identity — the single most important property for a service that has to change over years.</li>
+          <li><strong>Status in trailers, not the response code.</strong> A streaming server can discover an error halfway through the stream, after the <code>200 OK</code> headers are already sent. Trailers let the final outcome arrive after the body — something HTTP/1.1 could not do cleanly.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, gRPC is mature rather than novel. It's the default internal protocol for Kubernetes-native infrastructure (CRI, CSI, CNI, xDS, OpenTelemetry collectors), most cloud-provider control planes, and AI/ML serving (TensorFlow Serving, Triton, Ray). The interesting movement is at the edges: <strong>Connect-RPC</strong> offers a wire-compatible alternative with better browser ergonomics; <strong>gRPC over QUIC / HTTP/3</strong> is being prototyped to address TCP head-of-line blocking; <strong>buf</strong> has largely replaced ad-hoc <code>protoc</code> workflows for schema governance.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

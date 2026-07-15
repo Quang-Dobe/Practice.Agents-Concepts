@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hydration · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Hydration</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Hydration</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/hydration/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Hydration</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Hydration is the load-bearing piece in every SSR-capable JS framework you'll ship in 2026. You feel it most when CI catches a mismatch in a PR that "only changed copy," or a monitoring alert spikes because a date formatter ran in one time zone on the edge and another in the browser. The patterns below are the muscle memory that keeps those moments rare.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Next.js e-commerce</div><p>Hydration turns the server-rendered product grid into something that can open a quick-view modal.</p></div>
+          <div class="card"><div class="card__title">Nuxt publication</div><p>Hydration is what makes the comment widget come alive after the article HTML has already painted.</p></div>
+          <div class="card"><div class="card__title">Astro docs site</div><p>The thing you're deliberately avoiding for 95% of the page, enabled only for the search bar.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Gate browser-only logic behind effects, not render</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Read <code>window</code>, <code>localStorage</code>, <code>navigator</code>, or <code>matchMedia</code> inside <code>useEffect</code> / <code>onMounted</code> / <code>onMount</code> and store the result in state. Render a server-safe default on the first pass.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>There is no <code>window</code> during SSR. During hydration the client must produce the exact tree the server produced, or React 18 discards that subtree and re-renders it.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>const theme = typeof window !== 'undefined' ? localStorage.theme : 'light'</code> directly in JSX — a guaranteed mismatch on every reload.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Make server and client render from the same data</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pass server-fetched data into the client tree through the framework's state envelope (<code>__NEXT_DATA__</code>, <code>__NUXT__</code>, SvelteKit's <code>data</code>). Never let the client refetch the same query on first render.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Two fetches against the same endpoint at slightly different times return different results — pagination cursors shift, relative timestamps change, feature flags re-evaluate. Hydration sees that as a mismatch.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Calling <code>fetch</code> inside a client component's render path for data the server already rendered with.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Use <code>suppressHydrationWarning</code> only on the offending leaf</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Apply it to the single <code>&lt;time&gt;</code> or <code>&lt;span&gt;</code> whose content you know must differ — a relative timestamp, a per-tab UUID. React's own docs call the flag one level deep, an escape hatch, not a fix.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Wrapping it around a parent silences real bugs across the whole subtree. You'll ship a genuine mismatch and never see the warning.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>&lt;body suppressHydrationWarning&gt;</code> "to fix Grammarly." That hides every future mismatch in the whole app.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Reach for <code>&lt;ClientOnly&gt;</code> / <code>client:only</code> for genuinely client-bound widgets</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use Nuxt's <code>&lt;ClientOnly&gt;</code>, Astro's <code>client:only</code>, or Next's <code>dynamic(() =&gt; import(...), { ssr: false })</code> for components that read <code>window</code> at construction time — chart libraries, rich-text editors, map widgets, anything that opens a WebSocket on mount.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>These components can't produce stable SSR output, so paying the mismatch tax to render them on the server is pure cost. Skipping SSR for them is the documented escape hatch.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Wrapping the entire route in <code>&lt;ClientOnly&gt;</code>. You just rebuilt CSR with extra steps and lost FCP and SEO.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Defer expensive non-critical components</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For below-the-fold widgets that don't need SEO — recommendation carousels, embedded video, third-party comment threads — load them with <code>next/dynamic</code> and a skeleton, Astro's <code>client:visible</code>, or Nuxt's lazy-hydration helpers.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Hydration cost scales with the bundle size of components in the tree. A 200 KB comment widget on the critical path delays TTI for every visitor, including those who never scroll to it.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hydrating a full marketing footer that just renders links and a newsletter form on every page load.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Budget JS per route and treat it as a hydration tax</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set a per-route JS budget in CI (Lighthouse CI, <code>size-limit</code>, a bundle analyzer). When a PR pushes a route over budget, the diff has to justify the cost.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every kilobyte in the route bundle is JS that must download, parse, and run before that subtree is interactive. Hydration time is roughly linear in component count and bundle size.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Letting one team ship a 400 KB date picker into the global layout because "it's a shared component."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Default non-interactive UI to server components</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In Next App Router, keep components server by default. Mark only the leaves that need state, effects, or browser APIs with <code>'use client'</code>. Push that boundary as deep into the tree as it will go.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Server components ship zero JS to the client and skip hydration entirely. Every parent you convert to a server component shrinks the hydration surface.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Slapping <code>'use client'</code> on the root layout so child components can use hooks "for convenience." The whole tree below it becomes a hydration target.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Root["RootLayout (Server)"] --> Nav["Nav (Server)"]
+    Root --> Page["ProductPage (Server)"]
+    Page --> Gallery["ImageGallery (Server)"]
+    Page --> AddToCart["AddToCart ('use client')"]
+    AddToCart --> Qty["QuantitySelector ('use client')"]
+    Page --> Cart["CartDrawer ('use client', ssr:false)"]
+          </pre>
+          <figcaption class="diagram__caption">Push the client boundary as deep as it will go. Only the shaded leaves ship JS and pay the hydration cost; everything above stays a zero-JS server component.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Use streaming SSR + Suspense for slow data</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Wrap slow async subtrees in <code>&lt;Suspense&gt;</code> so React can stream their HTML in and hydrate them selectively. Pair with <code>useDeferredValue</code> to keep input responsive while heavy lists render.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A single slow query no longer blocks the shell. Users can click an already-hydrated nav while the comments boundary is still loading.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A top-level <code>await</code> that gates the whole page on the slowest fetch.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Pick the right architecture for the page type</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Match the rendering strategy to the page's interactivity ratio: mostly-static content (marketing, docs, blogs) → Astro islands or SSG with minimal hydration; heavy app shell with personalization → Next App Router with RSC; latency-critical interactivity on slow devices → consider Qwik's resumability.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Choosing full hydration for a static page pays TTI cost for nothing. Choosing islands for a dashboard means fighting your framework to share state across islands.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Picking the framework first and forcing every page into its default model.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Treat every hydration warning as a real bug</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Fail CI on hydration warnings in tests (Playwright plus a console assertion, or React's <code>onCaughtError</code>). Triage each one — they almost always mean non-determinism, stale CDN HTML, or a third-party script.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>React 18 patches what it can but still discards mismatched subtrees, so real users see flicker or lost client state. The warning is the only signal this is happening in production.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"It's just a dev warning, it works in prod" — it doesn't; it's the same code path, just quieter.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>Date.now()</code> / <code>Math.random()</code> in render</p>
+            <p>Looks harmless because each call returns a value. In production the server and client clocks differ, so the first paint mismatches every time. Compute these in <code>useEffect</code> and store in state, or pass the server's value as a prop.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>typeof window !== 'undefined'</code> ternaries in JSX</p>
+            <p>Looks like defensive coding. It produces one tree on the server and another on the client — the textbook mismatch. Replace with a
+              <span class="term">mount-flag pattern</span>
+              <span class="term__gloss">render the server-safe default, then swap in the real value once a mounted flag flips to true after an effect</span>
+              instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Wrapping the whole app in <code>&lt;NoSSR&gt;</code> to "fix the warning"</p>
+            <p>Eliminates the mismatch by eliminating SSR. You've thrown out FCP, SEO, and the social-card preview to silence a log line. The actual fix is to isolate the offending leaf.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Reading <code>localStorage</code> during render for theme</p>
+            <p>The server has no <code>localStorage</code>, so it picks a default; the client picks the stored value; the page flashes. Use a cookie read server-side, or a blocking inline script that sets the class on <code>&lt;html&gt;</code> before the framework boots.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Third-party widgets that mutate the DOM before hydration</p>
+            <p>Chat bubbles and A/B-test injectors insert nodes the framework didn't render; the reconciler walks into them and hydration breaks. Load them with an
+              <span class="term" data-gloss="load the script after the page becomes interactive, instead of blocking initial hydration">afterInteractive</span>
+              strategy and target a
+              <span class="term">portal root</span>
+              <span class="term__gloss">a dedicated DOM node outside the framework's managed tree that outside scripts can safely mutate</span>
+              they can't touch.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Stale HTML + fresh JS</p>
+            <p>A CDN serves yesterday's cached HTML alongside today's bundle with a new prop shape. Pin HTML cache TTLs short, or include a build hash in the cache key so they invalidate together.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">A/B flags evaluated separately on server and client</p>
+            <p>The server bucket says "control"; the client SDK rolls again and gets "treatment." Always pass the bucket assignment from server to client through the state envelope and have the client read from there.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Date picker locales without an explicit <code>timeZone</code></p>
+            <p><code>Intl.DateTimeFormat</code> falls back to the runtime's zone. Node's zone is wherever the container lives; the browser's is the user's. Always pass an explicit time zone.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">E-commerce product page (Next.js App Router)</div>
+            <p>Product info, price, and gallery render as server components — zero hydration cost on the bulk of the page. Add-to-cart, quantity, and the reviews carousel are <code>'use client'</code> islands. The cart drawer is <code>dynamic(..., { ssr: false })</code> because it reads guest-cart data from <code>localStorage</code>. <em>Lesson:</em> that one <code>ssr: false</code> choice is what unblocks the rest of the page from chasing localStorage mismatches up the tree.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Content site with comments (Astro)</div>
+            <p>Article body, sidebar, and footer ship as static HTML with no JS. The comment thread is one React island with <code>client:visible</code>, hydrating only when scrolled into view. <em>Lesson:</em> islands force you to think about state sharing up front — a "like" button can't easily talk to a header counter without a nanostores-style signal. That friction is the price of near-zero baseline JS.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">SaaS dashboard (Remix / React Router 7)</div>
+            <p>The whole shell hydrates because every panel is interactive. Heavy charts are deferred with <code>React.lazy</code> + <code>&lt;Suspense&gt;</code>. The team enforces a per-route 120 KB budget in CI and keeps the chart library out of the shared chunk. <em>Lesson:</em> when you can't escape full hydration, route-level code splitting and a hard budget keep TTI stable as the app grows.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">News site with personalization (Nuxt 3)</div>
+            <p>Article HTML is SSR'd per request with the reader's region in the URL. The "for you" strip uses <code>&lt;ClientOnly&gt;</code> because its ranking model runs in the browser against IndexedDB history. <em>Lesson:</em> per-user widgets often want CSR-only behavior inside an otherwise SSR'd page; <code>&lt;ClientOnly&gt;</code> is the right granularity, not the page or the app.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> is there a production console-error pipe that captures hydration warnings with stack traces?</li>
+              <li><strong>CI gate:</strong> do Playwright/Cypress tests fail when <code>console.error</code> fires during initial navigation?</li>
+              <li><strong>Bundle budgets:</strong> is there a per-route JS budget enforced in CI, and does the PR template surface the diff?</li>
+              <li><strong>Determinism audit:</strong> has anyone grepped the codebase for <code>Date.now</code>, <code>Math.random</code>, <code>new Date(</code>, <code>toLocaleString</code>, <code>typeof window</code> in render paths?</li>
+              <li><strong>Third-party scripts:</strong> are they all loaded with <code>afterInteractive</code> or <code>lazyOnload</code>, targeting portal roots, not the framework root?</li>
+              <li><strong>Theme/auth flicker:</strong> does the initial paint match the user's stored theme and auth state without a visible flash?</li>
+              <li><strong>A/B testing:</strong> is the variant assignment serialized from server to client, or does the SDK re-roll on hydration?</li>
+              <li><strong>Stale HTML defense:</strong> does the CDN's HTML cache key include the build hash, so an HTML/JS skew is impossible?</li>
+              <li><strong>Onboarding:</strong> does the team README spell out the <code>'use client'</code> boundary rule and the mount-flag pattern for browser APIs?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Framework defaults, first six months.</span> Teams start with whatever <code>create-next-app</code>, <code>nuxi init</code>, or <code>npm create svelte</code> gives them and ship features without thinking about hydration.</li>
+          <li><span class="steps__title">First real incident.</span> A hydration mismatch on the checkout page traces to a <code>toLocaleString</code> call, or a Lighthouse regression appears because someone added a 300 KB charting library to the shared layout. The team adds a console-error monitor and a bundle budget.</li>
+          <li><span class="steps__title">The ~50-route pain point.</span> The shared layout has accumulated client-only logic — auth context, theme provider, feature flags, analytics — and every page pays its hydration tax. Migrating to RSC, Astro islands, or a Qwik rewrite is no longer a weekend job: it means re-architecting context providers, splitting the design system into server-safe and client-safe variants, and auditing every third-party library that assumed it would run during render.</li>
+          <li><span class="steps__title">Mature hybrid.</span> Server components for static structure, narrow client islands for interactive leaves, deferred hydration for below-the-fold widgets, and a clear per-route budget that prevents regression. Hydration cost is tracked as a first-class metric next to FCP and CLS, not left as something the framework handles invisibly.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://react.dev/reference/react-dom/client/hydrateRoot" rel="noopener">React — <code>hydrateRoot</code></a> — the canonical reference for the API, the warning model, and <code>suppressHydrationWarning</code>'s exact semantics.</li>
+          <li><a href="https://nextjs.org/docs/app/getting-started/server-and-client-components" rel="noopener">Next.js — Server and Client Components</a> — the official rules for where the boundary should go in App Router code.</li>
+          <li><a href="https://nextjs.org/docs/messages/react-hydration-error" rel="noopener">Next.js — the <code>react-hydration-error</code> message</a> — the framework's own debugging checklist, the same one its error overlay links to.</li>
+          <li><a href="https://vuejs.org/guide/scaling-up/ssr.html#hydration-mismatch" rel="noopener">Vue 3 SSR Guide — Hydration Mismatch</a> — the Vue-specific quirks and the <code>&lt;ClientOnly&gt;</code> escape hatch.</li>
+          <li><a href="https://docs.astro.build/en/concepts/islands/" rel="noopener">Astro — Islands Architecture</a> — the case for shipping less JS by default, with the full <code>client:*</code> directive reference.</li>
+          <li><a href="https://www.patterns.dev/react/react-selective-hydration/" rel="noopener">Patterns.dev — Selective Hydration</a> — the clearest explanation of how Suspense boundaries interact with hydration priority in React 18.</li>
+          <li><a href="https://web.dev/articles/rendering-on-the-web" rel="noopener">web.dev — Rendering on the web</a> — Google's rendering-strategy decision guide, still the best framing of the trade space.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/hydration/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>B-Tree Index · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">B-Tree Index</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">B-Tree Index</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/b-tree-index/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">B-Tree Index</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A B-tree index is a self-balancing, on-disk, n-ary search tree where every node is sized to a disk block, every key is held in sorted order within its node, and every leaf sits at the same depth. Almost every mainstream relational database — PostgreSQL, MySQL/InnoDB, SQL Server, Oracle, SQLite — actually implements the <strong>B+tree</strong> variant of Bayer &amp; McCreight's original 1972 design: internal pages carry only routing keys, no row data, and the leaves form a doubly-linked list for ordered traversal.</p>
+        <ul>
+          <li><strong>Core idea.</strong> Fat nodes, shaped like a disk block, keep the tree shallow so a lookup costs only a few page reads.</li>
+          <li><strong>The "B".</strong> It stands for <em>balanced</em>, not binary. The formal rule: every node except the root holds between ⌈m/2⌉ and m children for some order m — the invariant that keeps the tree even-shaped under any mix of inserts and deletes, with no manual rebalancing.</li>
+          <li><strong>Family.</strong> It belongs to the disk-friendly ordered-index family, alongside hash indexes, LSM-trees, bitmap indexes, and geometric indexes (R-tree, GiST, SP-GiST).</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Page (node)</dt><dd>A fixed-size on-disk block — 8 KB by default in Postgres and SQL Server, 16 KB in InnoDB, 4 KB by default in SQLite. One page = one node = one I/O.</dd></div>
+          <div><dt>Routing key + child pointer</dt><dd>An internal page stores <code>[key₁ | ptr₁ | key₂ | ptr₂ | … ]</code>. Keys partition the key space; pointers are page numbers of children.</dd></div>
+          <div><dt>Leaf entry</dt><dd><code>[key | row pointer]</code> — a row's physical address (a TID in Postgres) or, in InnoDB's secondary indexes, the primary key.</dd></div>
+          <div><dt>High key / right link</dt><dd>Each page records the largest key it covers plus a pointer to its right sibling. This is the Lehman &amp; Yao structure that lets readers traverse without locking.</dd></div>
+          <div><dt>Metapage</dt><dd>One fixed-location page at the start of the index file, pointing at the current root (the root can move when the tree grows taller).</dd></div>
+          <div><dt>Fan-out (branching factor)</dt><dd>Children per internal node — typically 100–500, depending on key width.</dd></div>
+        </dl>
+        <p>Within the ordered-index family, the B+tree beat its theoretical cousins — 2-3 trees, red-black trees, skip lists — for one reason: its shape is built around the block-device unit of I/O, not around minimizing comparisons.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>A B-tree sits in the <strong>storage engine</strong> layer: below the SQL parser and query planner, above the buffer manager and OS page cache. Its pages live on disk in the same tablespace as the table and get pulled into the buffer pool one page at a time. For OLTP workloads almost all traffic is served from RAM — the root and upper internal levels are nearly always cached.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Q["SQL parser and query planner"] --> S["Storage engine: the B+tree index"]
+    S --> BP["Buffer pool and OS page cache"]
+    BP --> D["Disk pages"]
+          </pre>
+          <figcaption class="diagram__caption">The B-tree sits one layer below the planner. Most reads never reach the bottom layer — they're answered from the buffer pool.</figcaption>
+        </figure>
+
+        <p>Where you'll actually run into one:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">PostgreSQL</div><p>The default <code>CREATE INDEX</code> and every <code>PRIMARY KEY</code> / <code>UNIQUE</code> constraint.</p></div>
+          <div class="card"><div class="card__title">MySQL InnoDB</div><p>The table itself <em>is</em> a clustered B+tree on the primary key; every secondary index is another B+tree pointing back by primary key.</p></div>
+          <div class="card"><div class="card__title">SQLite</div><p>Every table is a B+tree keyed by rowid; every index is a separate B-tree.</p></div>
+          <div class="card"><div class="card__title">SQL Server / Oracle</div><p>Same story: clustered plus non-clustered B-trees.</p></div>
+          <div class="card"><div class="card__title">MongoDB (WiredTiger)</div><p>A B+tree storage engine underneath the document model.</p></div>
+          <div class="card"><div class="card__title">etcd / BoltDB</div><p>Embedded key-value stores built on a single B+tree file.</p></div>
+        </div>
+
+        <p>Tooling you'll actually use:</p>
+        <ul>
+          <li><strong>Inspection:</strong> <code>EXPLAIN (ANALYZE, BUFFERS)</code> in Postgres, <code>EXPLAIN FORMAT=JSON</code> in MySQL, <code>dm_db_index_physical_stats</code> in SQL Server.</li>
+          <li><strong>Low-level forensics:</strong> <code>pg_buffercache</code> and <code>pageinspect</code> in Postgres, Jeremy Cole's <code>innodb_ruby</code> visualizer for InnoDB.</li>
+          <li><strong>Maintenance:</strong> <code>REINDEX</code> (Postgres), <code>OPTIMIZE TABLE</code> (MySQL), <code>ALTER INDEX … REBUILD</code> (SQL Server).</li>
+          <li><strong>Bloat monitoring:</strong> <code>pgstattuple</code>, <code>pg_repack</code>, <code>sys.dm_db_index_physical_stats</code>.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>The column has high selectivity — an equality match returns under ~5% of rows.</li>
+              <li>You need range queries, <code>ORDER BY</code>, or <code>BETWEEN</code>.</li>
+              <li>You're enforcing uniqueness — it backs <code>UNIQUE</code> constraints for free.</li>
+              <li>The query uses a left-anchored <code>LIKE 'foo%'</code>.</li>
+              <li>The column is a foreign key used in joins.</li>
+              <li>You need a composite index over columns that share a leftmost prefix.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Cardinality is tiny (a boolean) — the planner scans anyway.</li>
+              <li>The table is small enough that a full scan is already sub-millisecond.</li>
+              <li>The workload writes to the column heavily and rarely reads it — every insert pays split and log cost.</li>
+              <li>You only need substring search (<code>LIKE '%foo%'</code>) — use a trigram/GIN index instead.</li>
+              <li>You need geometric, full-text, or vector similarity — use GiST, GIN, or an ANN index.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Bayer and McCreight described the B-tree in 1972 at Boeing, targeting disk-resident indexes where one seek cost milliseconds and an in-memory binary tree would have been catastrophically tall. The B+tree refinement (Knuth, mid-1970s) pushed all data to the leaves and linked them, tuned for the workload that actually dominates: range scans. The Lehman &amp; Yao paper (1981) added right-links and high-keys so concurrent reads never need to lock — the exact variant Postgres still runs today.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a single point lookup from the top:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Start at the metapage.</span> Jump to the current root.</li>
+          <li><span class="steps__title">Descend internal pages.</span> Binary-search the keys in each node to find the child whose range covers the search key, and follow that pointer.</li>
+          <li><span class="steps__title">Reach a leaf.</span> Binary-search the leaf for the exact key.</li>
+          <li><span class="steps__title">Return.</span> Hand back the matching row pointer(s). Total cost: O(log<sub>b</sub> N), where b is the fan-out.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant Q as Query
+    participant P as Planner
+    participant T as B-tree index
+    participant H as Table heap
+    Q->>P: WHERE key = X
+    P->>T: descend metapage to root
+    T->>T: binary-search each page, root to leaf
+    T-->>P: matching row pointer(s)
+    P->>H: fetch row at that pointer
+    H-->>P: row data
+    P-->>Q: result
+          </pre>
+          <figcaption class="diagram__caption">One point lookup: a handful of page reads down the tree, then one more to fetch the row (skipped entirely for a covering or clustered index).</figcaption>
+        </figure>
+
+        <h3>Fan-out and height</h3>
+        <p>For an 8 KB page with ~20-byte routing entries (an 8-byte bigint key plus a 6-byte pointer plus slot overhead), an internal node holds roughly 400 children. Expect these heights:</p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th scope="col">Rows</th><th scope="col">Height (fan-out ≈ 400)</th></tr></thead>
+            <tbody>
+              <tr><td>1,000</td><td>1–2</td></tr>
+              <tr><td>1,000,000</td><td>2–3</td></tr>
+              <tr><td>100,000,000</td><td>3–4</td></tr>
+              <tr><td>10,000,000,000</td><td>4–5</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A point lookup on a 100M-row table costs about 4 page reads — the top 2–3 are essentially always cached in RAM, so the disk-touching cost in steady state is one or two reads.</p>
+
+        <h3>How a node splits on insert</h3>
+        <p>Descend to the leaf that should hold the new key. If there's room, write it in sorted position and stop. If the leaf is full:</p>
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    A["Leaf is full, new key arrives"] --> B{"Room in leaf?"}
+    B -- yes --> C["Insert in sorted position - done"]
+    B -- no --> D["Split: allocate a new leaf"]
+    D --> E["Move about half the entries across"]
+    E --> F["Link the new leaf into the sibling chain"]
+    F --> G["Push the separator key up to the parent"]
+    G --> H{"Room in parent?"}
+    H -- yes --> I["Parent stores the new routing key - done"]
+    H -- no --> J["Split the parent too - recurse upward"]
+    J --> K["Root splits: new root allocated, tree grows one level taller"]
+          </pre>
+          <figcaption class="diagram__caption">A <span class="term">page split</span><span class="term__gloss"> a full node dividing in two and pushing a key up to its parent</span> cascades upward only when it has to. The tree's height only grows when the root itself splits.</figcaption>
+        </figure>
+        <p>InnoDB special-cases monotonic inserts: if the last insert landed at the end of the page, only the new record goes to the right side, leaving the left page ~15/16 full instead of ~1/2. That's why auto-increment primary keys build dense indexes.</p>
+        <p>Delete is the mirror image: find the leaf, remove the entry. If occupancy falls below the ⌈m/2⌉ floor, redistribute with a sibling or merge two siblings and pull a key down from the parent. In practice Postgres avoids eager merging — it keeps half-empty pages around and reclaims them during <code>VACUUM</code>. InnoDB merges once occupancy drops below its <code>MERGE_THRESHOLD</code>, default 50%.</p>
+
+        <h3>Why the leaves are linked, and how concurrent reads stay lock-free</h3>
+        <p>A range scan <code>WHERE x BETWEEN a AND b</code> descends once to the leaf holding <code>a</code>, then walks <code>next_leaf</code> pointers until it passes <code>b</code> — no re-descending, no parent pointers, sequential I/O when the pages were allocated contiguously.</p>
+        <p>Postgres implements the Lehman &amp; Yao scheme: a reader holds at most one page latch at a time, never two. If a concurrent split moves keys right while a reader is descending, the reader notices its key exceeds the page's high-key and follows the right link to catch up. Writers take page-level latches only at the leaf being changed. This is why B-tree reads scale linearly with cores.</p>
+
+        <h3>Composite indexes and the leftmost-prefix rule</h3>
+        <p>An index on <code>(last_name, first_name, dob)</code> is physically sorted by <code>last_name</code> first, then by <code>first_name</code> within each <code>last_name</code>, then by <code>dob</code> within each <code>(last_name, first_name)</code> pair. This is not a planner limitation — it's a direct consequence of the tree's physical sort order.</p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th scope="col">Query filters on</th><th scope="col">Can the tree seek?</th></tr></thead>
+            <tbody>
+              <tr><td><code>last_name</code></td><td>Yes</td></tr>
+              <tr><td><code>last_name</code> and <code>first_name</code></td><td>Yes</td></tr>
+              <tr><td><code>last_name</code> and <code>dob</code></td><td>Yes for <code>last_name</code>; <code>dob</code> is just a filter within that range</td></tr>
+              <tr><td><code>first_name</code> alone</td><td>No — only locally ordered inside each <code>last_name</code> bucket</td></tr>
+              <tr><td><code>dob</code> alone</td><td>No — same reason</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Clustered vs. non-clustered, and covering indexes</h3>
+        <ul>
+          <li><span class="term" data-gloss="the table's rows are physically stored in the index's own sort order">Clustered index</span> (InnoDB, SQL Server): the table <em>is</em> the B+tree. Leaves hold the full row. One per table; primary-key lookups need no second hop.</li>
+          <li><strong>PostgreSQL has no true clustered index.</strong> The table is a heap; every index points into it by TID. <code>CLUSTER</code> rewrites the heap in index order once, but new inserts immediately start to scatter it again.</li>
+          <li><strong>Secondary (non-clustered) index.</strong> The leaf holds <code>(key, row pointer)</code>. Resolving the row costs a second I/O — a primary-key lookup in InnoDB, a heap fetch (potentially scattered) in Postgres.</li>
+          <li><span class="term">Covering index</span><span class="term__gloss"> one that includes every column the query needs, so the row-fetching I/O is skipped entirely</span>. Postgres 11+ supports <code>CREATE INDEX … INCLUDE (col)</code>; SQL Server has had the equivalent for two decades.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>B+tree vs. B-tree</td><td>Range scans via leaf linking; denser internal pages</td><td>Slightly larger total size (keys duplicated in internals)</td></tr>
+              <tr><td>Large page (16 KB)</td><td>Higher fan-out, shallower tree, fewer I/Os</td><td>More wasted bandwidth per random read</td></tr>
+              <tr><td>Clustered index</td><td>One I/O for a primary-key lookup</td><td>Secondary indexes need PK indirection; changing the PK is expensive</td></tr>
+              <tr><td>B-tree vs. LSM-tree</td><td>Low <span class="term" data-gloss="extra reads needed to answer one query, beyond the ideal minimum">read amplification</span>, in-place updates</td><td>Higher <span class="term" data-gloss="extra writes performed per logical write, from compaction or page rewrites">write amplification</span> (RocksDB ~5–10× lower)</td></tr>
+              <tr><td>B-tree vs. hash index</td><td>Range, sort, and prefix matches all come free</td><td>Slower point-lookup constant factor</td></tr>
+              <tr><td>More indexes</td><td>More queries served by an index</td><td>Write amplification, larger working set</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Index ignored on low-selectivity predicates</p>
+            <p>The planner estimates over ~5–10% of rows match, so a sequential scan wins — random I/O for all those heap fetches costs more than streaming the whole table.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Stale statistics</p>
+            <p><code>ANALYZE</code> is out of date, so the planner misjudges selectivity and picks the wrong plan.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Index bloat</p>
+            <p>A long-running transaction holds back <code>VACUUM</code>; dead entries pile up, leaf pages fragment, and the index grows 2–10× its normal size. Fix: <code>REINDEX CONCURRENTLY</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Right-edge contention on monotonic keys</p>
+            <p>Every insert hits the rightmost leaf, so heavy concurrency causes latch contention there. Mitigations: UUIDv7, hash partitioning, or just accept it.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Page splits on random-key inserts (UUIDv4)</p>
+            <p>Inserts scatter across the whole tree, splitting half-full pages everywhere; the index settles around 50–70% full instead of ~90%.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Suffix predicates on composite indexes</p>
+            <p>The query filters only on the second or third column — the index is silently bypassed, per the leftmost-prefix rule above.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>LIKE '%foo'</code></p>
+            <p>A leading wildcard kills the sort order — full index or table scan, no way around it.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">A function wraps the indexed column</p>
+            <p><code>WHERE lower(email) = …</code> can't use a plain index on <code>email</code> — it needs a functional/expression index on <code>lower(email)</code>.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>The fundamental problem is the gap between random-access cost and sequential-access cost on block storage. A spinning-disk seek is ~10 ms; an SSD random read is ~100 μs; an in-memory access is ~100 ns. A binary tree of N keys is O(log₂ N) deep — for a billion keys, that's 30 hops. Thirty random page reads is 3 ms on SSD, 300 ms on spinning disk. A B+tree turns log₂ into log<sub>b</sub> with b ≈ 400, collapsing those 30 hops to 4. Fat nodes, sized to one I/O unit, exist purely to amortize the fixed cost of an I/O over hundreds of keys at once.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 220" role="img" aria-labelledby="heightTitle heightDesc" width="560" style="max-width:100%">
+            <title id="heightTitle">Binary tree height vs B-tree height</title>
+            <desc id="heightDesc">For one billion keys, a binary tree with two children per node needs about thirty levels, while a B-tree with a fan-out near four hundred needs only about four.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">1 billion keys, two search trees</text>
+
+              <!-- binary tree: tall thin stack -->
+              <text x="30" y="44" fill="var(--danger)" font-weight="650">Binary tree (fan-out 2)</text>
+              <g stroke="var(--danger)" fill="var(--danger-soft)">
+                <rect x="20" y="52" width="120" height="14" rx="3"/>
+                <rect x="20" y="70" width="120" height="14" rx="3"/>
+                <rect x="20" y="88" width="120" height="14" rx="3"/>
+                <rect x="20" y="106" width="120" height="14" rx="3"/>
+                <rect x="20" y="124" width="120" height="14" rx="3"/>
+                <rect x="20" y="142" width="120" height="14" rx="3"/>
+              </g>
+              <text x="20" y="172" fill="var(--danger)">⋮ ~30 levels deep</text>
+              <text x="20" y="192" fill="var(--text-faint)" font-size="12">≈ 30 random reads per lookup</text>
+
+              <!-- b-tree: short wide stack -->
+              <text x="300" y="44" fill="var(--accent)" font-weight="650">B-tree (fan-out ≈ 400)</text>
+              <g stroke="var(--accent)" fill="var(--accent-soft)">
+                <rect x="300" y="52" width="240" height="20" rx="4"/>
+                <rect x="300" y="82" width="240" height="20" rx="4"/>
+                <rect x="300" y="112" width="240" height="20" rx="4"/>
+                <rect x="300" y="142" width="240" height="20" rx="4"/>
+              </g>
+              <text x="300" y="182" fill="var(--accent)">4 levels deep</text>
+              <text x="300" y="202" fill="var(--text-faint)" font-size="12">≈ 4 reads — top levels usually cached in RAM</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Same billion keys, same asymptotic shape (a search tree) — but a fan-out of ~400 instead of 2 turns 30 hops into 4.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <ul>
+          <li><strong>Why not a hash table on disk?</strong> Hash tables don't preserve order, so range scans and <code>ORDER BY</code> would need a full scan.</li>
+          <li><strong>Why not a skip list</strong>, the usual in-memory alternative with similar asymptotics? Skip lists keep multiple forward pointers per node and have worse cache locality at block granularity — they suit RAM, not disk.</li>
+          <li><strong>Why push row data to the leaves (B+ vs plain B)?</strong> A plain B-tree stores row data in every node, which inflates internal pages and tanks fan-out. Routing-only internals keep far more of the tree resident in cache.</li>
+          <li><strong>Why doubly-link the leaves?</strong> So <code>WHERE x &gt; 100 ORDER BY x</code> walks forward through leaves without paying O(log N) to redescend from the root at every step.</li>
+          <li><strong>Why right-links (Lehman &amp; Yao)?</strong> So a concurrent split never forces a reader to hold ancestor latches all the way down — it can step sideways instead and stay lock-free.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>It's 2026, and B-trees still index most of the world's transactional data. The constraint that created them hasn't gone away — RAM is still roughly 100× faster than storage per random access, even on NVMe. LSM-trees have taken over the write-heavy log and time-series niche (Cassandra, RocksDB), but for mixed read/write OLTP with secondary indexes and range queries, B+trees remain the default. Current research (FAST '22, transparent-compression SSDs) is actually closing the write-amplification gap with LSM-trees, not the reverse.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

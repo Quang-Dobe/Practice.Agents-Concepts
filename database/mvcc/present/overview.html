@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MVCC · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">MVCC</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">MVCC</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/mvcc/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">MVCC</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Many transactions read and write the same rows at once. MVCC lets them do that without readers waiting on writers, or writers waiting on readers.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Instead of locking a row so only one transaction can touch it, the database keeps the old version around whenever someone updates a row. Each transaction reads from a
+              <span class="term">snapshot</span>
+              <span class="term__gloss">a frozen picture of the database, taken the instant the transaction began</span>
+              — a frozen picture of the database taken the moment it started. This is the default concurrency model in Postgres, MySQL/InnoDB, Oracle, SQL Server (under RCSI/Snapshot mode), and MongoDB's WiredTiger engine.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a shared document with version history always turned on:</p>
+        <ul>
+          <li>Alice opens the doc at 9:00. She starts reading paragraph 3.</li>
+          <li>Bob edits paragraph 3 and saves at 9:01.</li>
+          <li>In a lock-based world, Alice would see Bob's cursor land on her paragraph and have to wait — or worse, see half-written text.</li>
+          <li>In the shared-doc world, Alice keeps seeing the 9:00 text until she explicitly refreshes. Bob's edit becomes a new revision sitting alongside the old one.</li>
+          <li>Anyone who opens the doc at 9:02 sees Bob's version. Anyone who opened it at 8:59 still sees the old one.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant Alice
+    participant Doc as Document row
+    participant Bob
+    participant Carol
+    Alice->>Doc: opens at 9:00 — snapshot taken
+    Bob->>Doc: edits paragraph 3
+    Bob->>Doc: saves at 9:01 — new version committed
+    Doc-->>Alice: still returns the 9:00 version
+    Note over Alice,Doc: Alice keeps seeing her snapshot until she starts a new one
+    Carol->>Doc: opens at 9:02
+    Doc-->>Carol: returns Bob's 9:01 version
+          </pre>
+          <figcaption class="diagram__caption">Two readers, two snapshots, two honest answers — neither one waited on the other.</figcaption>
+        </figure>
+
+        <p>That is MVCC. The database never overwrites a row in place — it writes a new
+          <span class="term">row version</span>
+          <span class="term__gloss">one historical copy of a row, tagged with the transaction that created it</span>
+          and tags it with the transaction that created it. Every transaction carries a snapshot ID, and when it reads a row it walks the version chain and picks the version that was visible at that snapshot. Readers never block writers. Writers never block readers. The only thing two transactions actually fight over is writing the <em>same</em> row — and that conflict is handled separately, with ordinary row locks.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not the same as locking.</strong> Pessimistic two-phase locking makes readers and writers queue up. MVCC sidesteps that for the read path entirely.</li>
+              <li><strong>Not "no locks ever."</strong> Writers still take row-level locks so two transactions can't create conflicting new versions of the same row.</li>
+              <li><strong>Not free.</strong> Old versions pile up and must be garbage-collected — Postgres calls this <code>VACUUM</code>, InnoDB calls it purge.</li>
+              <li><strong>Not the same as serializable isolation.</strong> MVCC gives you <em>snapshot</em> isolation by default — strong, but it allows a subtle anomaly called
+                <span class="term" data-gloss="two transactions each read a shared rule as satisfied, each change a different row, and both commit — the rule ends up broken">write skew</span>.
+                True serializability needs extra machinery on top (Postgres calls it SSI).</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Reads and writes happen concurrently on the same hot rows in an OLTP workload.</li>
+              <li>Reporting queries need a consistent view of a live, mutating dataset.</li>
+              <li>Read latency matters and readers can't afford to wait on write locks.</li>
+              <li>You are running long analytical queries against a transactional store.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You mostly don't get a choice — for OLTP databases MVCC is essentially the default. The real question is <em>which</em> implementation, not whether.</li>
+              <li>Workloads of tiny, single-row updates with no contention may find plain in-place updates slightly cheaper — less
+                <span class="term" data-gloss="disk space wasted by old row versions the garbage collector hasn't reclaimed yet">bloat</span>, less garbage collection.</li>
+              <li>Embedded or single-writer stores (SQLite in many setups) have no concurrency to manage in the first place.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Tuple / row version</dt><dd>One historical copy of a row.</dd></div>
+          <div><dt>Snapshot</dt><dd>The set of transaction IDs a transaction considers already committed and visible.</dd></div>
+          <div><dt>xmin / xmax</dt><dd>Postgres's per-row stamps for "who created me" and "who deleted me."</dd></div>
+          <div><dt>Undo log</dt><dd>InnoDB/Oracle's way of rebuilding old versions on demand instead of storing them inline.</dd></div>
+          <div><dt>Visibility rules</dt><dd>The logic that decides which version of a row a given transaction sees.</dd></div>
+          <div><dt>Snapshot isolation</dt><dd>The isolation level MVCC naturally provides.</dd></div>
+          <div><dt>Write skew</dt><dd>The anomaly snapshot isolation does not prevent.</dd></div>
+          <div><dt>VACUUM / purge</dt><dd>The background job that reclaims space from row versions no transaction can still see.</dd></div>
+          <div><dt>Bloat</dt><dd>The disk-space cost of accumulated dead versions.</dd></div>
+          <div><dt>Snapshot-too-old</dt><dd>The error you get when a long-running transaction needs a version that has already been purged.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

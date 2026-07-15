@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event Sourcing · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Event Sourcing</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Event Sourcing</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/event-sourcing/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Event Sourcing</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~9 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Event sourcing is a persistence pattern where the true state of a system is a totally-ordered, immutable, append-only sequence of domain events. Any state you can query is a deterministic fold over that sequence. Writes produce events; reads consume projections of events; events themselves are never updated or deleted.</p>
+        <ul>
+          <li><strong>Core idea.</strong> The log is the source of truth. Every "current value" is derived, on demand, from the log.</li>
+          <li><strong>Never edited.</strong> Events are immutable facts, named in the past tense (<code>OrderPlaced</code>, <code>ItemRemoved</code>).</li>
+          <li><strong>Family.</strong> Named by Greg Young around 2006, it grew out of Domain-Driven Design — it's the persistence half of what DDD calls the aggregate.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Event</dt><dd>An immutable record of something that already happened. Carries a payload, a stream id, a stream version, a global position, an event id, and a timestamp.</dd></div>
+          <div><dt>Stream</dt><dd>The per-aggregate sequence of events, identified by an id like <code>order-7</code>. Each event has a monotonically increasing stream version (0, 1, 2, …).</dd></div>
+          <div><dt>Event store</dt><dd>The database that persists streams. Exposes at minimum <code>appendToStream(streamId, expectedVersion, events)</code> and <code>readStream(streamId, fromVersion)</code>.</dd></div>
+          <div><dt>Aggregate</dt><dd>The in-memory domain object, loaded by replaying its stream. New commands produce new events appended to the same stream.</dd></div>
+          <div><dt>Command</dt><dd>An intent to change state (<code>PlaceOrder</code>). The aggregate validates it and either emits events or rejects it.</dd></div>
+          <div><dt>Projection / read model</dt><dd>A materialized view derived from one or more streams, optimized for queries, rebuildable from position 0.</dd></div>
+          <div><dt>Subscription</dt><dd>A long-lived reader that pulls events from the store in order and feeds projections or other handlers.</dd></div>
+          <div><dt>Snapshot</dt><dd>An optional cached aggregate state at version N, so replay can start from N instead of 0.</dd></div>
+          <div><dt>Upcaster</dt><dd>Code that transforms an old event payload into the current schema at read time.</dd></div>
+        </dl>
+
+        <p>Event sourcing sits in the family of log-oriented persistence:</p>
+        <ul>
+          <li>Alongside write-ahead logs (Postgres WAL, RocksDB), distributed commit logs (Kafka, Pulsar), and CRDT operation logs — but it's distinct from each.</li>
+          <li>A WAL is an implementation detail of a row store, not a domain model.</li>
+          <li>Kafka is transport with retention, typically without per-aggregate concurrency control.</li>
+          <li>Its closest cousin is <strong>CQRS</strong> — independently useful, but it pairs naturally, because event sourcing already separates the write model (events) from the read model (projections).</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Event sourcing lives at the persistence layer of a service — not on the wire. The event store replaces, or sits alongside, a relational database for that service's write side.</p>
+        <ul>
+          <li>Projections may live in the same store, in a separate query database (Postgres, Elasticsearch, Redis, ClickHouse), or both.</li>
+          <li>Cross-service events are usually
+            <span class="term">integration events</span>
+            <span class="term__gloss">a translated, deliberately smaller subset of a service's internal domain events, published so aggregate internals don't leak to other teams</span>
+            — not the raw domain events themselves.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App["Your service — one aggregate's write side"]
+    App --> ES[("Event store")]
+    ES --> P1["Projection: same store (inline)"]
+    ES --> P2["Projection: separate query DB (Postgres, Elasticsearch, Redis, ClickHouse)"]
+    ES --> Sub["Subscription"]
+    Sub --> Int["Integration event (translated subset)"]
+    Int --> Other["Other services, over a broker"]
+          </pre>
+          <figcaption class="diagram__caption">Events never leave the service raw — a subscription translates a subset into integration events for everyone else.</figcaption>
+        </figure>
+
+        <p>Where you'll typically encounter it:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Financial / fintech</div><p>Stripe-like ledgers, exchange trading engines, payment processors.</p></div>
+          <div class="card"><div class="card__title">Insurance and claims</div><p>Policy lifecycle, claims adjudication where every decision must be defensible years later.</p></div>
+          <div class="card"><div class="card__title">Logistics and supply chain</div><p>Shipment workflows where every scan, exception, and handoff is itself the data.</p></div>
+          <div class="card"><div class="card__title">Healthcare records</div><p>EHR systems where regulators care what the chart said at a given moment.</p></div>
+          <div class="card"><div class="card__title">Gaming / collaborative editing</div><p>Multiplayer state where deterministic replay is needed for debugging or rollback.</p></div>
+        </div>
+
+        <p>Tooling by role:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Dedicated event stores</div><p>KurrentDB (formerly EventStoreDB), AxonServer.</p></div>
+          <div class="card"><div class="card__title">Library on a relational DB</div><p>Marten (Postgres, .NET), Eventuous (.NET), Axon Framework (JVM), Commanded (Elixir/Postgres), EventFlow (.NET), <code>node-event-storage</code>.</p></div>
+          <div class="card"><div class="card__title">Roll-your-own</div><p>Postgres with an <code>events</code> table plus a unique index on <code>(stream_id, version)</code>; DynamoDB with a conditional <code>PutItem</code>; MongoDB with a versioned document per stream.</p></div>
+          <div class="card"><div class="card__title">Projections &amp; schema tooling</div><p>A SQL view for simple reads; Kafka Connect or Debezium to a warehouse; Redis or Elasticsearch for low-latency reads; JSON Schema / Avro / Protobuf plus hand-written upcasters for evolution.</p></div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>The audit trail is a hard requirement, not a nice-to-have.</li>
+              <li>Domain experts naturally describe the system as business events ("when a shipment is dispatched…").</li>
+              <li>You expect to add read models or analytics later and want to backfill from history, not a separate ETL pipeline.</li>
+              <li>Reproducing production bugs by replaying real events would be high value.</li>
+              <li>Multiple consumers care about <em>why</em> state changed, not just its current value.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The domain is fundamentally CRUD: admin screens, user preferences, CMS-style content.</li>
+              <li>You have hard "right to be forgotten" requirements with no appetite for crypto-shredding.</li>
+              <li>The team is unfamiliar with DDD, async messaging, and eventual consistency — shallow adoption gets punished.</li>
+              <li>The data has no historical value and disk is already a cost concern — events accumulate forever by default.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>The idea predates the name: double-entry bookkeeping (15th century) is event sourcing on paper, and write-ahead logs use the same trick internally. Greg Young formalized it for application code around 2005–2006 in the DDD community, partly as a reaction to the information loss that came with ORM-driven, row-overwrite CRUD. The mid-2010s rise of Kafka popularized "log as source of truth" thinking and made the pattern more approachable — teams already had log-shaped infrastructure.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a single command through the lifecycle, using the shopping-cart example from the overview — a user removes item B from cart 7:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Load.</span> The handler calls <code>eventStore.readStream("cart-7")</code> and gets the ordered events at versions 0 and 1.</li>
+          <li><span class="steps__title">Fold.</span> It rehydrates a <code>Cart</code> aggregate by applying each event to an empty instance. The aggregate is now in memory at stream version 1.</li>
+          <li><span class="steps__title">Decide.</span> The handler calls <code>cart.removeItem("B")</code>. The aggregate checks the invariant (the item exists) and produces a proposed event — nothing is saved yet.</li>
+          <li><span class="steps__title">Append.</span> The handler calls <code>eventStore.appendToStream("cart-7", expectedVersion: 1, [ItemRemoved B])</code>. The store accepts only if the current head of <code>cart-7</code> is still at version 1.</li>
+          <li><span class="steps__title">Conflict or commit.</span> If another writer appended first, the head is now version 2 and the store rejects with a concurrency exception; the handler retries the whole load-decide-append cycle. If accepted, the event lands at version 2 with a fresh global position.</li>
+          <li><span class="steps__title">Propagate.</span> A subscription tails the store from its last position and pushes the new event to projection handlers. Other consumers — search index, analytics, integration outbox — receive it independently.</li>
+          <li><span class="steps__title">Acknowledge.</span> Each projection persists a
+            <span class="term" data-gloss="the last global position a projection has successfully processed, saved so it can resume after a crash without redoing or skipping work">checkpoint</span>
+            so it can resume after a crash without losing or double-counting events.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant H as Command handler
+    participant ES as Event store
+    participant A as Aggregate (in memory)
+    participant Sub as Subscription
+    H->>ES: readStream(cart-7)
+    ES-->>H: events at v0, v1
+    H->>A: fold events, rehydrate at v1
+    H->>A: removeItem(B)
+    A-->>H: proposed event ItemRemoved (not yet saved)
+    H->>ES: appendToStream(cart-7, expectedVersion=1, [ItemRemoved])
+    alt head still at v1
+        ES-->>H: accepted, new version 2
+        ES-->>Sub: push ItemRemoved
+        Sub->>Sub: update projection, save checkpoint
+    else head moved on
+        ES-->>H: reject — concurrency exception
+        H->>H: retry load, decide, append
+    end
+          </pre>
+          <figcaption class="diagram__caption">One command through the cycle. The <code>alt</code> branch is optimistic concurrency: two writers can race, but only one wins.</figcaption>
+        </figure>
+
+        <p>Internally, an event store is just an append-only table. A typical Postgres-based version:</p>
+        <pre><code>events(global_position BIGSERIAL, stream_id TEXT, version INT,
+       event_type TEXT, payload JSONB, metadata JSONB, occurred_at TIMESTAMPTZ,
+       UNIQUE(stream_id, version))</code></pre>
+        <p>The unique index on <code>(stream_id, version)</code> is what gives you
+          <span class="term">optimistic concurrency</span>
+          <span class="term__gloss">letting writes proceed without a lock, then rejecting one if two writers targeted the same version</span>
+          for free — two competing inserts at the same <code>(stream_id, version)</code> cannot both succeed.</p>
+
+        <h3>Snapshots: skipping the long replay</h3>
+        <p>When a stream gets long — say, an account with around 50,000 events — replay-from-zero becomes a latency problem. The fix: periodically write a snapshot of the aggregate state and the version it represents. On load, fetch the latest snapshot, then read only the events after it. Common triggers: every N events, every N minutes, or only once measured replay time crosses a threshold. Snapshots must always be rebuildable — never let one become the source of truth.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 150" role="img" aria-labelledby="snapTitle snapDesc" width="560" style="max-width:100%">
+            <title id="snapTitle">Replay with and without a snapshot</title>
+            <desc id="snapDesc">Without a snapshot, loading a long stream of around fifty thousand events replays all of them. With a snapshot taken at some later version, replay only covers the events after that version.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="12" y="20" fill="var(--text-muted)">Without snapshot — stream of ~50,000 events</text>
+              <rect x="12" y="30" width="536" height="24" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="280" y="47" fill="var(--danger)" text-anchor="middle">replay all ~50,000 events</text>
+
+              <text x="12" y="86" fill="var(--text-muted)">With snapshot — cached at version N</text>
+              <rect x="12" y="96" width="380" height="24" rx="6" fill="var(--border-soft)" stroke="var(--border)"/>
+              <text x="200" y="113" fill="var(--text-faint)" text-anchor="middle">skipped — loaded from snapshot</text>
+              <rect x="392" y="96" width="156" height="24" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="470" y="113" fill="var(--accent)" text-anchor="middle">replay tail</text>
+              <line x1="392" y1="130" x2="392" y2="140" stroke="var(--border)"/>
+              <text x="392" y="148" fill="var(--text-faint)" font-size="11" text-anchor="middle">version N</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A snapshot turns "replay everything" into "replay the tail" — the snapshot itself is a cache, never the source of truth.</figcaption>
+        </figure>
+
+        <h3>Projections and idempotency</h3>
+        <p>Two projection flavors exist. <strong>Inline</strong> projections update in the same transaction as the append — strongly consistent, but only work when the projection lives in the same database (Marten supports this on Postgres). <strong>Async</strong> projections update via a subscription — eventually consistent, but they scale to external stores. Async is the default, and the source of the eventual-consistency tax.</p>
+        <ul>
+          <li>Subscriptions deliver at-least-once: the same event can arrive twice after a crash or rebalance.</li>
+          <li>Projections handle this by storing the last processed global position per projection, in the same transaction as the update, and skipping anything at or before that checkpoint.</li>
+          <li>Naturally
+            <span class="term" data-gloss="safe to apply more than once — repeating the same operation produces the same result as doing it once">idempotent</span>
+            updates (<code>SET status = 'shipped'</code>) are fine too — duplicate writes are no-ops.</li>
+        </ul>
+
+        <h3>Schema evolution — five tactics, in order of rising cost</h3>
+        <ol class="steps">
+          <li><span class="steps__title">Additive only.</span> Add optional fields; old consumers ignore them. Cheapest, works for most changes.</li>
+          <li><span class="steps__title">Versioned event types.</span> <code>OrderPlacedV2</code>. Old handlers stay; a new handler is added for V2.</li>
+          <li><span class="steps__title">Weak schema.</span> Deserialize into a tolerant shape (dictionary, dynamic) and let the aggregate cope.</li>
+          <li><span class="steps__title">Upcasting.</span> On read, transform <code>V1 → V2 → V3</code> so the aggregate only ever sees V3. Chain upcasters; never jump versions.</li>
+          <li><span class="steps__title">Copy-and-transform.</span> Rewrite the whole stream into a new one with new shapes. Expensive, last resort, breaks ordering with prior history.</li>
+        </ol>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Append-only log as source of truth</td><td>Full history, replay, temporal queries, free audit</td><td>Storage grows forever; harder GDPR deletion</td></tr>
+              <tr><td>Async projections</td><td>Read scalability, multiple read models, independent failure domains</td><td>Eventual consistency; user-visible read-your-write lag</td></tr>
+              <tr><td>Optimistic concurrency on stream version</td><td>Lock-free writes, no global locking, high throughput per stream</td><td>Conflict retries on hot streams; needs careful aggregate boundaries</td></tr>
+              <tr><td>Snapshots</td><td>Fast aggregate load on long streams</td><td>Extra storage; can drift if upcasters change semantics</td></tr>
+              <tr><td>Per-aggregate stream</td><td>Natural concurrency boundary; clear consistency unit</td><td>Cross-aggregate invariants need sagas/process managers, not transactions</td></tr>
+              <tr><td>Domain events as the schema</td><td>Business-meaningful history; new read models are cheap</td><td>Schema evolution is forever — you can never "drop a column"</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">CRUD events</p>
+            <p>Emitting <code>CartUpdated { state: ... }</code> instead of <code>ItemAdded</code> / <code>ItemRemoved</code>. You pay the full cost of event sourcing and get none of the benefit — the history carries no meaning.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Fat events</p>
+            <p>Stuffing entire denormalized payloads into events so projections "don't need joins." Schema evolution becomes a nightmare and PII leaks everywhere.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Replay cliff</p>
+            <p>A read-model rebuild on a 200-million-event store takes 14 hours and blocks a deploy. Cause: no checkpointing, no parallel projection workers, no snapshots.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Hot stream contention</p>
+            <p>A single aggregate — a popular product, a global counter — gets concurrent commands and every write loses the optimistic race. Cause: the aggregate boundary is modeled too coarsely.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Projection drift</p>
+            <p>A projection's code changed but the projection was never rebuilt — the read model now disagrees with the events. Cause: no rebuild discipline, no versioned projection name.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Lossy upcaster</p>
+            <p>Upcasting V1 → V2 invents a default value for a new field, and later business logic assumes that value is real. Cause: treating upcasting as a free lunch.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">GDPR collision</p>
+            <p>A "delete this user" request arrives and the user's email is embedded in 40,000 events across 8 streams. Mitigations: store PII outside the event store and reference it by id (<em>forgettable payloads</em>), or encrypt per-user fields with a key you can shred (<em>crypto-shredding</em>) — though EU regulators have argued encrypted personal data is still personal data, so this is not unambiguously compliant.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Broker confused with store</p>
+            <p>Treating Kafka topic retention as the source of truth, then losing data when retention expires. Kafka is transport; an event store is durable history.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Three forces drive it:</p>
+        <ul>
+          <li><strong>Information loss.</strong> Row-overwrite CRUD throws away exactly the data — the history of change — that businesses increasingly care about.</li>
+          <li><strong>Separation of concerns.</strong> Write-side invariants and read-side query shapes have different lifecycles and scaling profiles; stuffing both into one normalized schema makes both worse.</li>
+          <li><strong>Debuggability.</strong> Distributed systems are easier to reason about when state is a function of an ordered input than when it's a graph of mutually-updating rows.</li>
+        </ul>
+
+        <p>The obvious alternative — keep a history table next to your tables — fails for a structural reason: that history is <em>derived</em> from the writes, not the source of them. The moment the application has a bug, the live table and the history table can silently disagree.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 190" role="img" aria-labelledby="divergeTitle divergeDesc" width="560" style="max-width:100%">
+            <title id="divergeTitle">Bolted-on history versus event sourcing</title>
+            <desc id="divergeDesc">A live table and a separate history table start in agreement, then a bug causes them to silently disagree. In event sourcing, the event log is the only source of truth and the table is always derived from it, so there is nothing to disagree with.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="12" y="18" fill="var(--text-muted)">Bolted-on history — two sources of truth</text>
+              <rect x="12" y="28" width="200" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="112" y="47" fill="var(--accent)" text-anchor="middle">Live table</text>
+              <rect x="12" y="64" width="200" height="28" rx="6" fill="var(--border-soft)" stroke="var(--border)"/>
+              <text x="112" y="83" fill="var(--text-muted)" text-anchor="middle">History table (derived)</text>
+              <line x1="230" y1="42" x2="290" y2="42" stroke="var(--border)" stroke-dasharray="3 3"/>
+              <line x1="230" y1="78" x2="290" y2="78" stroke="var(--border)" stroke-dasharray="3 3"/>
+              <text x="300" y="45" fill="var(--warn)" font-size="18">✕</text>
+              <text x="326" y="60" fill="var(--danger)">a bug writes one, forgets the other</text>
+              <text x="326" y="78" fill="var(--danger)">— they silently disagree</text>
+
+              <line x1="12" y1="112" x2="548" y2="112" stroke="var(--border-soft)"/>
+
+              <text x="12" y="134" fill="var(--text-muted)">Event sourcing — one source of truth</text>
+              <rect x="12" y="144" width="180" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="102" y="163" fill="var(--accent)" text-anchor="middle">Event log</text>
+              <line x1="192" y1="158" x2="240" y2="158" stroke="var(--accent)" marker-end="url(#arrowES)"/>
+              <defs>
+                <marker id="arrowES" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 z" fill="var(--accent)"/>
+                </marker>
+              </defs>
+              <rect x="248" y="144" width="180" height="28" rx="6" fill="var(--border-soft)" stroke="var(--border)"/>
+              <text x="338" y="163" fill="var(--text-muted)" text-anchor="middle">Table (always derived)</text>
+              <text x="440" y="163" fill="var(--success)" font-size="16">✓</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">History <em>is</em> the write, and the table is derived — so there's nothing left for the two to disagree about.</figcaption>
+        </figure>
+
+        <p>Optimistic concurrency on stream version, rather than pessimistic locking on a row, is the second non-obvious choice. It lets writes scale horizontally per aggregate while still giving each aggregate strict serializability — the consistency model the domain actually needs. Checking <code>expectedVersion</code> on every append is the deliberate, minimal amount of coordination needed to keep concurrent writers honest without taking a lock up front.</p>
+
+        <h3>Why it matters now</h3>
+        <ul>
+          <li>KurrentDB (formerly EventStoreDB, v24.10+) and Marten 7 on Postgres are both stable, well-documented options for .NET teams.</li>
+          <li>Regulatory pressure — PSD3, DORA, evolving AI-act audit requirements — is making "what did the system know, and when" a first-class engineering requirement in finance and healthcare.</li>
+          <li>LLM-assisted debugging makes a replayable event log more valuable: agents can re-run scenarios deterministically.</li>
+          <li>The pattern is not winning the CRUD market and never will, but it's firmly established wherever history is the product.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

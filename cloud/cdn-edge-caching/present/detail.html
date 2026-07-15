@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CDN Edge Caching · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CDN Edge Caching</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CDN Edge Caching</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/cdn-edge-caching/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CDN Edge Caching</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>CDN edge caching places HTTP reverse-proxy caches inside the points of presence (POPs) of a globally distributed network. Responses from an origin server are stored under a deterministic
+          <span class="term">cache key</span>
+          <span class="term__gloss">the identifier — usually URL plus selected headers — used to look up a stored response</span>
+          and re-served to later requests whose key matches, for as long as the freshness rules allow. Those rules come straight from HTTP's own cache semantics (<a href="https://www.rfc-editor.org/rfc/rfc9111" rel="noopener">RFC 9111</a>, plus the stale-content extensions in <a href="https://www.rfc-editor.org/rfc/rfc5861.html" rel="noopener">RFC 5861</a>).</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>POP (Point of Presence)</dt><dd>A physical site with one or more cache servers (Varnish, ATS, nginx, or a vendor's own) terminating TLS and answering user requests.</dd></div>
+          <div><dt>Cache object</dt><dd>The stored response — headers plus body — indexed by cache key, with metadata: insertion time, TTL, surrogate keys, vary axes.</dd></div>
+          <div><dt>Cache key</dt><dd>The lookup tuple. Default: scheme + host + path (+ query). Customizable to include selected headers, cookies, device class.</dd></div>
+          <div><dt>Vary axes</dt><dd>Extra dimensions the cache must split on, declared by the origin's <code>Vary</code> header (e.g. <code>Vary: Accept-Encoding</code>).</dd></div>
+          <div><dt>Freshness lifetime</dt><dd>How long an object may be served without revalidation: <code>s-maxage</code> → <code>max-age</code> → <code>Expires</code> → heuristic, in that order.</dd></div>
+          <div><dt>Tier</dt><dd>Edge POP, regional shield, or origin shield. Each tier coalesces misses from the tier below.</dd></div>
+          <div><dt>Purge / invalidation channel</dt><dd>An out-of-band API that evicts or marks-stale objects by URL, surrogate key, or wildcard.</dd></div>
+        </dl>
+
+        <p>Edge caching is a specialization of HTTP reverse proxying (<a href="https://varnish-cache.org/" rel="noopener">Varnish</a>, <a href="http://www.squid-cache.org/" rel="noopener">Squid</a>, nginx in proxy mode), set apart by global distribution and an anycast routing layer that maps each user to the nearest POP. Its siblings:</p>
+        <ul>
+          <li><strong>Browser caching</strong> — private, per-user.</li>
+          <li><strong>Application caches</strong> (Redis, Memcached) — shared, but confined to one datacenter.</li>
+          <li><strong>Edge compute</strong> (Workers, Lambda@Edge) — runs code, not just bytes.</li>
+        </ul>
+        <p>A CDN vendor typically bundles all four — caching, routing, TLS, and compute — into one product.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>An edge cache sits between the user's TCP stack and your origin's load balancer — the first piece of <em>your</em> infrastructure a request touches (after the user's ISP and the
+          <span class="term">anycast</span>
+          <span class="term__gloss">network routing that sends a request to the nearest of many servers advertising the same address</span>
+          network), and the last piece it touches on the way out. It operates at L7: it parses HTTP, decides on headers, and re-emits responses.</p>
+
+        <h3>Where you typically encounter it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Cloudflare</div><p>Full reverse proxy with Workers-integrated cache; default for many sites.</p></div>
+          <div class="card"><div class="card__title">Fastly</div><p>Varnish + VCL, surrogate-key purging; popular for news and commerce.</p></div>
+          <div class="card"><div class="card__title">Amazon CloudFront</div><p>Tight AWS integration, policy-driven cache keys.</p></div>
+          <div class="card"><div class="card__title">Akamai</div><p>The original (1999); still dominant in media, OTT video, regulated industries.</p></div>
+          <div class="card"><div class="card__title">Bunny.net</div><p>Cheap pay-as-you-go, with Perma-Cache as a permanent middle tier.</p></div>
+          <div class="card"><div class="card__title">Google Cloud CDN · Azure Front Door · Vercel/Netlify edge</div><p>PaaS-bundled options wired into their own deploy pipelines.</p></div>
+        </div>
+
+        <p>Ecosystem you'll meet alongside it:</p>
+        <ul>
+          <li><strong>Open-source cache engines</strong> for on-prem/self-hosted setups: Varnish (used by Fastly), Apache Traffic Server (historically Yahoo/Akamai), nginx, HAProxy.</li>
+          <li><strong>Config / IaC:</strong> per-vendor Terraform providers, Cloudflare Wrangler, Fastly VCL and Compute@Edge.</li>
+          <li><strong>Observability:</strong> per-vendor log streams (Cloudflare Logpush, Fastly Real-Time Analytics, CloudFront logs) and <code>X-Cache: HIT/MISS</code> debug headers.</li>
+          <li><strong>Specs worth knowing:</strong> RFC 9111 (HTTP caching), RFC 5861 (stale extensions), the <a href="https://www.w3.org/TR/edge-arch" rel="noopener">Edge Architecture Specification</a> (ESI), RFC 8246 (<code>immutable</code>).</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    U["User"] --> E["Edge POP — lower tier, closest to the user"]
+    E -->|MISS| S["Regional / origin shield — upper tier"]
+    S -->|MISS| O[("Origin server")]
+    O -->|fills| S
+    S -->|fills| E
+    E -->|HIT| U
+          </pre>
+          <figcaption class="diagram__caption">Tiered caching: many lower-tier POPs share a small set of upper-tier POPs, so a cold object only reaches origin once instead of once per POP.</figcaption>
+        </figure>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You serve any static asset (JS/CSS/images/video/fonts) to more than one region.</li>
+              <li>Origin RPS for a hot path exceeds what a single instance handles comfortably, and responses are cacheable for at least seconds.</li>
+              <li>You need to absorb spikes — launches, virality, mild DDoS — without scaling origin.</li>
+              <li>You serve large files where origin egress would be expensive; CDN transit is usually far cheaper than your cloud bill.</li>
+              <li>You need TLS termination, HTTP/3, or Brotli at every region without operating it yourself.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Responses are fully personalized per request with no shared shape (raw GraphQL for an authenticated dashboard).</li>
+              <li>Strong read-after-write consistency is mandatory at sub-second scale (live order book, checkout inventory).</li>
+              <li>Traffic is low and geographically concentrated near a nearby origin — the cache never warms up.</li>
+              <li>Compliance forbids data leaving certain jurisdictions and the CDN can't guarantee residency.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Akamai launched in 1999 to solve a concrete problem: the 1998 World Cup site collapsed under load, and one datacenter couldn't feed a global audience without unacceptable round-trip time. Before CDNs, the workaround was DNS-based mirroring — manually replicated FTP/HTTP servers per region. CDNs automated that, added consistent invalidation, and later absorbed TLS termination, DDoS scrubbing, and edge compute. The shift from plain object caching to full-stack edge platforms accelerated after ~2017 with Cloudflare Workers.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a single request through a modern POP:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Route.</span> Anycast sends the user's TCP SYN to the closest POP by BGP path, terminates TLS, and parses the HTTP request.</li>
+          <li><span class="steps__title">Compute the key.</span> Default: (scheme, host, path), plus whatever the vendor's cache policy adds — sorted query params, selected headers, device class.</li>
+          <li><span class="steps__title">Look up.</span> If present and fresh (age &lt; freshness lifetime), return immediately with <code>X-Cache: HIT</code>.</li>
+          <li><span class="steps__title">Stale handling.</span> If present but stale: serve it now and refresh in the background if
+            <span class="term">stale-while-revalidate</span>
+            <span class="term__gloss">serve the stale copy immediately while a background fetch refreshes it</span>
+            is set; serve stale only on error if <code>stale-if-error</code> is set; otherwise send a conditional request to origin.</li>
+          <li><span class="steps__title">Miss + coalesce.</span> If absent, forward to the next tier — a regional shield in tiered setups, otherwise origin. Concurrent misses for the same key are
+            <span class="term">coalesced</span>
+            <span class="term__gloss">collapsing many concurrent requests for the same cold object into one origin fetch</span>:
+            one fetch goes upstream, the rest wait on it. Cloudflare, Fastly, CloudFront, and Vercel all implement this.</li>
+          <li><span class="steps__title">Storability check.</span> Parse the origin response and decide whether it's storable, using <code>Cache-Control</code> (public vs. private, <code>no-store</code>, <code>s-maxage</code>, and vendor-specific <code>Set-Cookie</code> heuristics).</li>
+          <li><span class="steps__title">Write.</span> Store the object on disk/RAM, index by cache key, tag it with any <code>Surrogate-Key</code> headers, and send the response to the user.</li>
+          <li><span class="steps__title">Invalidate later.</span> Purge events arrive over a separate channel and either delete the object (hard purge) or flip a stale flag (soft purge).</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant E as Edge POP
+    participant O as Origin
+    U->>E: request
+    E->>E: compute cache key
+    alt fresh HIT
+        E-->>U: X-Cache HIT (instant)
+    else stale, has stale-while-revalidate
+        E-->>U: serve stale copy now
+        E->>O: background revalidation
+        O-->>E: fresh response, store
+    else MISS
+        E->>O: forward (coalesced if concurrent)
+        O-->>E: response
+        E->>E: check storability, write object
+        E-->>U: X-Cache MISS
+    end
+          </pre>
+          <figcaption class="diagram__caption">One request through the edge: a fresh hit returns instantly, a stale hit serves-then-refreshes, and a miss forwards once — even if thousands of users asked at the same moment.</figcaption>
+        </figure>
+
+        <h3>Cache-key construction</h3>
+        <p>The default key is narrow on purpose — every extra dimension multiplies the cache footprint and shrinks the hit ratio.</p>
+        <ul>
+          <li><strong>Query strings.</strong> Tracking params (<code>utm_*</code>, <code>fbclid</code>, <code>gclid</code>) explode the key space if included. Most vendors offer "ignore query string" or "include only these" modes; Cloudflare's Query String Sort collapses <code>?a=1&amp;b=2</code> and <code>?b=2&amp;a=1</code> into one key.</li>
+          <li><strong>Headers.</strong> Including raw <code>User-Agent</code> is almost always a mistake — thousands of variants. Use a normalized class instead (<code>CF-Device-Type</code>: mobile/tablet/desktop).</li>
+          <li><strong>Cookies.</strong> The classic foot-gun: <code>Vary: Cookie</code> plus a per-user session ID gives one cache entry per user — the same as no cache. Strip session cookies before lookup, or key only on specific named cookies (e.g. <code>theme=dark</code>).</li>
+          <li><strong><code>Vary</code> header.</strong> Tells the downstream cache to split on a request header. <code>Vary: Accept-Encoding</code> is essential (separate gzip vs. br bodies); <code>Vary: *</code> means "don't cache."</li>
+        </ul>
+
+        <h3>TTL governance</h3>
+        <p>Freshness is decided by precedence: <code>s-maxage</code> (shared caches only) &gt; <code>max-age</code> &gt; <code>Expires</code> &gt; heuristic (typically 10% of <code>Last-Modified</code> age). Useful directives:</p>
+        <ul>
+          <li><code>Cache-Control: public, max-age=60, s-maxage=3600</code> — browsers cache 1 min, CDN caches 1 hour. Standard for HTML-with-personalization.</li>
+          <li><code>stale-while-revalidate=600</code> — keep serving for 10 min past TTL while a background fetch refreshes.</li>
+          <li><code>stale-if-error=86400</code> — survive a 24-hour origin outage on cached paths.</li>
+          <li><code>immutable</code> (RFC 8246) — for fingerprinted assets; tells browsers not to revalidate on reload.</li>
+          <li><code>Surrogate-Control</code> — a TTL the CDN sees but the browser ignores, stripped at the edge.</li>
+        </ul>
+        <p>Origin overrides ("page rules", "cache rules") can force a TTL regardless of what the origin sent — useful when you don't control the origin (S3, a third-party API) but want longer edge retention.</p>
+
+        <h3>Invalidation</h3>
+        <p>Three escalating mechanisms:</p>
+        <ol class="steps">
+          <li><span class="steps__title">URL purge.</span> Invalidate one exact key. Cheap, surgical — but misses variants from <code>Vary</code> or query strings.</li>
+          <li><span class="steps__title">Tag / surrogate-key purge.</span> The origin attaches <code>Surrogate-Key: product-42 category-shoes</code>; one later API call purges everything tagged <code>product-42</code>. Fastly pioneered this pattern; Cloudflare's equivalent is Cache-Tag (Enterprise).</li>
+          <li><span class="steps__title">Full purge / wildcard.</span> Nukes everything. Use sparingly — it triggers a stampede on the next wave of traffic.</li>
+        </ol>
+        <p>A hard purge deletes the object immediately, so the next request is a guaranteed MISS. A soft purge marks it stale instead, keeping it eligible for <code>stale-while-revalidate</code> and <code>stale-if-error</code> — prefer soft purge in production; it spreads origin load and tolerates origin downtime. The most reliable "invalidation" is not invalidating at all: ship assets as <code>/static/app.4f2a1b.js</code> and change the filename on every build. The old key ages out; the new key is a fresh miss followed by long-lived hits — the only safe way to pair <code>Cache-Control: max-age=31536000, immutable</code> with iterative development.</p>
+
+        <h3>Tiered caching and request coalescing</h3>
+        <p>Without tiering, every POP that misses goes straight to origin — N POPs producing N origin fetches for the same cold object. Tiered caching inserts a smaller set of upper-tier POPs between edges and origin (<code>user → edge POP → regional shield → upper tier → origin</code>). Cloudflare's Smart Tiered Cache auto-picks the tier closest to origin; Regional Tiered Cache adds a hub layer; CloudFront calls its variant Origin Shield; Bunny's Perma-Cache goes further and replicates objects to permanent regional storage so origin is contacted at most once. The cost is a small extra hop on MISS for a major drop in origin RPS.</p>
+        <p>When a popular object's TTL expires and 10,000 requests arrive at once, a naive cache sends 10,000 fetches to origin. Request coalescing holds back all but one, lets that one fill the cache, and serves the rest from the now-fresh object. Every major CDN implements this per-POP; tiered caches extend it across POPs through the shared upper tier — the combination is what makes a 30-second TTL on a viral resource safe.</p>
+
+        <h3>Dynamic-content acceleration</h3>
+        <ul>
+          <li><strong>ESI (Edge Side Includes).</strong> The origin returns a page skeleton with <code>&lt;esi:include src="/header"/&gt;</code> tags; the edge fetches and assembles fragments, each with its own TTL — cache the static 90% at 1 hour while re-fetching the personalized 10% every request. Supported by Akamai, Fastly, Varnish, LiteSpeed; not by Cloudflare's default cache.</li>
+          <li><strong>Micro-caching.</strong> TTLs of 1–10 seconds on otherwise "uncacheable" pages. Under load a 5-second TTL still collapses thousands of requests into one origin fetch; under no load the staleness is invisible. Originally an nginx pattern for WordPress, now standard for news sites.</li>
+          <li><strong>Edge functions with custom cache logic.</strong> Cloudflare Workers' Cache API and CloudFront Functions compute a personalized cache key (country + plan tier) and serve from cache for the slice of users who share it.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Cost</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Long TTL</td><td>Higher hit ratio, lower origin RPS</td><td>Stale content windows, harder rollbacks</td></tr>
+              <tr><td>Include header/cookie in key</td><td>Per-variant correctness</td><td>Cache fragmentation, lower hit ratio</td></tr>
+              <tr><td>Surrogate-key purge</td><td>Surgical invalidation</td><td>Extra tagging discipline in origin code</td></tr>
+              <tr><td>Tiered cache</td><td>Fewer origin fetches</td><td>Extra ~10–40 ms on MISS</td></tr>
+              <tr><td>Soft purge + stale-while-revalidate</td><td>Origin-outage resilience</td><td>Users see stale data briefly</td></tr>
+              <tr><td>ESI</td><td>Cache the cacheable parts of dynamic pages</td><td>Origin must emit fragments, edge must parse them</td></tr>
+              <tr><td>Micro-caching</td><td>Cache "uncacheable" pages safely</td><td>Up to N-second staleness window</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Cache poisoning via unkeyed input</p>
+            <p>Origin reflects an unkeyed header (e.g. <code>X-Forwarded-Host</code>) into the response; one attacker request pollutes the entry for everyone. Fix: include reflected inputs in the key, or strip them.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>Vary: Cookie</code> with session IDs</p>
+            <p>Collapses hit ratio to ~0%. Fix: strip session cookies before lookup, or use a custom cache key.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>Set-Cookie</code> on a cached response</p>
+            <p>Many CDNs refuse to cache responses with <code>Set-Cookie</code>; others cache it and leak the cookie to other users. Always strip it on cacheable paths.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Stampede after a full purge</p>
+            <p>Flushing everything causes a synchronized MISS storm. Fix: soft purge, or warm via crawl.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">TTL drift between browser and edge</p>
+            <p><code>max-age</code> shared between both leads to browsers holding old assets long after an edge purge. Fix: split via <code>s-maxage</code>, or use fingerprinted URLs.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Heuristic caching of headerless responses</p>
+            <p>Without <code>Cache-Control</code> or <code>Expires</code>, some caches assign a heuristic TTL and cache things you never intended. Fix: always send explicit headers.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Query-string explosion from tracking params</p>
+            <p>UTM and <code>fbclid</code> params create unique keys per link variant. Fix: strip or sort query strings at the edge.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Latency is bounded by physics — roughly 1 ms per 100 km one-way over fiber, plus switching. A request from Sydney to Virginia is ~160 ms round-trip at minimum, before TCP handshakes, TLS, or any origin processing. Edge caching attacks this two ways: it moves the response close to the user, eliminating most of that round trip, and it removes the origin from the critical path entirely for cacheable content. The same mechanism doubles as an economic optimization (origin egress is expensive, CDN egress is cheap) and as resilience (origin can be down for hours while cached paths keep serving).</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 200" role="img" aria-labelledby="latTitle latDesc" width="560" style="max-width:100%">
+            <title id="latTitle">Round-trip latency, direct vs. edge-cached</title>
+            <desc id="latDesc">A direct request from Sydney to a Virginia origin costs about 160 milliseconds round trip. The same request served from a nearby edge point of presence costs only a few milliseconds.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="24" fill="var(--text-muted)">Sydney user, request round trip</text>
+
+              <text x="10" y="50" fill="var(--text)">Direct to origin (Virginia)</text>
+              <rect x="10" y="60" width="520" height="28" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="270" y="79" fill="var(--danger)" text-anchor="middle">~160 ms round trip</text>
+
+              <text x="10" y="118" fill="var(--text)">Served from nearby edge POP</text>
+              <rect x="10" y="128" width="26" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="46" y="147" fill="var(--accent)">~few ms</text>
+
+              <line x1="10" y1="176" x2="530" y2="176" stroke="var(--border)"/>
+              <text x="10" y="196" fill="var(--text-faint)" font-size="12">~1 ms per 100 km one-way over fiber, plus switching — the edge removes almost the whole trip.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The edge doesn't make the network faster — it makes the trip shorter, by moving the answer next to the question.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative is replicated origins — full app servers and databases in every region (active-active multi-region). Teams build that, but it forces solving distributed consistency for <em>write</em> paths, which is expensive in engineering time and infrastructure. Edge caching deliberately punts on writes:</p>
+        <ul>
+          <li>It caches only idempotent GETs.</li>
+          <li>It accepts bounded staleness.</li>
+          <li>It lets the origin remain the single source of truth.</li>
+        </ul>
+        <p>That asymmetry — cache reads, centralize writes — is why it scales so cheaply: caches don't need a consensus protocol. The design also leans on HTTP's existing cache semantics rather than inventing new ones, which is why most of the configuration you write is just <code>Cache-Control</code> headers your origin already understood.</p>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026, edge caching is table stakes — every major framework (Next.js, Remix, SvelteKit, Astro) emits <code>Cache-Control</code> headers automatically and assumes a CDN sits in front. The frontier has shifted: edge platforms increasingly blur the line between cache and compute (Cloudflare Workers KV, Vercel Data Cache, Fastly Compute), and ML inference is being pushed to the edge for latency. Understanding the cache primitives precisely is what lets you reason about those products instead of treating them as magic.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sharding · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sharding</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sharding</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/sharding/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sharding</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical multi-tenant SaaS backend, sharding sits between the API tier and the relational database once one primary stops absorbing the write rate: a router (Vitess <code>vtgate</code>, MongoDB <code>mongos</code>, a Citus coordinator, or a homemade proxy) in front of N MySQL/Postgres clusters, each replicated for its own high availability. You'll run into it in four settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Multi-tenant SaaS</div><p>A routing component in front of N clusters. Same shape everywhere: Vitess, MongoDB, Citus, or a homemade proxy like Figma's <code>DBProxy</code>.</p></div>
+          <div class="card"><div class="card__title">Consumer social feed</div><p>The reason <code>user_id = ?</code> stays under 10 ms on a 50-billion-row table. Pick the wrong key and the next viral post takes a shard down.</p></div>
+          <div class="card"><div class="card__title">Serverless database</div><p>DynamoDB, Cosmos DB, Aurora DSQL, Spanner — you don't operate sharding, but partition keys and per-partition limits are still yours to design.</p></div>
+          <div class="card"><div class="card__title">Regulated workload</div><p>EU vs US residency, healthcare per-region rules. The shard key pins a customer's data to a physical region for compliance, not performance.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Choose the shard key from the dominant query, not the data model</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pick the key that appears in the <code>WHERE</code> clause of over 95% of your hot-path queries — in multi-tenant SaaS, almost always <code>tenant_id</code>. Verify with real query logs, not intuition.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Any read missing the shard key triggers a scatter-gather across every shard. Tail latency rises with shard count, and one slow shard sets p99 for everyone.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Sharding by <code>created_at</code> or <code>id</code> because it "feels even" — that breaks every per-tenant query.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Hash, don't range, unless you have a concrete reason</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default to hash sharding, or consistent hashing with virtual nodes. Reach for range sharding only when range scans dominate — time-series, append-only logs with TTL-based deletion — and you have a plan for the tail-end hotspot.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Range sharding plus a monotonic key — an auto-increment ID, <code>now()</code> — sends every new write to the rightmost shard. You scaled horizontally and bought a single-writer system.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Range sharding on <code>timestamp</code> for a high-write event stream with no bucketing or salting.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Hash["Hash sharding"]
+      H1[Even distribution]
+      H2[Range scans need scatter-gather]
+    end
+    subgraph Range["Range sharding"]
+      R1[Fast range scans, time-series locality]
+      R2[Monotonic keys create a hot rightmost shard]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Same routing problem, opposite failure modes — pick based on whether range scans or point lookups dominate.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Pick a key that is immutable, high-cardinality, and well-distributed</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>The key must never change for a row, must have far more distinct values than you'll ever have shards, and should have access skew under roughly 4x between the hottest and median value.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A mutable key means moving a row across shards on every update — most engines forbid it outright. A low-cardinality key (<code>country_code</code>, <code>plan_tier</code>) creates jumbo chunks in MongoDB or ranges the balancer can't split in Vitess.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>status</code>, <code>region</code>, <code>is_active</code>, or anything Boolean-ish.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Co-locate related entities under the same shard key</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Shard <code>users</code>, <code>orders</code>, <code>invoices</code>, and <code>audit_log</code> all by the same <code>customer_id</code> — Citus's distribution-column alignment, Vitess's keyspace IDs, DynamoDB's shared partition key.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Local joins and single-shard transactions stay cheap. The moment a parent and its children live on different shards, every join becomes scatter-gather and every write becomes a two-phase-commit candidate.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Sharding <code>orders</code> by <code>order_id</code> while <code>users</code> is sharded by <code>user_id</code> — "show me this user's orders" now touches every shard.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Treat cross-shard transactions as a code smell, not a feature</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Design the data model so multi-row writes stay on one shard. When truly unavoidable, use idempotent, retry-safe operations with a
+              <span class="term" data-gloss="a sequence of local transactions with compensating steps that undo earlier ones on failure">saga</span>
+              or
+              <span class="term" data-gloss="write the change and an event in the same local transaction, then publish the event asynchronously">outbox pattern</span>;
+              reserve two-phase commit for the few flows that genuinely need atomicity.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Cross-shard 2PC commit latency is bounded by the slowest participant — typically 2–10x a single-shard write. A coordinator crash mid-prepare stalls every participant until manual cleanup.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Turning on two-phase commit globally because "transactions should just work."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Build the routing layer before you need a second shard</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Even on a single physical database, add a routing abstraction and write every query as if it were sharded — always carrying the shard key. Figma did exactly this with logical "sharded views" on one Postgres instance before any physical split.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Adding a shard key to 1,400 call sites under incident pressure is the worst possible time to do it. Doing it cold, as feature work, takes a fraction of the effort.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We'll add the routing layer when we shard." You won't — you'll be too busy firefighting.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Monitor per-shard metrics, not just cluster aggregates</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Dashboards must show CPU, IOPS, replication lag, p99 latency, QPS, and storage broken down by shard. Alert on any shard exceeding 2x the median before alerting on cluster totals.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A hot shard at 95% CPU averages out to a healthy-looking 40% across an 8-shard cluster. Dashboards look fine right up until the hot shard tips over.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Reusing a single-node dashboard and adding <code>sum()</code> everywhere.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Practice resharding before you need it</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run a resharding drill in staging on realistic data volumes at least once a quarter. Measure how long copy, catch-up, and cutover actually take for your largest shard, and kill the source primary mid-copy.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Resharding under real pressure — a hot shard degrading production right now — is when teams discover their bulk-copy can't keep up with the live write rate, the resharding lag spiral from Detail.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming the vendor docs' "few seconds of read-only cutover" applies to your write rate without measuring it.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Prefer vendor-managed sharding unless you have an SRE team</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For most teams under roughly 5 engineers on data infrastructure, use Vitess (PlanetScale), Citus (Azure Cosmos DB for PostgreSQL), MongoDB Atlas sharded clusters, or DynamoDB/Spanner.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Online DDL, resharding, topology management, and shard-aware connection pooling are each multi-quarter projects. Vendors have already solved them; a small team building it in-house stalls at "barely works."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Rebuilding ProxySQL with custom routing rules because "it's just a hash function."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Plan for schema migrations across N shards from day one</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use a tool that applies DDL to every shard atomically with rollback — Vitess <code>OnlineDDL</code>, gh-ost coordinated across shards, Citus's coordinator-driven DDL — and verify schema parity in CI.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A migration that succeeds on 7 of 8 shards leaves one shard with a missing column. Every query touching it fails for that slice of users — a partial outage that's hard to diagnose.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A bash loop that runs <code>ALTER TABLE</code> against each shard and hopes for the best.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Sharding too early</p>
+            <p>Splitting a 40 GB database into 8 shards "to be ready." You inherit rebalancing, cross-shard joins, and distributed schema migrations without the throughput need — a bigger box would have been cheaper for two years. Fix indexes and add read replicas first.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Auto-increment ID with range partitioning</p>
+            <p>Every new row lands on the last shard, so writes don't scale and old shards go cold. Use hash sharding, or shard by a tenant key.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The "one tenant to rule them all" shard key</p>
+            <p>Sharding by <code>customer_id</code> when one customer holds 60% of the data. The whale tenant saturates one shard. Split that tenant across sub-keys, or move it to a dedicated shard via a directory map.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Mutable shard key</p>
+            <p>Sharding users by their current <code>region</code>, then letting users change region. The row now belongs on a different shard but physically sits on the old one — queries silently return empty results. Use an immutable surrogate or a directory layer.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting adaptive capacity to save a bad partition key</p>
+            <p>"Adaptive capacity will handle it" — until a burst exceeds the per-partition 1,000 WCU ceiling for 5+ minutes before split-for-heat kicks in. Design for even distribution; adaptive capacity is a safety net, not a strategy.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Cross-shard query creep</p>
+            <p>A small admin screen adds "show me all pending orders." It looks fine in dev with 3 shards; in production it scatters to 64 shards on every page load and tail latency triples. Gate non-shard-key queries behind explicit review.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Treating reference data like sharded data</p>
+            <p>Routing <code>countries</code>, <code>currencies</code>, or <code>feature_flags</code> through the shard path. Replicate them to every shard as reference tables (Citus) or lookup vindexes (Vitess) so joins stay local.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">A routing layer with no cache, or an unbounded cache TTL</p>
+            <p>No cache turns the topology store into the hot path. A forever-cached topology sends clients to a shard that's already retired. Cache the shard map with a 1–10 second TTL and push-based invalidation.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Multi-tenant B2B SaaS, 20k tenants</div>
+            <p>Hash-sharded by <code>tenant_id</code> across 16 MySQL shards behind Vitess. About 98% of queries carry <code>tenant_id</code>; the rest run against a separate CDC-fed analytics replica. <em>Lesson:</em> that analytics escape valve is what keeps the OLTP path clean.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Consumer social feed, 50M MAU</div>
+            <p>Sharded by <code>user_id</code> with consistent hashing; per-user data stays single-shard. <em>Lesson:</em> the team deliberately did not shard posts by <code>post_id</code> — "user plus their posts" is the dominant query, so posts stay on the author's shard.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Time-series telemetry, 200k writes/sec</div>
+            <p>Range-sharded by <code>(device_id_hash, hour_bucket)</code>. The hash prevents a rightmost-shard hotspot; the hour bucket lets old data be deleted by dropping whole shards. <em>Lesson:</em> dropping a shard for TTL is orders of magnitude cheaper than <code>DELETE WHERE timestamp &lt; ...</code>.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">DynamoDB-backed event store</div>
+            <p>Partition key is <code>tenant_id#YYYYMMDD</code>, salted with the date to spread one tenant's writes across partitions. <em>Lesson:</em> added only after one large tenant hit the per-partition WCU cap — they wish they'd built it in from day one.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Figma-style pre-sharding</div>
+            <p>Logical shards as Postgres views, routed through <code>DBProxy</code>, with the physical split deferred. <em>Lesson:</em> the interface — every query carries a shard key, every transaction stays single-shard — is what made the eventual physical migration take days instead of months.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> per-shard CPU, QPS, p99 latency, replication lag, and storage on the dashboard, with an alert when any shard exceeds 2x the median?</li>
+              <li><strong>Hot-key detection:</strong> a job sampling the top-100 shard-key values by traffic every 5 minutes, so a celebrity hot key is caught within the hour?</li>
+              <li><strong>Resharding:</strong> a full drill run in staging in the last 90 days, including a forced primary kill mid-copy?</li>
+              <li><strong>Schema migrations:</strong> DDL applied to all shards atomically with rollback, and CI checking for schema drift?</li>
+              <li><strong>Cross-shard queries:</strong> a lint or proxy rule flagging queries without the shard key, and a budget on scatter-gather queries?</li>
+              <li><strong>Failure handling:</strong> documented, tested behavior when one shard's primary is unreachable for 60 seconds?</li>
+              <li><strong>Security:</strong> per-shard credentials, rotated independently, with no app instance able to read beyond its tenant scope?</li>
+              <li><strong>Cost:</strong> per-shard and per-tenant cost visible, so a whale tenant shows up before the bill does?</li>
+              <li><strong>Backups:</strong> cross-shard, point-in-time consistent snapshots, not just independent per-shard ones?</li>
+              <li><strong>Onboarding:</strong> can a new engineer name the shard key, the routing layer, and the resharding tool on day one?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">No sharding.</span> One Postgres or MySQL primary and a few read replicas. Scaling moves are vertical first, then more replicas, then a cache in front of hot reads, then maybe pulling one heavy table onto its own database. None of this is sharding yet.</li>
+          <li><span class="steps__title">First physical split.</span> Write throughput on the primary, or a working set that no longer fits in RAM, finally forces it. Hundreds of existing queries assume a single database; many don't carry a shard key, some join across what will become shard boundaries.</li>
+          <li><span class="steps__title">Figma-style de-risking.</span> The modern move: introduce a routing proxy and logical sharding <em>before</em> any physical split. Teams that skip this spend 6–18 months half-migrated, with elaborate conditional routing.</li>
+          <li><span class="steps__title">Maturity.</span> Convergence on a vendor-managed control plane (Vitess, Citus, DynamoDB), strict lint rules on shard-key predicates, a separate analytics pipeline for non-shard-key queries, and per-tenant cost dashboards.</li>
+          <li><span class="steps__title">Multi-region.</span> The next evolution is usually multi-region sharding for residency and latency — which reopens most of these decisions, because the routing function now also encodes geography.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.figma.com/blog/how-figmas-databases-team-lived-to-tell-the-scale/" rel="noopener">How Figma's Databases Team Lived to Tell the Scale</a> — the reference write-up for staged horizontal sharding on Postgres; the logical-before-physical pattern is the most copied idea in this space right now.</li>
+          <li><a href="https://www.amazon.science/blog/lessons-learned-from-10-years-of-dynamodb" rel="noopener">Lessons learned from 10 years of DynamoDB</a> — Amazon's own retrospective on hot partitions, adaptive capacity, and why partition-key design is a system problem, not a capacity problem.</li>
+          <li><a href="https://vitess.io/docs/20.0/reference/vreplication/reshard/" rel="noopener">Vitess Resharding documentation</a> — the canonical operational playbook for online resharding of MySQL: copy, catch-up, verify, cutover.</li>
+          <li><a href="https://aws.amazon.com/blogs/database/part-2-scaling-dynamodb-how-partitions-hot-keys-and-split-for-heat-impact-performance/" rel="noopener">Scaling DynamoDB: partitions, hot keys, and split-for-heat</a> — concrete numbers on per-partition limits and how the platform reacts to skew, useful even off DynamoDB.</li>
+          <li><a href="https://www.mongodb.com/docs/manual/core/sharding-troubleshooting-shard-keys/" rel="noopener">MongoDB shard key troubleshooting</a> — jumbo chunks, low-cardinality keys, and the limits of <code>refineCollectionShardKey</code>. Translates directly to other systems.</li>
+          <li><a href="https://dataintensive.net/" rel="noopener">Designing Data-Intensive Applications, Ch. 6 "Partitioning"</a> — Kleppmann's chapter is the cleanest theoretical grounding for everything above.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/sharding/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

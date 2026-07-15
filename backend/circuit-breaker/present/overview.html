@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Circuit Breaker · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Circuit Breaker</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Circuit Breaker</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/circuit-breaker/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Circuit Breaker</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Services call other services. When a callee gets slow or starts failing, the naive move is to keep calling it — and that is exactly how one outage spreads to everything.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>A circuit breaker sits in front of an outbound call and watches the failure rate. Once things look bad it stops calling for a while — callers get an instant error or a
+              <span class="term">fallback</span>
+              <span class="term__gloss">a cheaper backup answer: a cached value, a default, or a friendly error</span>
+              instead of waiting on a doomed request. After a cool-down it cautiously tests whether the other side is healthy again before resuming normal traffic.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of the breaker in your home electrical panel. Under normal load, current flows through it and you never think about it. If something downstream shorts out, the breaker trips — it physically opens the circuit so the fault can't burn the wiring upstream. You wait, fix the appliance, and flip it back on. A software breaker does the same job for a network call.</p>
+
+        <p>Picture <code>OrderService</code> calling <code>PaymentService</code>. Payments is having a bad day: its database is locked and responses take 30 seconds before timing out. Every request from Orders eats a thread, a connection, and some memory for 30 seconds. Orders runs out of threads. Then the service calling Orders runs out of threads. Within minutes a payments problem is a checkout outage, then a homepage outage. That spread is
+          <span class="term">cascading failure</span>
+          <span class="term__gloss">one service's outage propagating upstream through synchronous calls</span>
+          — the single biggest reason small incidents become company-wide ones.</p>
+
+        <p>The breaker stops that. Once it sees, say, 50% of recent calls fail, it <strong>opens</strong>: every later call returns immediately, so no thread is held and no 30-second wait happens. The failing service gets breathing room to recover instead of being hammered by retries.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[Incoming call] --> B{Breaker state?}
+    B -- Closed --> C[Forward to service]
+    B -- Open --> D[Fail fast · return fallback]
+    B -- HalfOpen --> P[Allow one probe]
+    C --> E[Record success or failure]
+    P --> E
+    E --> F{Cross the threshold?}
+    F -- yes --> G[Trip → Open]
+    F -- no --> B
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: check the switch, either forward or fail fast, record the outcome, and re-check the threshold.</figcaption>
+        </figure>
+
+        <p>Two words carry the recovery story. When the breaker is Open it lets callers
+          <span class="term">fail fast</span>
+          <span class="term__gloss">return an error immediately instead of waiting for a doomed call</span>.
+          After a timeout it moves to
+          <span class="term">half-open</span>
+          <span class="term__gloss">a probe state that admits a few real calls to test recovery</span>:
+          if those trial calls succeed it <strong>closes</strong> and traffic resumes; if they fail it snaps back <strong>open</strong>.</p>
+
+        <h3>The three states in one line each</h3>
+        <ul>
+          <li><strong>Closed</strong> — normal operation; calls pass through and failures are counted.</li>
+          <li><strong>Open</strong> — calls fail instantly without touching the network.</li>
+          <li><strong>Half-Open</strong> — a probe lets a few real calls through to test recovery.</li>
+        </ul>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a retry.</strong> A retry assumes the failure is transient and tries again <em>now</em>; a breaker assumes it is sustained and refuses to try at all. They compose: retry inside, breaker outside.</li>
+              <li><strong>Not a rate limiter.</strong> Rate limiters cap traffic you <em>choose</em> to send. Breakers react to traffic that's already broken.</li>
+              <li><strong>Not a timeout.</strong> A timeout bounds a single call. A breaker uses timeouts as one signal among many to decide whether to keep calling.</li>
+              <li><strong>Not a load balancer.</strong> A breaker decides <em>whether</em> traffic goes, not <em>where</em> it goes.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>A synchronous call to another service can stall your own threads.</li>
+              <li>You call a flaky third-party API — payment gateway, SMS provider, geocoder.</li>
+              <li>"Fail fast with a fallback" is better UX than "spin for 30 seconds and then fail".</li>
+              <li>You run high-fan-in services where one slow dependency can drain the whole worker pool.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The call is pure in-process — there's nothing to break.</li>
+              <li>The work is async and queue-based — backoff and dead-letter queues fit better.</li>
+              <li>Every request must eventually succeed and there is no acceptable fallback.</li>
+              <li>The system is tiny, with one downstream and no real cascade risk. The complexity isn't free.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Cascading failure</dt><dd>One service's outage propagating upstream through synchronous calls.</dd></div>
+          <div><dt>Closed / Open / Half-Open</dt><dd>The three breaker states.</dd></div>
+          <div><dt>Failure threshold</dt><dd>The error rate or count that trips the breaker.</dd></div>
+          <div><dt>Cool-down</dt><dd>How long the breaker stays open before probing (the reset timeout).</dd></div>
+          <div><dt>Fallback</dt><dd>The alternative response returned when the breaker is open.</dd></div>
+          <div><dt>Fail fast</dt><dd>Return an error immediately instead of waiting for a doomed call.</dd></div>
+          <div><dt>Bulkhead</dt><dd>Sibling pattern that isolates resource pools so one bad dependency can't drain all your threads.</dd></div>
+          <div><dt>Probe</dt><dd>The half-open trial request used to test recovery.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

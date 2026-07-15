@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JWT · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">JWT</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">JWT</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/jwt/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">JWT</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A JWT is a self-contained authentication token. The server signs a tiny JSON document and hands it to the client, which sends it back on every later request — usually in an <code>Authorization: Bearer &lt;token&gt;</code> header.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Because the token is signed, the server can trust its contents just by checking the signature — no database lookup, no in-memory session table. That's what makes a JWT
+              <span class="term">stateless</span>
+              <span class="term__gloss">the server keeps no record of the token; everything needed to trust it travels inside the token itself</span>,
+              and it's why JWT became the default for stateless APIs, microservices, and single sign-on.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of a JWT as a
+          <span class="term" data-gloss="any change breaks a seal that's easy to check, even though the seal doesn't hide the contents">tamper-evident</span>
+          wristband at a music festival. At the gate, security checks your ID once and snaps a wristband on you with your access tier printed on it. For the rest of the night, no booth re-checks your ID — they just glance at the wristband. A holographic seal makes it impossible to fake without the festival's special machine; scratch out "general admission" and write "VIP" and the seal breaks instantly. The festival keeps no list of who got a wristband — the wristband itself carries the proof.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[Check ID once at the gate] --> B[Issue a signed wristband]
+    B --> C[Show the wristband at every booth]
+    C --> D{Seal still intact?}
+    D -- yes --> E[Let them through, no ID re-check]
+    D -- tampered --> F[Reject, seal is broken]
+          </pre>
+          <figcaption class="diagram__caption">Check identity once, then trust the wristband everywhere else — that's the whole idea.</figcaption>
+        </figure>
+
+        <p>The wristband is a string with three parts separated by dots:</p>
+        <ul>
+          <li><strong>Header</strong> — says which signing algorithm was used, e.g. <code>{"alg":"HS256","typ":"JWT"}</code>.</li>
+          <li><strong>Payload</strong> — the
+            <span class="term">claims</span>
+            <span class="term__gloss">key/value facts about the subject, e.g. who the user is or when the token expires</span>:
+            who the user is, when the token expires, what they're allowed to do, e.g. <code>{"sub":"123","name":"Alice","exp":1735689600}</code>.</li>
+          <li><strong>Signature</strong> — the cryptographic seal, computed over the first two parts plus a secret (or private key) only the server knows.</li>
+        </ul>
+
+        <p>Verifying a JWT means recomputing the signature and checking it matches. If it does, the payload is trustworthy; if anyone flipped a single character in it, the signature breaks. Crucially, <strong>the payload is encoded, not encrypted</strong> — anyone can paste a JWT into a site like jwt.io and read it. The signature stops tampering, not snooping.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not encryption.</strong> The payload is readable by anyone who has the token. Use JWE (a separate spec) if you need confidentiality.</li>
+              <li><strong>Not a session.</strong> A session lives in the server's memory or database; a JWT lives in the client's storage. That difference is the whole point.</li>
+              <li><strong>Not an OAuth replacement.</strong> OAuth 2.0 is the <em>protocol</em> for issuing tokens. JWT is just one <em>format</em> a token can take.</li>
+              <li><strong>Not a long-term credential.</strong> It's a short-lived proof, not a password.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You run stateless REST or gRPC APIs that should scale horizontally without sticky sessions.</li>
+              <li>You need service-to-service auth inside a microservice mesh.</li>
+              <li>You run single sign-on flows (OpenID Connect — the ID token is a JWT).</li>
+              <li>You issue short-lived access tokens from an OAuth 2.0 authorization server.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It's a classic monolithic web app where a server-side session cookie is simpler and easier to revoke.</li>
+              <li>You need to invalidate a token <em>immediately</em> on logout — JWTs stay valid until they expire unless you build a denylist, which kills the "stateless" benefit.</li>
+              <li>You're tempted to store anything sensitive in the payload — passwords, PII, secrets. It's readable.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Claim</dt><dd>A key/value pair in the payload (<code>sub</code>, <code>exp</code>, <code>iat</code>, <code>aud</code>, <code>iss</code>, plus custom ones).</dd></div>
+          <div><dt>Signature</dt><dd>The cryptographic proof of integrity.</dd></div>
+          <div><dt>HS256</dt><dd>Symmetric signing with a shared secret (HMAC-SHA256).</dd></div>
+          <div><dt>RS256 / ES256</dt><dd>Asymmetric signing — the server signs with a private key, anyone verifies with the public key.</dd></div>
+          <div><dt>Bearer token</dt><dd>"Whoever holds it, gets in" — how JWTs are sent in the <code>Authorization</code> header.</dd></div>
+          <div><dt><code>exp</code> claim</dt><dd>Expiration timestamp — the single most important field in the payload.</dd></div>
+          <div><dt><code>alg: none</code></dt><dd>A footgun: the spec allows an unsigned JWT. A naive verifier that accepts it is trivially exploitable. Always pin the allowed algorithm.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

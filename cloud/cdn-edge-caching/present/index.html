@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CDN Edge Caching — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CDN Edge Caching</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CDN Edge Caching</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/cdn-edge-caching/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>cloud</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">CDN Edge Caching</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">cloud</span>
+            <span class="badge">performance</span>
+            <span class="badge">delivery</span>
+          </div>
+          <h1 class="hero__title">CDN Edge Caching</h1>
+          <p class="hero__tagline">Store copies of your content on servers worldwide so a user's request never travels all the way back to your origin.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">1999</div><div class="stat__label">Akamai launches after the 1998 World Cup site collapse</div></div>
+          <div class="stat"><div class="stat__num">95%+</div><div class="stat__label">healthy hit ratio for static-heavy sites</div></div>
+          <div class="stat"><div class="stat__num">~300</div><div class="stat__label">edge POPs a request might land on</div></div>
+          <div class="stat"><div class="stat__num">5–10×</div><div class="stat__label">origin RPS drop after enabling tiered cache</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED): the mental model -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    U["User"] -->|request| E["Nearest edge POP"]
+    E -->|"cache hit"| U
+    E -->|"cache miss"| O[("Origin server")]
+    O -->|response, stored| E
+    E -->|response| U
+          </pre>
+          <figcaption class="diagram__caption">One request, two possible paths: served instantly from the nearby edge, or forwarded once to the origin and then remembered.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the cookbook-and-library mental model, and what a CDN is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: what it is, where it lives, when to use it, how a request moves through a POP, and why it's built this way.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Eleven best practices with the Do/Why/Avoid triad, anti-patterns, real case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail for the request lifecycle and trade-offs, or Practice for the tuning rules.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

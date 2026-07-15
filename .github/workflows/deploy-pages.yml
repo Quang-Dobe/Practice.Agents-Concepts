@@ -1,0 +1,50 @@
+name: Deploy presentation site to GitHub Pages
+
+# Publishes the static HTML presentation site (root index.html dashboard +
+# every <category>/<topic>/present/*.html page + shared /assets) to GitHub Pages.
+#
+# One-time setup required in the repo UI (cannot be done from code):
+#   Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+# After that, this workflow publishes on every push to main.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least-privilege permissions needed to deploy to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-flight publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload the whole repo root: the root index.html is the site entry,
+          # /assets holds the shared theme, and each topic's present/ folder is
+          # reachable at its natural path. A root .nojekyll disables Jekyll so
+          # files/folders are served verbatim.
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

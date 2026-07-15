@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embeddings · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Embeddings</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Embeddings</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/embeddings/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Embeddings</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Precisely: an embedding is a learned function that maps an input — a token, a sentence, an image patch, an audio clip — to a dense vector, such that a distance measure between two vectors tracks how related the two inputs actually are. A neural network's weights are trained until the shape of the output space encodes meaning.</p>
+        <ul>
+          <li><strong>Core idea.</strong> Similar inputs land near each other; unrelated inputs land far apart. That's the one mechanism everything else hangs off.</li>
+          <li><strong>Not portable.</strong> Two embeddings from different models live in different spaces and cannot be compared — even at the same dimension. The space is defined by how the model was trained, not by how long the vector is.</li>
+          <li><strong>Family.</strong> Embeddings are the dense end of a spectrum that also holds sparse representations (one-hot, TF-IDF, BM25) and structured ones (knowledge-graph entities).</li>
+        </ul>
+
+        <p>The building blocks, named once each:</p>
+        <dl class="vocab">
+          <div><dt>Encoder</dt><dd>The network that produces the vector — almost always a transformer for text.</dd></div>
+          <div><dt>Pooling head</dt><dd>Turns a sequence of token vectors into one fixed-length vector — <code>[CLS]</code>, mean-pool, last-token, or attention-weighted.</dd></div>
+          <div><dt>Projection &amp; normalization</dt><dd>A final linear layer plus L2 normalization, so the vector lands on the unit hypersphere. Most modern text embeddings ship pre-normalized.</dd></div>
+          <div><dt>Vector space</dt><dd>Typically 384, 768, 1024, 1536, or 3072 numbers wide. More width buys more capacity, more storage, and a slower similarity check.</dd></div>
+          <div><dt>Similarity metric</dt><dd>Cosine, dot product, or Euclidean distance. On normalized vectors, all three rank results in the same order.</dd></div>
+          <div><dt>Loss / training signal</dt><dd>Contrastive (InfoNCE), triplet, or masked-language-modeling objectives.</dd></div>
+        </dl>
+
+        <p>Inside the embedding family, the axes that separate one model from another: static vs. contextual, single-vector vs. multi-vector (ColBERT), text-only vs. multimodal (CLIP, SigLIP, Gemini Embedding 2), and fixed-dimension vs. Matryoshka-truncatable.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Embedding generation is a model call — local GPU/CPU inference or a hosted API. The resulting vectors live in a storage layer built for nearest-neighbor search. Query-time similarity search runs inside that storage layer; a RAG pipeline, a classifier, or a prompt builder sits on top.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Inference layer</div><p>OpenAI, Cohere, Voyage, Google, or a self-hosted model turns text into vectors.</p></div>
+          <div class="card"><div class="card__title">Storage layer</div><p>Pinecone, Qdrant, Weaviate, Milvus, pgvector, SQL Server's vector type, OpenSearch k-NN, Elasticsearch <code>dense_vector</code>.</p></div>
+          <div class="card"><div class="card__title">Consumer layer</div><p>RAG pipelines, classifiers, recommenders, and dedup jobs read the search results.</p></div>
+        </div>
+
+        <p>Where you'll actually run into it:</p>
+        <ul>
+          <li><strong>RAG pipelines:</strong> chunk → embed → store → retrieve → prompt an LLM.</li>
+          <li><strong>Semantic search:</strong> product catalogs, support knowledge bases, code search (Copilot, Sourcegraph).</li>
+          <li><strong>Recommendations:</strong> two-tower / dual-encoder models at YouTube, Spotify, Pinterest.</li>
+          <li><strong>Clustering &amp; deduplication:</strong> feedback grouping, near-duplicate document detection.</li>
+          <li><strong>Anomaly detection:</strong> flag records that sit far from any cluster center.</li>
+          <li><strong>Multimodal retrieval:</strong> CLIP / SigLIP for "find images matching this caption."</li>
+        </ul>
+
+        <p>Ecosystem, at a glance: hosted models include OpenAI <code>text-embedding-3</code>, Cohere <code>embed-v4</code>, Voyage <code>voyage-3-large</code>, Google <code>gemini-embedding-001</code>. Open-weight models include <code>bge-*</code>, <code>nomic-embed-text-v1.5</code>, <code>nv-embed-v2</code>, <code>Qwen3-Embedding-8B</code>, <code>e5-mistral-7b-instruct</code>. MTEB (Massive Text Embedding Benchmark) is the de-facto leaderboard; BEIR covers retrieval only.</p>
+
+        <!-- WHEN -->
+        <h2>When it emerged</h2>
+        <ol class="steps">
+          <li><span class="steps__title">2003.</span> Bengio's neural language model produces the first dense word vectors, as a side effect of predicting the next word.</li>
+          <li><span class="steps__title">2013.</span> word2vec (Mikolov) makes dense word vectors cheap to train, and gives the famous <code>king - man + woman ≈ queen</code> analogy.</li>
+          <li><span class="steps__title">2014.</span> GloVe factors a global co-occurrence matrix instead of predicting from a local window.</li>
+          <li><span class="steps__title">2018.</span> ELMo, then BERT, bring contextual embeddings — the vector for "bank" now depends on the sentence around it.</li>
+          <li><span class="steps__title">2019.</span> Sentence-BERT adds a siamese training scheme so the pooled vector actually works for sentence similarity. Raw BERT vectors were notoriously bad at this before.</li>
+          <li><span class="steps__title">2020.</span> DPR (Dense Passage Retrieval) sets the contrastive + in-batch-negatives + hard-negatives recipe every modern dense retriever still uses.</li>
+          <li><span class="steps__title">2022–2024.</span> OpenAI ships <code>text-embedding-ada-002</code>, then <code>text-embedding-3-*</code> with Matryoshka Representation Learning.</li>
+          <li><span class="steps__title">2025–2026.</span> Open-weight models (NV-Embed-v2 at 72.31 on MTEB, Qwen3-Embedding) catch and overtake closed APIs; multimodal embeddings go mainstream.</li>
+        </ol>
+
+        <h2>When to use it — and when not</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Rule of thumb</p>
+            <p>Reach for embeddings when the signal is semantic (paraphrase, synonym, cross-language) rather than lexical, when you're past a few thousand items, when you need one shared space across modalities or languages, or when you're clustering / deduplicating / classifying by nearest example. Skip them for exact-match or boolean filters, corpora dominated by rare entity names (BM25 still wins there), decisions that need an audit trail, or data that mutates faster than re-embedding pays for.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Four stages, from training a model to answering one query:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Train.</span> Modern text embedders are trained as dual encoders — also called a <span class="term">bi-encoder</span> <span class="term__gloss">two independent encoder passes, one for the query and one for the document, compared only at the end</span> — with a <span class="term">contrastive</span> <span class="term__gloss">push matching pairs together, push everything else in the batch apart</span> objective called <span class="term" data-gloss="the standard contrastive loss for dense retrieval">InfoNCE</span>. For a batch of <code>N</code> query/document pairs, every off-diagonal pair is a free "in-batch negative"; hard negatives (near-misses mined by BM25 or a weaker retriever) and large batches (1024–32768 pairs) sharpen the signal further.</li>
+          <li><span class="steps__title">Infer.</span> Tokenize → run through the transformer → pool the token states into one vector → L2-normalize → return. A sentence-BERT-class model does a few thousand sentences per second on a modern GPU; a 7B-parameter embedder like <code>e5-mistral</code> drops to tens per second per GPU.</li>
+          <li><span class="steps__title">Store &amp; index.</span> Vectors go into an ANN index — <span class="term" data-gloss="Hierarchical Navigable Small World: a multi-layer proximity graph">HNSW</span> or <span class="term" data-gloss="Inverted File index: k-means cells, probe the nearest few">IVF</span>.</li>
+          <li><span class="steps__title">Search.</span> For normalized vectors, cosine similarity is just a dot product — one multiply-add per dimension, vectorized on SIMD or GPU.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    Q["Query text"] --> M["Embedding model"]
+    M --> V["Query vector"]
+    V --> T{"Index type"}
+    T -- HNSW --> H["Walk the proximity graph, top layer down"]
+    T -- IVF --> I["Probe nprobe nearest cell centers"]
+    H --> K["Top-k candidates"]
+    I --> K
+    K --> S["Rank by cosine / dot product"]
+          </pre>
+          <figcaption class="diagram__caption">The ANN index flow: a query becomes a vector, the vector finds a neighborhood, the neighborhood gets ranked.</figcaption>
+        </figure>
+
+        <p>HNSW answers in roughly 1–10 ms per query at billion scale, but the whole graph has to fit in RAM — 1–4 KB per vector at full precision. IVF runs 5–50 ms, uses 16–64x less memory, and plays nicer with pre-filters; it's often paired with Product Quantization (PQ) to compress vectors 8–32x for a modest recall loss.</p>
+
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gain</th><th scope="col">Cost</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Higher <code>d</code> (3072 vs. 384)</td><td>More capacity, better tail recall</td><td>8x storage, 8x similarity cost, slower index</td></tr>
+              <tr><td><span class="term">Matryoshka</span> <span class="term__gloss">nested training so the first k numbers of the vector are themselves a valid, smaller embedding</span> truncation</td><td>Choose <code>d</code> at query time</td><td>Slight recall loss vs. full width; model must be trained for it</td></tr>
+              <tr><td>Bi-encoder vs. cross-encoder</td><td>Pre-compute once, search with ANN</td><td>5–10 points lower NDCG than a cross-encoder rerank</td></tr>
+              <tr><td>Contextual (BERT-class) vs. static (word2vec)</td><td>Word-sense disambiguation, sentence-level meaning</td><td>100–1000x more compute per inference</td></tr>
+              <tr><td>In-memory HNSW vs. disk IVF-PQ</td><td>10x lower latency</td><td>10–50x more RAM</td></tr>
+              <tr><td>Cosine / dot on normalized vectors</td><td>Magnitude-agnostic comparison</td><td>Throws away magnitude when magnitude carries signal (e.g. popularity)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The standard production pattern is <strong>bi-encoder retrieval + cross-encoder rerank on the top 50</strong>: cheap recall first, expensive precision second.</p>
+
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Anisotropy / hubness</p>
+            <p>Raw BERT <code>[CLS]</code> vectors cluster in a narrow cone; some vectors turn into "hubs" that look close to everything. Fix: contrastive fine-tuning, whitening, or a sentence-BERT-class model.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Chunking mismatch</p>
+            <p>Chunks too long bury the relevant sentence; chunks too short lose context. Symptom: recall drops on multi-sentence questions.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Domain drift</p>
+            <p>A general-web embedder underperforms on legal, biomedical, or code corpora. Fix: a domain-adapted or fine-tuned model.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Asymmetric query/doc lengths</p>
+            <p>Queries run 10 tokens, documents run 500. Most modern models expect a <code>query:</code> / <code>passage:</code> prefix for this — get it wrong and recall silently drops by half.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Mixing model versions</p>
+            <p>Re-embedding half the corpus with a new model and searching across both. The two spaces are unrelated; results are noise.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Forgotten normalization</p>
+            <p>Un-normalized vectors work fine with cosine, but querying them with dot product silently ranks by magnitude instead of meaning.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Filtered HNSW collapse</p>
+            <p>High-selectivity filters (over 90% rejected) fragment the graph and tail latency explodes. Switch to IVF, or pre-filter before the vector search.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Comparing discrete symbols is brittle: "automobile" and "car" share zero characters but mean the same thing; "bank" can mean two different things in an identical string. Embeddings exist because geometry generalizes where exact matching cannot. Once meaning is a coordinate, similarity is arithmetic, indexable, and scalable — an exponential, sparse symbol space becomes a tractable, dense, continuous one where ordinary tools (k-NN, clustering, linear classifiers) just work.</p>
+
+        <p>The picture below shows why a single distance number ("cosine similarity") can stand in for "similar meaning": vectors pointing almost the same direction score near 1, and vectors pointing in very different directions score near 0 (or negative).</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 420 260" role="img" aria-labelledby="cosTitle cosDesc" width="420" style="max-width:100%">
+            <title id="cosTitle">Cosine similarity as an angle</title>
+            <desc id="cosDesc">Three vectors drawn from the same origin. "Car" and "automobile" point in almost the same direction, a small angle apart, meaning their cosine similarity is close to one. "Banana" points in a very different direction, roughly a hundred degrees apart from "car", meaning its cosine similarity is close to zero.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <line x1="20" y1="220" x2="400" y2="220" stroke="var(--border)"/>
+              <line x1="70" y1="240" x2="70" y2="20" stroke="var(--border)"/>
+
+              <line x1="70" y1="220" x2="260" y2="90" stroke="var(--accent)" stroke-width="2"/>
+              <text x="264" y="90" fill="var(--accent)">car</text>
+
+              <line x1="70" y1="220" x2="240" y2="80" stroke="var(--accent)" stroke-width="2" stroke-dasharray="2 3"/>
+              <text x="240" y="66" fill="var(--accent)">automobile</text>
+
+              <line x1="70" y1="220" x2="50" y2="90" stroke="var(--danger)" stroke-width="2"/>
+              <text x="14" y="80" fill="var(--danger)">banana</text>
+
+              <path d="M 103,197 Q 108,203 101,195" fill="none" stroke="var(--text-faint)" stroke-width="1.5"/>
+              <text x="112" y="205" fill="var(--text-faint)">~5°</text>
+
+              <path d="M 115,189 Q 73,165 31,181" fill="none" stroke="var(--text-faint)" stroke-width="1.5"/>
+              <text x="60" y="150" fill="var(--text-faint)">~100°</text>
+
+              <text x="140" y="245" fill="var(--text-muted)">small angle → cosine ≈ 1 → similar meaning</text>
+              <text x="140" y="260" fill="var(--text-muted)">wide angle → cosine ≈ 0 → unrelated</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">"Car" and "automobile" point almost the same way; "banana" points somewhere else entirely.</figcaption>
+        </figure>
+
+        <h2>Why it looks the way it does</h2>
+        <p>Why one dense vector instead of, say, a graph of token relationships? Because a single vector is a fixed-size, GPU-friendly object any downstream consumer can handle the same way. Multi-vector approaches like ColBERT score higher on retrieval benchmarks, but multiply storage and search cost by 30–200x for a 1–3 point NDCG gain — not worth it for most production systems.</p>
+        <p>Why contrastive training and not just masked-language-modeling? MLM optimizes for guessing hidden words, not for pushing unrelated sentences apart in vector space. Models trained only with MLM produce vectors that sit at similar cosine regardless of meaning — the anisotropy problem above. Contrastive training with hard negatives explicitly pushes unrelated content apart, which is exactly the geometry retrieval needs.</p>
+        <p>Why Matryoshka? Committing to one width at training time forces a trade-off between quality (big <code>d</code>) and cost (small <code>d</code>). Matryoshka Representation Learning trains nested objectives so the first <code>k</code> numbers of the vector are themselves a valid embedding for any <code>k</code>. OpenAI's <code>text-embedding-3-large</code> at <code>d=256</code> beats <code>text-embedding-ada-002</code> at <code>d=1536</code> on MTEB — same model family, one-sixth the storage.</p>
+        <p>Why it matters now: RAG made embeddings load-bearing infrastructure. The 2026 MTEB leaderboard is dominated by open-weight models (NV-Embed-v2, Qwen3-Embedding-8B, BGE-en-ICL), so teams can self-host top-tier retrieval without an API bill. Multimodal embeddings (Gemini Embedding 2, March 2026) are collapsing separate text-search and image-search pipelines into one index. Vector databases have crossed into mainstream relational territory via pgvector and SQL Server's vector type. Anyone shipping an AI feature in 2026 is, transitively, shipping an embedding pipeline.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

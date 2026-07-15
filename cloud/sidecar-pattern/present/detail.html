@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sidecar Pattern · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sidecar Pattern</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sidecar Pattern</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/sidecar-pattern/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sidecar Pattern</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~9 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A sidecar is a second container co-scheduled with an application container inside the same Kubernetes Pod (or equivalent atomic deployment unit). It shares the Pod's network namespace, IPC namespace, and any declared volumes, and it lives and dies with the same lifecycle as the app. It handles cross-cutting jobs — proxying, telemetry, secrets, configuration — that the app would otherwise implement itself.</p>
+        <ul>
+          <li><strong>Core idea.</strong> One deployment unit, two containers, one job split cleanly between them.</li>
+          <li><strong>Building blocks.</strong> Pod, shared network namespace, shared volume, and — in current Kubernetes — an
+            <span class="term">admission webhook</span>
+            <span class="term__gloss">a piece of code the API server calls to inspect or rewrite an object before it's saved</span>
+            that injects the sidecar automatically.</li>
+          <li><strong>Family.</strong> Sidecar belongs to a set of four "single-node multi-container" patterns first catalogued by Burns &amp; Oppenheimer in 2016: <strong>sidecar</strong>, <strong>ambassador</strong> (proxies outbound calls only), <strong>adapter</strong> (normalizes the app's own output), and <strong>init</strong> (runs once, then exits). Sidecar is the most general of the four — ambassador and adapter are narrower specializations of it.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Pod</dt><dd>The scheduling unit. Containers in a Pod always run on the same node, share an IP, share <code>/dev/shm</code> and any <code>emptyDir</code> volume, and are torn down together.</dd></div>
+          <div><dt>Shared network namespace</dt><dd>The app reaches the sidecar via <code>localhost:&lt;port&gt;</code> — no DNS, no service discovery, no extra hop across the node.</dd></div>
+          <div><dt>Shared volume</dt><dd>Usually an <code>emptyDir</code> mount used as a drop-box — log files, sockets, rendered config.</dd></div>
+          <div><dt>Native sidecar</dt><dd>An <code>initContainers</code> entry with <code>restartPolicy: Always</code> — started in order before the main container, kept running, and restarted on failure.</dd></div>
+          <div><dt>Probes</dt><dd>Native sidecars accept <code>startupProbe</code>, <code>readinessProbe</code>, <code>livenessProbe</code>; the Pod isn't Ready until the sidecar's readiness probe passes.</dd></div>
+          <div><dt>Admission webhook</dt><dd>For service-mesh sidecars: a <code>MutatingAdmissionWebhook</code> rewrites the Pod spec at admission time to add the sidecar and an init container that programs iptables.</dd></div>
+        </dl>
+        <p>Its real competitors aren't the other three catalogued patterns — they're other <em>placements</em> of the same logic: in-process libraries (gRPC interceptors, Spring Cloud), node-level agents (a DaemonSet like Fluent Bit or the Datadog Agent), and, most recently, sidecarless service meshes (Istio ambient, Cilium) that push the proxy down to the node or into eBPF.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Architecturally, a sidecar sits between the app process and the rest of the world: every byte the app sends or receives can be intercepted, but the app itself just binds to <code>localhost</code>. In layer terms it's L4/L7 plumbing physically next to L7 application code, decoupled from it only by a Unix socket or a loopback TCP port.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Service mesh proxy</div><p>Envoy (Istio), <code>linkerd2-proxy</code> (Linkerd, Rust), Consul Connect — injected into every Pod.</p></div>
+          <div class="card"><div class="card__title">Secrets sidecar</div><p>HashiCorp Vault Agent pulls and rotates secrets, writes them to a shared <code>emptyDir</code>, signals the app via a file watcher.</p></div>
+          <div class="card"><div class="card__title">Observability sidecar</div><p>OpenTelemetry Collector, Fluent Bit, Promtail — ships logs, metrics, traces when the app can't talk to the backend directly.</p></div>
+          <div class="card"><div class="card__title">Data-access sidecar</div><p>Cloud SQL Auth Proxy / AWS RDS Proxy — terminates IAM-authenticated DB connections so the app speaks plain Postgres on <code>localhost:5432</code>.</p></div>
+          <div class="card"><div class="card__title">Runtime-API sidecar</div><p>Dapr's <code>daprd</code> exposes state, pub/sub, and binding APIs over localhost HTTP/gRPC. Managed variants: AWS App Mesh, Azure Service Fabric Mesh, GKE Anthos Service Mesh.</p></div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Multiple services in different languages need the same cross-cutting capability (mTLS, retries, tracing).</li>
+              <li>You cannot modify the app — legacy code, a vendor binary, a compliance-frozen image.</li>
+              <li>The capability has its own release cadence (security patches to a TLS library) you want decoupled from app deploys.</li>
+              <li>You need per-Pod isolation of the helper — its own failure domain, identity, resource limits.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>One process per node would do. Log scraping from stdout/stderr is a DaemonSet job, not a sidecar.</li>
+              <li>Pod density is high and resource overhead dominates — an Envoy sidecar baselines ~40 MB RAM and 0.35 vCPU per 1,000 RPS, multiplied by every Pod on the node.</li>
+              <li>The "concern" is actually business logic. Validation and authorization decisions belong in the app.</li>
+              <li>You're on FaaS/Cloud Run/Lambda, where you don't own the Pod spec.</li>
+              <li>You need cross-Pod shared state — sidecars are per-Pod by definition.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>The term entered common use around 2015 with Kubernetes 1.0 and the multi-container Pod, but Netflix's Prana (2014) was already a JVM sidecar giving non-JVM services access to Eureka and Hystrix. Lyft open-sourced Envoy in 2016; Istio (2017) and Linkerd 2 (2018) standardized "Envoy-per-Pod". Kubernetes itself didn't model sidecars natively until KEP-753 (<code>restartPolicy: Always</code> on init containers): alpha in v1.28, beta and on-by-default in v1.29, GA in v1.33 (April 2025).</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk through what happens when you <code>kubectl apply</code> a Pod into an Istio-enabled namespace using native sidecars:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Admission.</span> The API server runs the Pod spec through the <code>istio-sidecar-injector</code> <code>MutatingAdmissionWebhook</code>.</li>
+          <li><span class="steps__title">Spec rewrite.</span> istiod prepends an <code>istio-init</code> init container and adds <code>istio-proxy</code> — with native sidecars, <code>istio-proxy</code> goes into <code>initContainers</code> with <code>restartPolicy: Always</code> instead of the plain container list.</li>
+          <li><span class="steps__title">Scheduling.</span> The kube-scheduler places the Pod based on summed resource requests, sidecar included.</li>
+          <li><span class="steps__title">Init runs.</span> <code>istio-init</code> runs as root with <code>NET_ADMIN</code>/<code>NET_RAW</code> and programs iptables: outbound TCP redirects to <code>127.0.0.1:15001</code>, inbound to <code>127.0.0.1:15006</code>, with the Envoy user (UID 1337) exempted to avoid traffic loops.</li>
+          <li><span class="steps__title">Sidecar starts first.</span> Because it's a native sidecar, kubelet waits for its <code>startupProbe</code>/readiness before starting the app — no more racing against an Envoy that isn't listening yet.</li>
+          <li><span class="steps__title">App starts.</span> It binds to whatever port it likes; iptables silently routes its traffic through Envoy, which gets live config (listeners, clusters, routes, endpoints) from istiod over gRPC.</li>
+          <li><span class="steps__title">Runtime traffic.</span> A call from app A to app B goes: app A → localhost redirect → Envoy A → network (mTLS) → Envoy B → localhost → app B. Two extra hops, both on loopback.</li>
+          <li><span class="steps__title">Shutdown, reversed.</span> Kubelet SIGTERMs the app first and waits (bounded by <code>terminationGracePeriodSeconds</code>, default 30s), then SIGTERMs the native sidecar — so Envoy keeps draining in-flight requests instead of dying with the app.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant API as API server
+    participant Hook as Admission webhook istiod
+    participant Init as istio-init
+    participant Side as istio-proxy native sidecar
+    participant App as App container
+    API->>Hook: review new Pod
+    Hook-->>API: rewritten spec adds istio-init and istio-proxy
+    API->>Init: start istio-init
+    Init->>Init: program iptables redirect rules
+    Init-->>Side: netns ready, init exits
+    Side->>Side: start, wait for startupProbe
+    Side-->>App: proxy ready, app may start
+    App->>Side: outbound call over localhost
+    Side->>Side: enforce mTLS, retries, routing
+    Note over API,App: shutdown runs in reverse order
+    App->>App: SIGTERM, drain in-flight requests
+    App-->>Side: app exits
+    Side->>Side: SIGTERM only now, after the app is gone
+          </pre>
+          <figcaption class="diagram__caption">Admission through shutdown for one Pod. The native sidecar starts first and stops last — the whole reason KEP-753 exists.</figcaption>
+        </figure>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Co-locate the proxy in the Pod</td><td>Per-Pod identity (SPIFFE ID), strict isolation, no noisy-neighbour blast radius</td><td>RAM/CPU multiplied by Pod count; slower rollouts — every Pod restart is a mesh upgrade</td></tr>
+              <tr><td>Talk over localhost</td><td>Zero network hops on the wire, no DNS, kernel-fast loopback</td><td>Still pays the TCP stack overhead twice; ~1–3 ms p90 added per hop in Envoy</td></tr>
+              <tr><td>Use a MutatingAdmissionWebhook for injection</td><td>App teams don't know the sidecar exists; one config flips it for a whole namespace</td><td>The webhook is a global single point of failure; debugging a missing sidecar is a classic ops chore</td></tr>
+              <tr><td>Native sidecars vs. sibling containers</td><td>Deterministic start/stop order, working probes, no <code>preStop sleep</code> hacks</td><td>Requires Kubernetes ≥1.29 (beta) or ≥1.33 (GA); older clusters need a fallback</td></tr>
+              <tr><td>Sidecar vs. in-process library</td><td>Polyglot, decoupled release cycle, language-agnostic</td><td>Extra process, extra memory, extra latency vs. an in-process call</td></tr>
+              <tr><td>Sidecar vs. DaemonSet</td><td>Per-Pod identity and config; strong isolation</td><td>N× resource cost vs. one agent per node</td></tr>
+              <tr><td>Sidecar vs. ambient (ztunnel + waypoint)</td><td>Mature; full L7 features per Pod</td><td>Higher overhead; a node-shared ztunnel saves ~70% memory in published Istio benchmarks</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Startup race</p>
+            <p>The app sends an outbound request before Envoy is listening, so the connection is refused. Cause: iptables rules go active before Envoy binds to 15001. Fix: native sidecars, or <code>holdApplicationUntilProxyStarts</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Shutdown drop</p>
+            <p>SIGTERM kills Envoy while the app is still draining, causing in-flight 5xxs. Cause: sibling containers terminated in parallel. Fix: native sidecars, or a <code>preStop sleep</code> on the proxy.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Job Pods never complete</p>
+            <p>The app exits, the sidecar keeps running, and the Job stays <code>Active</code> forever. Fix: native sidecars (they terminate after the main container) or <code>/quitquitquit</code> on Envoy.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Sidecar CrashLoopBackOff cascades</p>
+            <p>A bad mesh upgrade poisons the webhook's config, and every new Pod across a namespace is born broken. Fix: canary mesh upgrades with revision tags.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">iptables breaks host-network Pods</p>
+            <p>Redirect rules assume the Pod's own network namespace; <code>hostNetwork: true</code> bypasses them, so traffic flows unencrypted while dashboards still claim mesh coverage.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Resource starvation</p>
+            <p>A sidecar with no <code>requests</code>/<code>limits</code> competes with the app for CPU, and tail latency spikes under load.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Webhook unavailability</p>
+            <p>If <code>istiod</code> goes down, new Pods are either admitted with no sidecar or rejected outright, depending on <code>failurePolicy</code>. Both outcomes are bad in different ways.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>The sidecar exists because the alternatives are worse for polyglot microservices. Cross-cutting concerns — authentication, encryption, retries, observability — are universal, rarely changed by app developers, and easy to get subtly wrong. Put them in a library and you force N language ports, each locked to the library's release cadence. Put them in one central proxy and you break per-call identity and create a chokepoint. The sidecar threads the needle: one binary, written once, deployed everywhere, sharing the Pod's identity, scaling exactly with the workload.</p>
+
+        <p>The obvious alternative is one proxy per node — a DaemonSet — which is exactly what Istio's ambient mode does with
+          <span class="term">ztunnel</span>
+          <span class="term__gloss">the ambient mesh's shared, per-node L4 proxy</span>.
+          Two reasons Istio didn't start there: per-Pod identity is easier when each Pod owns its own proxy — a shared proxy needs kernel tricks like <code>SO_ORIGINAL_DST</code> plus UID-based mapping to map traffic back to a Pod's certificate — and
+          <span class="term">blast radius</span>
+          <span class="term__gloss">how much breaks when one thing fails</span>:
+          a bad config push to a shared proxy takes down every Pod on the node, while per-Pod sidecars fail individually. The cost of that isolation is memory multiplied by Pod count.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 220" role="img" aria-labelledby="cmpTitle cmpDesc" width="560" style="max-width:100%">
+            <title id="cmpTitle">Sidecar-per-Pod vs. shared node proxy</title>
+            <desc id="cmpDesc">On the left, three Pods each run their own Envoy proxy alongside the app, three copies total. On the right, three Pods run only the app, and one shared ztunnel proxy on the node serves all three.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+              <!-- LEFT: sidecar per pod -->
+              <rect x="10" y="18" width="250" height="180" rx="8" fill="none" stroke="var(--border)" stroke-dasharray="4 3"/>
+              <text x="135" y="14" fill="var(--text-muted)" text-anchor="middle" font-size="12">Sidecar per Pod</text>
+
+              <rect x="24" y="32" width="95" height="32" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="71" y="52" fill="var(--accent)" text-anchor="middle">App</text>
+              <rect x="128" y="32" width="90" height="32" rx="6" fill="var(--bg-elev-2)" stroke="var(--text-muted)"/>
+              <text x="173" y="52" fill="var(--text-muted)" text-anchor="middle">Envoy</text>
+
+              <rect x="24" y="76" width="95" height="32" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="71" y="96" fill="var(--accent)" text-anchor="middle">App</text>
+              <rect x="128" y="76" width="90" height="32" rx="6" fill="var(--bg-elev-2)" stroke="var(--text-muted)"/>
+              <text x="173" y="96" fill="var(--text-muted)" text-anchor="middle">Envoy</text>
+
+              <rect x="24" y="120" width="95" height="32" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="71" y="140" fill="var(--accent)" text-anchor="middle">App</text>
+              <rect x="128" y="120" width="90" height="32" rx="6" fill="var(--bg-elev-2)" stroke="var(--text-muted)"/>
+              <text x="173" y="140" fill="var(--text-muted)" text-anchor="middle">Envoy</text>
+
+              <text x="135" y="180" fill="var(--text-faint)" text-anchor="middle" font-size="11">3 Pods → 3 proxy copies</text>
+
+              <!-- RIGHT: shared node proxy -->
+              <rect x="300" y="18" width="250" height="180" rx="8" fill="none" stroke="var(--border)" stroke-dasharray="4 3"/>
+              <text x="425" y="14" fill="var(--text-muted)" text-anchor="middle" font-size="12">Shared node proxy (ambient)</text>
+
+              <rect x="314" y="32" width="220" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="424" y="51" fill="var(--accent)" text-anchor="middle">App</text>
+              <rect x="314" y="70" width="220" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="424" y="89" fill="var(--accent)" text-anchor="middle">App</text>
+              <rect x="314" y="108" width="220" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="424" y="127" fill="var(--accent)" text-anchor="middle">App</text>
+
+              <rect x="314" y="150" width="220" height="30" rx="6" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="424" y="170" fill="var(--info)" text-anchor="middle">ztunnel — 1 shared proxy</text>
+
+              <text x="425" y="192" fill="var(--text-faint)" text-anchor="middle" font-size="11">3 Pods → 1 proxy copy</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The isolation-versus-cost trade-off in one picture: per-Pod proxies fail independently but multiply memory; a shared node proxy is cheap but widens the blast radius.</figcaption>
+        </figure>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026 the sidecar pattern is at an inflection point. Native sidecars are GA in Kubernetes 1.33, so the worst operational complaints — startup races, Job Pods that won't exit — are finally solved at the platform level. At the same time, ambient mesh reached GA for L4 traffic in Istio 1.22 and is closing in on L7 parity via waypoint proxies, and Cilium offers a fully eBPF-based sidecarless model. The working question in 2026 isn't "should I use a sidecar?" — it's "sidecar, or a node-shared proxy?" — and answering that well still requires understanding the sidecar model first.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

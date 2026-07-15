@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tokenization · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Tokenization</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Tokenization</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/tokenization/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Tokenization</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A tokenizer is a deterministic, lossless mapping from a Unicode string to a sequence of integer IDs drawn from a fixed vocabulary, and back. It runs in two stages:</p>
+        <ul>
+          <li><strong>Pre-tokenizer.</strong> A
+            <span class="term">pre-tokenizer</span>
+            <span class="term__gloss">the regex pass that splits raw text into word-like chunks before subword merging starts</span>
+            splits the raw string into "word-like" chunks using a regex over Unicode categories.</li>
+          <li><strong>Subword model.</strong> Segments each chunk into vocabulary entries — by merging (BPE, WordPiece) or by picking the most likely split (Unigram).</li>
+          <li><strong>Frozen vocabulary.</strong> Learned once on a training corpus, then frozen. At inference time, encoding is a pure function of the input bytes.</li>
+        </ul>
+        <p>Formally, a subword tokenizer is a tuple <code>(V, M, P)</code>: <code>V</code> is the vocabulary, <code>M</code> is either an ordered
+          <span class="term">merge table</span>
+          <span class="term__gloss">an ordered list of character-pair merges — replaying it out of order changes the output</span>
+          (BPE/WordPiece) or a probability distribution over <code>V</code> (Unigram), and <code>P</code> is the pre-tokenization regex.</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Vocabulary V</dt><dd>32k (Llama 2), 100k (GPT-4 / <code>cl100k_base</code>), 128k (Llama 3), or 200k (GPT-4o / <code>o200k_base</code>) entries, each with a unique ID.</dd></div>
+          <div><dt>Base alphabet</dt><dd>The smallest units that can never run out. Byte-level BPE uses the 256 UTF-8 byte values, so every input is representable.</dd></div>
+          <div><dt>Merge table</dt><dd>An ordered list of pairs <code>(a, b) → ab</code> for BPE/WordPiece. Order is part of the model.</dd></div>
+          <div><dt>Unigram probability table</dt><dd>Unigram stores <code>log p(t)</code> per token and runs Viterbi to find the most likely split.</dd></div>
+          <div><dt>Pre-tokenization regex</dt><dd>Guarantees merges never span a space-to-letter or letter-to-digit boundary.</dd></div>
+          <div><dt>Special tokens</dt><dd>Reserved IDs added after training (<code>&lt;|endoftext|&gt;</code>, <code>&lt;|im_start|&gt;</code>) — never produced by merging, only inserted by a chat template.</dd></div>
+          <div><dt>Decoder</dt><dd>The inverse map. For byte-level tokenizers: concatenate token byte strings, then re-decode as UTF-8.</dd></div>
+        </dl>
+
+        <p>Subword tokenizers sit between two extremes: word-level (huge vocabulary, terrible behavior on unseen words, effectively dead) and character/byte-level (tiny vocabulary, very long sequences, expensive attention). Inside the subword family there are three sibling algorithms — <strong>BPE</strong> (Sennrich et al., 2016), <strong>WordPiece</strong> (Schuster &amp; Nakajima, 2012; revived by BERT), and <strong>Unigram LM</strong> (Kudo, 2018) — plus the <strong>SentencePiece</strong> library, which is a packaging of BPE or Unigram that treats whitespace as a regular character. Newer research (Boundless BPE, BlockBPE) is pushing on the pre-tokenizer step itself, but as of 2026 every production LLM still uses one of those three algorithms.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Tokenization is the first computation in the inference pipeline and the last one before output. It runs on the <strong>host CPU</strong>, not the GPU — the encoded IDs are what gets copied to device memory:</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[Raw string] --> B["tokenizer.encode — CPU"]
+    B --> C[Integer IDs]
+    C --> D["Embedding lookup — GPU"]
+    D --> E["Transformer — GPU"]
+    E --> F["Unembedding + sampling — GPU"]
+    F --> G[Integer ID]
+    G --> H["tokenizer.decode — CPU"]
+    H --> I[Text]
+          </pre>
+          <figcaption class="diagram__caption">The same tokenizer instance is used at training, fine-tuning, and inference time. A vocabulary mismatch between any two silently wrecks quality.</figcaption>
+        </figure>
+
+        <p>Where you'll run into it in practice:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">OpenAI tiktoken</div><p><code>cl100k_base</code> (GPT-4, GPT-3.5-turbo), <code>o200k_base</code> (GPT-4o, o-series). C++ core with Rust bindings, built for speed.</p></div>
+          <div class="card"><div class="card__title">Hugging Face tokenizers</div><p>Rust-backed; hosts BPE, WordPiece, and Unigram variants for thousands of models.</p></div>
+          <div class="card"><div class="card__title">SentencePiece</div><p>Google's reference C++ implementation, used by T5, mT5, ALBERT, XLNet, Gemma, mBART.</p></div>
+          <div class="card"><div class="card__title">Llama 3 / 3.1 / 3.2</div><p>128,256-entry vocabulary built with tiktoken-format BPE plus Meta's own special tokens.</p></div>
+          <div class="card"><div class="card__title">BERT / DistilBERT</div><p>WordPiece with a <code>##</code> continuation prefix and <code>[UNK]</code> / <code>[CLS]</code> / <code>[SEP]</code>.</p></div>
+          <div class="card"><div class="card__title">Claude, Gemini</div><p>Proprietary BPE-family tokenizers; exact size and rules are not public.</p></div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for an existing tokenizer when</p>
+            <ul>
+              <li>You're calling any hosted LLM API — you must match what the model was trained on; there's no choice here.</li>
+              <li>You're fine-tuning a foundation model — extending the vocabulary is possible but rare; reuse the base tokenizer.</li>
+              <li>You're building a RAG pipeline — measure chunk size in tokens, not characters, because the context budget is in tokens.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it — or don't reuse one — when</p>
+            <ul>
+              <li>You only need word counts for a UI — <code>str.split()</code> is correct and cheaper.</li>
+              <li>You want semantic similarity — that's sentence embeddings, a separate model.</li>
+              <li>You're reusing another model's tokenizer with a different model's weights — "tokenizer recycling" reliably produces garbage.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Train your own only when</p>
+            <ul>
+              <li>You're pre-training from scratch on a domain (code, biomedical text, a low-resource language) where public tokenizers give bad <span class="term">fertility</span><span class="term__gloss">tokens produced per word — higher fertility means more tokens, more cost, and less usable context for the same text</span> — typically more than 2 tokens per word on your evaluation set.</li>
+              <li>You need a custom alphabet — protein sequences, MIDI events — where Unicode-based pre-tokenization is the wrong tool.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Encoding a string with byte-level BPE (the <code>cl100k_base</code> recipe):</p>
+        <ol class="steps">
+          <li><span class="steps__title">Normalize.</span> Pass the input through Unicode NFC. Most modern tokenizers don't normalize aggressively — they want to round-trip exactly.</li>
+          <li><span class="steps__title">Pre-tokenize.</span> Apply the regex. <code>" the cat sat"</code> becomes the chunks <code>[" the", " cat", " sat"]</code> — note the leading space stays attached, so <code>" cat"</code> and <code>"cat"</code> are different tokens.</li>
+          <li><span class="steps__title">Encode to bytes.</span> Each chunk becomes a UTF-8 byte sequence, remapped through a reversible byte-to-printable-character table so the merge table can be written in plain text.</li>
+          <li><span class="steps__title">Greedy merge.</span> For every adjacent pair of current tokens, apply the lowest-rank (earliest-learned) merge in the table first. Repeat until no merge applies.</li>
+          <li><span class="steps__title">Look up IDs.</span> Map each final piece to its integer ID.</li>
+          <li><span class="steps__title">Concatenate.</span> Emit the flat list of IDs across all chunks.</li>
+        </ol>
+        <p>The complexity is <code>O(n log n)</code> per chunk with a priority queue keyed on merge rank, or <code>O(n)</code> with the linked-list trick <code>tiktoken</code> uses. A 4k-token prompt encodes in single-digit milliseconds on a laptop CPU.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    A[Normalize Unicode] --> B[Split into word-like chunks with the pre-tokenizer regex]
+    B --> C[Encode each chunk to UTF-8 bytes]
+    C --> D{Adjacent pair in the merge table?}
+    D -- yes, lowest rank first --> E[Replace the pair with its merge]
+    E --> D
+    D -- no merge applies --> F[Look up final token IDs]
+    F --> G[Concatenate IDs across chunks]
+          </pre>
+          <figcaption class="diagram__caption">One string through byte-level BPE encoding — the merge loop is the only part doing real work.</figcaption>
+        </figure>
+
+        <h3>Training a vocabulary</h3>
+        <p>Training builds the merge table the encode loop replays. Starting from the 256 base bytes, count every adjacent token-pair across the corpus, merge the most frequent pair into a new vocabulary entry, record it as the next merge, and repeat until the vocabulary hits its target size. The three algorithms differ in how they pick and apply merges:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">BPE</div><p>Picks the most <em>frequent</em> pair at each step. Deterministic, fast, easy to cache. Used by GPT-4/4o's <code>tiktoken</code> and Llama 3.</p></div>
+          <div class="card"><div class="card__title">WordPiece</div><p>Picks the pair that maximizes a likelihood ratio, <code>count(a,b) / (count(a)·count(b))</code>, not raw frequency. Marks continuation pieces with <code>##</code> and matches greedily at encode time. Used by BERT.</p></div>
+          <div class="card"><div class="card__title">Unigram</div><p>Works top-down: seed a huge candidate set, estimate probabilities with EM, drop the lowest-scoring ~10%, repeat. Encoding runs Viterbi to find the most likely split, which also enables sampling alternate splits for data augmentation. Used by SentencePiece and Gemma.</p></div>
+        </div>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Larger vocab (200k vs 32k)</td><td>Fewer tokens per request, cheaper inference, better non-English fertility</td><td>Larger embedding matrix (d_model × |V|), more memory, slower softmax over the unembedding</td></tr>
+              <tr><td>Byte-level fallback</td><td>No OOV ever; emoji, code, rare scripts always representable</td><td>A single rare CJK character may cost 3 tokens (one per UTF-8 byte)</td></tr>
+              <tr><td>Pre-tokenization regex</td><td>Stable behavior across whitespace, no "the→cat" merges</td><td>Locks in English-centric word boundaries; bad for Chinese/Japanese</td></tr>
+              <tr><td>BPE greedy encode</td><td>Deterministic, fast, easy to cache</td><td>No notion of probability, no regularization at training</td></tr>
+              <tr><td>Unigram + Viterbi</td><td>Probabilistic, supports sampling for regularization</td><td>More expensive to encode, harder to implement correctly</td></tr>
+              <tr><td>Adding special tokens post-hoc</td><td>Clean separation of structure vs. content</td><td>Can collide with user input; vulnerable to prompt-injection of <code>&lt;|im_end|&gt;</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Digit-grouping arithmetic errors</p>
+            <p><code>cl100k_base</code> and Llama 3 chunk runs of digits into up-to-3-digit tokens. <code>1,000,001</code> may split into <code>1</code>, <code>000</code>, <code>001</code> while <code>999</code> is one token — the model learns inconsistent representations of the same digit position.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Leading-space artifacts</p>
+            <p><code>"Hello"</code> and <code>" Hello"</code> are different IDs. A model fine-tuned on <code>"Hello"</code> after a newline can quietly underperform when the prompt template inserts a space.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Glitch tokens</p>
+            <p>Tokens like <code>SolidGoldMagikarp</code> made it into the vocabulary from corpus quirks but were stripped from later training data. Their embeddings stay near their random initialization and produce nonsense output.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Multilingual fertility tax</p>
+            <p>English averages ~1.2 tokens/word; Ukrainian ~2.7; Burmese, Telugu, and Khmer are often above 3. Same API call, different cost; same 8k context window, roughly half the usable text.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Chat-template injection</p>
+            <p>A user message that contains literal <code>&lt;|im_end|&gt;</code> text can be tokenized straight into the special ID if the tokenizer is configured to recognize specials in input — a real prompt-injection surface.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Tokenizer recycling</p>
+            <p>Porting another model's tokenizer onto new weights (say, using Llama's tokenizer for a French model) causes fertility to blow up and perplexity to degrade.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Trailing-whitespace traps</p>
+            <p>A chat template that ends the prompt with a trailing space makes the model score the wrong continuation tokens, because the leading-space variant is already "consumed".</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <ul>
+          <li><strong>Lossless integer encoding is required.</strong> Transformers compute on integer-indexed embeddings, so the string-to-int step has to be reversible and identical at training and inference time.</li>
+          <li><strong>Sequence length costs O(n²) attention.</strong> Compressing 4 characters into 1 token quarters the cost of attention. Tokenization is a learned compressor trying to shrink the sequence without losing the ability to express anything.</li>
+          <li><strong>No-OOV guarantee.</strong> A byte-level alphabet makes the encoder a total function — every Unicode string round-trips, with nothing ever "unknown".</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 520 220" role="img" aria-labelledby="attnTitle attnDesc" width="520" style="max-width:100%">
+            <title id="attnTitle">Quadratic attention cost</title>
+            <desc id="attnDesc">A 12-character sequence needs a 12 by 12 attention grid of 144 pairs; the same text tokenized into 3 subword tokens needs only a 3 by 3 grid of 9 pairs.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="22" fill="var(--text-muted)">Same sentence, two sequence lengths</text>
+              <!-- big grid: 12 chars -->
+              <g>
+                <rect x="20" y="40" width="160" height="160" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <path d="M20,66.7 H180 M20,93.3 H180 M20,120 H180 M20,146.7 H180 M20,173.3 H180 M46.7,40 V200 M73.3,40 V200 M100,40 V200 M126.7,40 V200 M153.3,40 V200" stroke="var(--border)" stroke-width="1"/>
+                <text x="100" y="216" fill="var(--danger)" text-anchor="middle" font-size="12">12 chars → 12² = 144 pairs</text>
+              </g>
+              <!-- small grid: 3 tokens -->
+              <g>
+                <rect x="280" y="140" width="60" height="60" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <path d="M280,160 H340 M280,180 H340 M300,140 V200 M320,140 V200" stroke="var(--border)" stroke-width="1"/>
+                <text x="310" y="216" fill="var(--accent)" text-anchor="middle" font-size="12">3 tokens → 3² = 9 pairs</text>
+              </g>
+              <text x="380" y="90" fill="var(--text-faint)" font-size="12">Fewer, richer</text>
+              <text x="380" y="106" fill="var(--text-faint)" font-size="12">tokens shrink</text>
+              <text x="380" y="122" fill="var(--text-faint)" font-size="12">the attention</text>
+              <text x="380" y="138" fill="var(--text-faint)" font-size="12">grid a lot.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Attention cost grows with the square of sequence length, so shrinking text into fewer subword tokens is a direct compute saving, not just a cost trick.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative is pure character-level tokenization: a vocabulary of every Unicode code point, no merging, no pre-tokenizer. It's simpler, fairer across languages, and sidesteps glitch tokens entirely. It isn't used because:</p>
+        <ul>
+          <li>Sequences become 3–5× longer, blowing the attention budget.</li>
+          <li>The model spends most of its capacity learning spelling instead of meaning.</li>
+          <li>Subword models match or beat character models on downstream tasks at a fraction of the compute (Kudo &amp; Richardson, 2018, and many follow-ups).</li>
+        </ul>
+        <p>Byte-level — not character-level — BPE is the synthesis: it keeps the no-OOV property of character models and the compression of subword models, at the cost that one Han character may run 3 bytes. The BPE-vs-Unigram choice is mostly about training convenience: Unigram supports sampled splits during training, BPE is deterministic and faster to encode. Most production tokenizers picked BPE because encode-time determinism made the engineering simpler, not because it's mathematically better.</p>
+
+        <h3>Why it matters now</h3>
+        <ul>
+          <li><strong>Context windows keep growing</strong> — 1M tokens for Gemini, 200k+ for Claude and GPT. Fertility is now a first-class scaling-cost question: a 10% better tokenizer is a 10% larger effective context.</li>
+          <li><strong>Multilingual deployment is the norm.</strong> The fertility tax lands hardest on the regions with the fastest LLM adoption growth.</li>
+          <li><strong>Code-acting agents</strong> parse, edit, and re-emit source code, where numeric and whitespace tokenization now have real correctness effects on diff fidelity, not just cost.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

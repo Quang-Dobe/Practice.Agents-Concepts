@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LSM Tree · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">LSM Tree</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">LSM Tree</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/lsm-tree/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">LSM Tree</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~9 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>You rarely "use an LSM tree" on purpose — you inherit one. The moment your team picks Cassandra, ScyllaDB, HBase, or any RocksDB-backed system, every quirk below becomes your problem. The LSM tree is the silent layer between the query engine and the block device, and it leaks its trade-offs upward as latency spikes, disk-full pages, and CPU you can't explain.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Metrics / observability</div><p>Prometheus-style TSDBs and InfluxDB ingest a firehose of points. The LSM-like engine is why you can take millions of writes per second on commodity SSDs — and why "disk at 95%, compaction backlog growing" pages you at 3 a.m.</p></div>
+          <div class="card"><div class="card__title">Wide-column stores</div><p>Cassandra and ScyllaDB run the LSM/SSTable model directly. Your read p99, write-stall incidents, and storage bill all trace back to memtable, compaction, and Bloom filter tuning.</p></div>
+          <div class="card"><div class="card__title">NewSQL on RocksDB</div><p>CockroachDB, TiKV, YugabyteDB, and MyRocks put a RocksDB instance under each shard. Most teams never touch its settings until something breaks.</p></div>
+          <div class="card"><div class="card__title">Stream processors</div><p>Kafka Streams and Flink keep windowed aggregation state in an embedded RocksDB, right next to the hot path.</p></div>
+        </div>
+        <p>The recurring shape: writes are cheap and you fall in love with the system, then weeks later compaction, tombstones, or space amplification present a bill you didn't budget for.</p>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Match the compaction strategy to the read/write/delete shape, not the default</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use leveled compaction for read-heavy and update-heavy tables; size-tiered for write-heavy, append-mostly tables; time-windowed for TTL'd time-series.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The strategy <em>is</em> the read-vs-write-vs-space amplification dial. Get it wrong and you either get a read p99 that fans out across dozens of SSTables, or write amplification north of 10x burning your SSD's endurance.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving Cassandra on the size-tiered default for a heavily updated, read-latency-sensitive table — reads end up scanning many overlapping tiers.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Use time-windowed compaction for anything with a uniform TTL, and only that</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pick the compaction window size so the TTL spans roughly 20–30 windows — a 90-day TTL suggests ~3-day windows. Whole expired SSTables get dropped without rewriting data.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>
+              <span class="term">TWCS</span>
+              <span class="term__gloss">time-windowed compaction strategy — groups data by write time so a whole expired file can be dropped</span>
+              reclaims space by deleting files, not by merging tombstones — the cheapest possible reclaim. Size-tiered or leveled compaction would rewrite expiring data repeatedly instead.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using it on a table that also does explicit deletes of non-TTL'd rows — tombstones and the data they shadow land in different time windows and never compact together.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Size memtables and compaction parallelism so compaction keeps up with ingest</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Watch the L0 file count and pending-compaction bytes. If they climb under steady load, raise the number of background compaction jobs and the number of memtables allowed to absorb bursts.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>When L0 overflows faster than background workers drain it, the engine throttles then stops writers — a latency cliff, not a clean error.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Running a single compaction thread on a multi-core box with SSDs that can absorb far more concurrent I/O.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Size Bloom filters at ~10 bits per key and keep them resident</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default to 10 bits per key (~1% false-positive rate). Enable whole-key filtering for point gets; add a prefix extractor only if you do prefix range scans. Consider the Ribbon filter for ~30% less filter memory at the same false-positive rate when CPU is cheaper than RAM.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Below ~5 bits per key, false positives turn negative lookups into wasted block reads — read amplification you'll see as elevated p99 on keys that don't even exist.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Disabling filters "to save memory," then wondering why every miss hits disk.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Provision disk for transient space amplification, not just logical size</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Budget roughly 2x logical size for size-tiered compaction — a large tier merge needs room for the inputs plus the output at the same time. Leveled compaction is tighter (~1.1x) but spikier under backlog.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Compaction writes the merged output before deleting the inputs. Run a disk too close to full and one big compaction wedges the node — it can neither compact nor free space. That's
+              <span class="term">space amplification</span>
+              <span class="term__gloss">extra disk space consumed by stale copies and in-flight merges beyond the logical data size</span>
+              biting you at the worst time.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Running a manual full compaction on a size-tiered table in production — it fuses everything into one giant SSTable with no same-size peer left to merge with.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Treat deletes as expensive writes</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Prefer TTLs over explicit deletes; model data so you delete whole partitions or SSTables rather than scattered cells. Tune
+              <span class="term" data-gloss="the delay before a tombstone and the data it shadows can be permanently removed together">gc_grace_seconds</span>
+              deliberately — Cassandra's 10-day default exists for tombstone propagation across replicas, not performance.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A tombstone is a live row until both it and every shadowed copy are compacted together <em>and</em> the grace period passes. Until then, reads and range scans must read past every tombstone.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Queue-on-Cassandra patterns — insert, read, delete — that manufacture tombstone storms and eventually fail reads.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Never range-scan across a wall of tombstones</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Keep the tombstone-warn threshold (1000) and tombstone-failure threshold (100,000) as guardrails, and design partitions so a scan never crosses thousands of deleted cells.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Tombstones can't be paged — the coordinator must hold all encountered ones in memory, since other replicas may not know about the delete yet. Latency and heap grow with tombstone count until the query trips the failure threshold.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Reading "all undeleted rows in a partition" that's mostly deletes — that scan reads every tombstone first.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Tune write-stall thresholds intentionally and alert before them</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set the soft and hard pending-compaction-bytes limits knowing the soft limit slows writers and the hard limit stops them. Alert on the soft limit so you act before the hard one.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Hitting the hard limit is a full write stall — to the application it looks like the database hung. The soft limit is your early warning.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Discovering these knobs exist only while reading the log file during the incident.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Reduce write amplification before adding hardware</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Anything that lowers write amplification — larger memtables, fewer levels, better compression, a right-sized level multiplier (RocksDB default 10) — speeds up compaction, because compaction <em>is</em> the bytes being rewritten.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A compaction backlog is usually a write-amplification problem wearing an I/O-saturation costume; adding disks without fixing amplification just delays the next stall.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Scaling out the cluster to mask a single-node tuning problem.</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph LCS["Leveled compaction"]
+      L1[Read-heavy / update-heavy tables]
+      L2[Low read and space amplification]
+    end
+    subgraph STCS["Size-tiered compaction"]
+      S1[Write-heavy, append-mostly tables]
+      S2[Low write amplification]
+    end
+    subgraph TWCS["Time-windowed compaction"]
+      T1[Uniform TTL, time-series data]
+      T2[Drop whole expired SSTable, no rewrite]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Pick the strategy by workload shape, not by copying a default — each one wins on a different amplification axis.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">LSM as a queue or work queue</p>
+            <p>Insert task, poll, delete done-task. It looks like a table but generates a tombstone per delete; reads slow to a crawl and eventually fail at the tombstone threshold. Use an actual queue — Kafka, SQS, Redis streams.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Read-heavy point lookups on a cold working set</p>
+            <p>Choosing an LSM store for a key-value cache whose working set exceeds RAM. Each miss fans out across SSTables where a B-tree would do one seek. Use a B-tree engine or an actual cache.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Manual major compaction "to clean things up"</p>
+            <p>A full compaction on a size-tiered table merges everything into one monster SSTable that never compacts again, so space stops recovering normally. Let the strategy do its job, or switch to leveled/time-windowed first.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Disabling Bloom filters to save RAM</p>
+            <p>Saves a little memory, then turns every nonexistent-key lookup into disk I/O. Keep filters; shrink bits per key or switch to Ribbon if memory is truly tight.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Many different TTLs on one time-windowed table</p>
+            <p>Breaks the "drop the whole expired SSTable" optimization, because windows never fully expire. Use a single table-level TTL.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Ignoring space amplification until the disk fills</p>
+            <p>Logical data is 400 GB, you provisioned 500 GB, then a tier merge needs another 400 GB transiently and the node wedges. Size for the strategy's worst-case amplification.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Treating compaction CPU as a leak</p>
+            <p>Seeing constant background CPU/I/O and throttling compaction to "fix" it — which just moves the cost to read amplification and a future write stall.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Metrics platform, tens of millions of points/sec</div>
+            <p>A TSDB ingesting from thousands of agents stores each metric with a fixed retention TTL, using time-windowed compaction so a whole window's data expires and its files are deleted as a unit. <em>Lesson:</em> retention changes are nearly free — drop old windows — but re-tuning the window size afterward is painful, since windows already on disk keep their old boundaries.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Wide-column store behind a social feed</div>
+            <p>A Cassandra/Scylla cluster holds per-user timelines, append-heavy with occasional edits, on size-tiered compaction. Read p99 quietly degraded over months as overlapping tiers piled up. <em>Lesson:</em> the fix was moving read-hot tables to leveled compaction, not adding nodes — amplification trade-offs drift with data volume.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">NewSQL OLTP on RocksDB</div>
+            <p>A distributed SQL database puts a RocksDB/Pebble instance under each range. A batch import saturated compaction on a few hot ranges, triggering write stalls the app saw as transaction timeouts. <em>Lesson:</em> in a sharded LSM system you don't have one compaction problem, you have N — per-shard metrics, not cluster averages, find it.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Kafka Streams / Flink state store</div>
+            <p>A stream processor keeps windowed aggregation state in an embedded RocksDB. Under high cardinality, compaction competed with the processing threads for disk and CPU, raising end-to-end lag. <em>Lesson:</em> when the LSM sits next to compute, compaction is not "background" — cap its resource use explicitly.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> are L0 file count, pending-compaction bytes, compaction throughput vs. ingest rate, and read/write/space amplification tracked per shard, not just cluster-wide?</li>
+              <li><strong>Write stalls:</strong> do you alert on the soft pending-compaction limit before the hard limit is hit?</li>
+              <li><strong>Tombstones:</strong> for delete/TTL tables, is tombstone-per-read count monitored and well under the failure threshold? Is <code>gc_grace_seconds</code> set deliberately?</li>
+              <li><strong>Disk headroom:</strong> is free space sized for the chosen strategy's transient amplification (~2x logical for size-tiered) so a big compaction can't wedge the node?</li>
+              <li><strong>Failure handling:</strong> have you tested what happens when ingest outpaces compaction for an hour?</li>
+              <li><strong>Bloom filters:</strong> are filters enabled, sized ~10 bits per key, and resident in memory for open files?</li>
+              <li><strong>Range scans:</strong> have you load-tested range scans — which can't use Bloom filters — separately from point reads?</li>
+              <li><strong>Cost:</strong> do you know your write amplification factor? It drives SSD wear and your cloud IOPS/throughput bill directly.</li>
+              <li><strong>Onboarding:</strong> can a new on-call engineer find the compaction-stats command and read the L0/backlog signals on day one?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Honeymoon.</span> Teams accept the defaults. Ingestion is smooth, writes are cheap, and the LSM tree is invisible. This lasts as long as the data stays small relative to RAM and disk — nobody tunes compaction because nothing is broken yet.</li>
+          <li><span class="steps__title">First painful migration.</span> At scale, read p99 creeps up (overlapping SSTables under size-tiered), or the disk fills faster than logical growth explains (space amplification and tombstones), or ingest bursts trigger write stalls that look like outages. Teams discover compaction strategies exist and often switch strategy on a live table — an expensive, I/O-heavy rewrite scheduled for off-peak. Delete-heavy workloads hit the tombstone wall around the same time.</li>
+          <li><span class="steps__title">Mature usage.</span> Amplification becomes a first-class, monitored budget: per-table compaction strategies chosen on purpose, alerts on backlog and stalls, disk provisioned for worst-case amplification, and compaction CPU/I/O treated as a permanent line item, not a bug.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://github.com/facebook/rocksdb/wiki/RocksDB-Tuning-Guide" rel="noopener">RocksDB Tuning Guide</a> — the canonical reference for memtable sizing, compaction, and amplification knobs, from the people who run it at scale.</li>
+          <li><a href="https://github.com/facebook/rocksdb/wiki/Write-Stalls" rel="noopener">RocksDB Write Stalls</a> — exactly what triggers stalls and which option moves which limit; read this before the incident, not during.</li>
+          <li><a href="https://thelastpickle.com/blog/2016/12/08/TWCS-part1.html" rel="noopener">TWCS — how it works and when to use it (The Last Pickle)</a> — the clearest explanation of time-windowed compaction and its deletes-break-it caveat.</li>
+          <li><a href="https://www.instaclustr.com/support/documentation/cassandra/using-cassandra/managing-tombstones-in-cassandra/" rel="noopener">Managing Tombstones in Apache Cassandra (Instaclustr)</a> — practical tombstone diagnosis and the queue anti-pattern, from people who operate large fleets.</li>
+          <li><a href="https://vldb.org/pvldb/vol14/p2216-sarkar.pdf" rel="noopener">Constructing and Analyzing the LSM Compaction Design Space (VLDB 2021)</a> — the rigorous map of the compaction trade-off space behind the rules of thumb here.</li>
+          <li><a href="https://rocksdb.org/blog/2021/12/29/ribbon-filter.html" rel="noopener">Ribbon Filter (RocksDB blog)</a> — when to trade CPU for ~30% less filter memory than a Bloom filter at the same false-positive rate.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/lsm-tree/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Learning Notebook — 25 Software-Engineering Topics</title>
+  <meta name="description" content="Intuition-first notes on 25 software-engineering topics: overview, deep dive, and real-world practice for each, with diagrams.">
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="stylesheet" href="./assets/site.css">
+</head>
+<body style="--accent:#6ea8fe; --accent-soft:rgba(110,168,254,0.15)">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <main id="main" class="dash">
+
+    <header class="dash__header">
+      <div class="dash__top">
+        <div>
+          <h1 class="dash__title">Learning Notebook</h1>
+          <p class="dash__subtitle">Intuition-first notes on 25 software-engineering topics — each with an overview, a deep dive, and real-world practice, explained with diagrams.</p>
+        </div>
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+      </div>
+
+      <div class="stat-grid dash__stats">
+        <div class="stat"><div class="stat__num">25</div><div class="stat__label">topics</div></div>
+        <div class="stat"><div class="stat__num">6</div><div class="stat__label">categories</div></div>
+        <div class="stat"><div class="stat__num">3</div><div class="stat__label">docs per topic</div></div>
+        <div class="stat"><div class="stat__num">100+</div><div class="stat__label">pages</div></div>
+      </div>
+    </header>
+
+    <div class="dash-controls">
+      <input class="dash-search" type="search" placeholder="Search topics — e.g. cache, retry, index…" aria-label="Search topics">
+      <div class="dash-filters" role="group" aria-label="Filter by category">
+        <button class="filter-chip is-active" type="button" data-cat="all" aria-pressed="true">All</button>
+        <button class="filter-chip" type="button" data-cat="frontend" aria-pressed="false">Frontend</button>
+        <button class="filter-chip" type="button" data-cat="backend" aria-pressed="false">Backend</button>
+        <button class="filter-chip" type="button" data-cat="ai" aria-pressed="false">AI</button>
+        <button class="filter-chip" type="button" data-cat="database" aria-pressed="false">Database</button>
+        <button class="filter-chip" type="button" data-cat="cloud" aria-pressed="false">Cloud</button>
+        <button class="filter-chip" type="button" data-cat="general-concept" aria-pressed="false">General</button>
+      </div>
+    </div>
+
+    <p class="dash-empty">No topics match your search.</p>
+
+    <!-- ============================= FRONTEND ============================= -->
+    <section class="dash-cat-group">
+      <h2 class="dash-cat-group__head"><span style="color:#58a6ff">Frontend</span> <span class="badge">4</span></h2>
+      <div class="dash-grid">
+        <a class="topic-card" data-cat="frontend" data-search="hydration ssr server-rendered html interactive event listeners react" href="frontend/hydration/present/index.html">
+          <span class="topic-card__cat">frontend</span>
+          <h3 class="topic-card__title">Hydration</h3>
+          <p class="topic-card__desc">Waking up server-rendered HTML in the browser by attaching JS listeners and state so the page becomes interactive.</p>
+        </a>
+        <a class="topic-card" data-cat="frontend" data-search="service worker offline cache pwa background thread fetch intercept network" href="frontend/service-worker/present/index.html">
+          <span class="topic-card__cat">frontend</span>
+          <h3 class="topic-card__title">Service Worker</h3>
+          <p class="topic-card__desc">A background-thread JS file that sits between your page and the network to intercept and answer requests.</p>
+        </a>
+        <a class="topic-card" data-cat="frontend" data-search="virtual dom diff reconciliation react ui tree patch render" href="frontend/virtual-dom/present/index.html">
+          <span class="topic-card__cat">frontend</span>
+          <h3 class="topic-card__title">Virtual DOM</h3>
+          <p class="topic-card__desc">A lightweight JS copy of the UI tree, diffed against the previous copy to patch the real DOM minimally.</p>
+        </a>
+        <a class="topic-card" data-cat="frontend" data-search="web components custom elements shadow dom html templates reusable" href="frontend/web-components/present/index.html">
+          <span class="topic-card__cat">frontend</span>
+          <h3 class="topic-card__title">Web Components</h3>
+          <p class="topic-card__desc">The browser's built-in way to define your own reusable HTML tags that work in any framework or none.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- ============================= BACKEND ============================= -->
+    <section class="dash-cat-group">
+      <h2 class="dash-cat-group__head"><span style="color:#3fb950">Backend</span> <span class="badge">5</span></h2>
+      <div class="dash-grid">
+        <a class="topic-card" data-cat="backend" data-search="circuit breaker resilience retry timeout fail fast state machine polly resilience4j" href="backend/circuit-breaker/present/index.html">
+          <span class="topic-card__cat">backend</span>
+          <h3 class="topic-card__title">Circuit Breaker</h3>
+          <p class="topic-card__desc">Stops calling a broken remote service so one sick dependency doesn't drag the whole system down.</p>
+        </a>
+        <a class="topic-card" data-cat="backend" data-search="connection pooling database pgbouncer reuse tcp handshake driver" href="backend/connection-pooling/present/index.html">
+          <span class="topic-card__cat">backend</span>
+          <h3 class="topic-card__title">Connection Pooling</h3>
+          <p class="topic-card__desc">Keep a stash of already-open database connections and lend them out instead of opening a fresh one each time.</p>
+        </a>
+        <a class="topic-card" data-cat="backend" data-search="grpc rpc http2 protobuf protocol buffers binary schema codegen streaming" href="backend/grpc/present/index.html">
+          <span class="topic-card__cat">backend</span>
+          <h3 class="topic-card__title">gRPC</h3>
+          <p class="topic-card__desc">Call a function on another machine as if it were local — a schema, HTTP/2 binary transport, generated code.</p>
+        </a>
+        <a class="topic-card" data-cat="backend" data-search="jwt json web token auth authentication signed claims stateless bearer" href="backend/jwt/present/index.html">
+          <span class="topic-card__cat">backend</span>
+          <h3 class="topic-card__title">JWT</h3>
+          <p class="topic-card__desc">A small signed token the server hands a client to prove "I already checked who you are" — no server memory needed.</p>
+        </a>
+        <a class="topic-card" data-cat="backend" data-search="rate limiting throttling token bucket leaky bucket api quota 429 doorman" href="backend/rate-limiting/present/index.html">
+          <span class="topic-card__cat">backend</span>
+          <h3 class="topic-card__title">Rate Limiting</h3>
+          <p class="topic-card__desc">The doorman of your API: it counts how often each caller knocks and turns them away when they knock too fast.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- =============================== AI =============================== -->
+    <section class="dash-cat-group">
+      <h2 class="dash-cat-group__head"><span style="color:#a371f7">AI</span> <span class="badge">4</span></h2>
+      <div class="dash-grid">
+        <a class="topic-card" data-cat="ai" data-search="attention mechanism transformer query key value self-attention softmax weighted" href="ai/attention-mechanism/present/index.html">
+          <span class="topic-card__cat">ai</span>
+          <h3 class="topic-card__title">Attention Mechanism</h3>
+          <p class="topic-card__desc">A learned weighted average over a sequence, with weights from comparing a "query" against a set of "keys".</p>
+        </a>
+        <a class="topic-card" data-cat="ai" data-search="embeddings vector semantic search cosine similarity rag ann hnsw pgvector" href="ai/embeddings/present/index.html">
+          <span class="topic-card__cat">ai</span>
+          <h3 class="topic-card__title">Embeddings</h3>
+          <p class="topic-card__desc">Numbers that place meaning on a giant invisible map, so "near each other" means "similar in meaning".</p>
+        </a>
+        <a class="topic-card" data-cat="ai" data-search="harness engineer agent llm loop tools memory guardrails observability scaffolding" href="ai/harness-engineer/present/index.html">
+          <span class="topic-card__cat">ai</span>
+          <h3 class="topic-card__title">Harness Engineer</h3>
+          <p class="topic-card__desc">Building the scaffolding around an LLM — loop, tools, memory, guardrails — that turns a model into an agent.</p>
+        </a>
+        <a class="topic-card" data-cat="ai" data-search="tokenization tokens bpe byte pair encoding vocabulary context length subword" href="ai/tokenization/present/index.html">
+          <span class="topic-card__cat">ai</span>
+          <h3 class="topic-card__title">Tokenization</h3>
+          <p class="topic-card__desc">How a model turns raw text into the small numbered chunks it does math on — shaping cost and context length.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- ============================= DATABASE ============================= -->
+    <section class="dash-cat-group">
+      <h2 class="dash-cat-group__head"><span style="color:#d29922">Database</span> <span class="badge">4</span></h2>
+      <div class="dash-grid">
+        <a class="topic-card" data-cat="database" data-search="b-tree index sorted balanced tree page lookup range scan postgres mysql" href="database/b-tree-index/present/index.html">
+          <span class="topic-card__cat">database</span>
+          <h3 class="topic-card__title">B-Tree Index</h3>
+          <p class="topic-card__desc">A sorted, shallow, wide tree beside your table so the DB finds rows by key in a few hops, not a full scan.</p>
+        </a>
+        <a class="topic-card" data-cat="database" data-search="lsm tree log structured merge sstable memtable compaction write append rocksdb cassandra" href="database/lsm-tree/present/index.html">
+          <span class="topic-card__cat">database</span>
+          <h3 class="topic-card__title">LSM Tree</h3>
+          <p class="topic-card__desc">Cheap writes by never erasing in place — it keeps appending and tidies up later in the background.</p>
+        </a>
+        <a class="topic-card" data-cat="database" data-search="mvcc multi-version concurrency control snapshot isolation readers writers postgres transaction" href="database/mvcc/present/index.html">
+          <span class="topic-card__cat">database</span>
+          <h3 class="topic-card__title">MVCC</h3>
+          <p class="topic-card__desc">Serve many transactions at once without blocking readers behind writers, by keeping multiple row versions.</p>
+        </a>
+        <a class="topic-card" data-cat="database" data-search="sharding partition horizontal scaling shard key distributed database routing" href="database/sharding/present/index.html">
+          <span class="topic-card__cat">database</span>
+          <h3 class="topic-card__title">Sharding</h3>
+          <p class="topic-card__desc">Split one logical database into many physical ones by a key, so each machine owns only a slice of the data.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- ============================== CLOUD ============================== -->
+    <section class="dash-cat-group">
+      <h2 class="dash-cat-group__head"><span style="color:#ec6547">Cloud</span> <span class="badge">4</span></h2>
+      <div class="dash-grid">
+        <a class="topic-card" data-cat="cloud" data-search="blue green deployment release rollback traffic switch two environments zero downtime" href="cloud/blue-green-deployment/present/index.html">
+          <span class="topic-card__cat">cloud</span>
+          <h3 class="topic-card__title">Blue-Green Deployment</h3>
+          <p class="topic-card__desc">Two identical production environments; deploy to the idle one and flip a switch — the old one stays warm.</p>
+        </a>
+        <a class="topic-card" data-cat="cloud" data-search="cdn edge caching content delivery network origin pop ttl invalidation latency" href="cloud/cdn-edge-caching/present/index.html">
+          <span class="topic-card__cat">cloud</span>
+          <h3 class="topic-card__title">CDN Edge Caching</h3>
+          <p class="topic-card__desc">Store copies of your content on servers worldwide so a request never travels all the way to your origin.</p>
+        </a>
+        <a class="topic-card" data-cat="cloud" data-search="service mesh istio envoy sidecar mtls retries observability microservices networking" href="cloud/service-mesh/present/index.html">
+          <span class="topic-card__cat">cloud</span>
+          <h3 class="topic-card__title">Service Mesh</h3>
+          <p class="topic-card__desc">A networking layer that gives every microservice retries, mTLS, and observability without touching app code.</p>
+        </a>
+        <a class="topic-card" data-cat="cloud" data-search="sidecar pattern container kubernetes pod proxy cross-cutting logging tls helper" href="cloud/sidecar-pattern/present/index.html">
+          <span class="topic-card__cat">cloud</span>
+          <h3 class="topic-card__title">Sidecar Pattern</h3>
+          <p class="topic-card__desc">A helper container beside your app in the same unit, handling cross-cutting plumbing so app code stays focused.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- ========================= GENERAL CONCEPT ========================= -->
+    <section class="dash-cat-group">
+      <h2 class="dash-cat-group__head"><span style="color:#ec6cb9">General Concepts</span> <span class="badge">4</span></h2>
+      <div class="dash-grid">
+        <a class="topic-card" data-cat="general-concept" data-search="backpressure flow control slow consumer fast producer queue buffer reactive streams" href="general-concept/backpressure/present/index.html">
+          <span class="topic-card__cat">general-concept</span>
+          <h3 class="topic-card__title">Backpressure</h3>
+          <p class="topic-card__desc">How a slow consumer tells a fast producer to ease up, so the system bends instead of breaking.</p>
+        </a>
+        <a class="topic-card" data-cat="general-concept" data-search="cap theorem consistency availability partition tolerance distributed systems tradeoff" href="general-concept/cap-theorem/present/index.html">
+          <span class="topic-card__cat">general-concept</span>
+          <h3 class="topic-card__title">CAP Theorem</h3>
+          <p class="topic-card__desc">When the network splits, you must choose: refuse some requests to stay correct, or answer and risk stale data.</p>
+        </a>
+        <a class="topic-card" data-cat="general-concept" data-search="event sourcing event store append log projection cqrs replay state audit" href="general-concept/event-sourcing/present/index.html">
+          <span class="topic-card__cat">general-concept</span>
+          <h3 class="topic-card__title">Event Sourcing</h3>
+          <p class="topic-card__desc">Store every change that ever happened instead of just current state — recompute state by replaying them.</p>
+        </a>
+        <a class="topic-card" data-cat="general-concept" data-search="idempotency retry safe duplicate idempotency key exactly once at least once http" href="general-concept/idempotency/present/index.html">
+          <span class="topic-card__cat">general-concept</span>
+          <h3 class="topic-card__title">Idempotency</h3>
+          <p class="topic-card__desc">The property that doing something twice (or a hundred times) leaves the system exactly as doing it once.</p>
+        </a>
+      </div>
+    </section>
+
+    <footer class="dash__footer">
+      <p>A personal tech-learning notebook. Each topic also keeps its full written docs and runnable code in the repository.</p>
+      <p><a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts">View the repository on GitHub ↗</a></p>
+    </footer>
+
+  </main>
+
+  <script src="./assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Circuit Breaker · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Circuit Breaker</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Circuit Breaker</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/circuit-breaker/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Circuit Breaker</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~9 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A circuit breaker is a stateful proxy around a fallible operation — almost always a remote call — driven by a
+          <span class="term">state machine</span>
+          <span class="term__gloss">a fixed set of named states with deterministic moves between them</span>
+          with three states: <strong>Closed</strong>, <strong>Open</strong>, <strong>Half-Open</strong>.</p>
+        <ul>
+          <li><strong>Closed.</strong> It forwards calls and records outcomes against a windowed health metric.</li>
+          <li><strong>Open.</strong> When that metric crosses a threshold it short-circuits — every call throws a sentinel exception (<code>BrokenCircuitException</code> in Polly, <code>CallNotPermittedException</code> in resilience4j) without touching the network.</li>
+          <li><strong>Half-Open.</strong> After a cool-down it admits a bounded number of trial calls, then returns to Closed or back to Open based on their outcomes.</li>
+        </ul>
+        <p>It belongs to the <strong>Stability Patterns</strong> family that Michael Nygard named in <em>Release It!</em> (2007). Think of it as the "fail fast" complement to retries and timeouts.</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>State machine</dt><dd>Three named states with deterministic transitions. Some implementations add a fourth virtual <em>Forced Open / Disabled</em> state for manual operator override.</dd></div>
+          <div><dt>Outcome classifier</dt><dd>A predicate that decides whether a result is a failure: exceptions, HTTP 5xx, gRPC <code>UNAVAILABLE</code>, and crucially <em>slow calls</em> (latency over a threshold).</dd></div>
+          <div><dt>Health window</dt><dd>Aggregates recent outcomes. Three flavours: consecutive-count (Hystrix-era, brittle), count-based sliding window (resilience4j default, N = 100), and time-based sliding window (Polly v8's only model).</dd></div>
+          <div><dt>Threshold + minimum throughput</dt><dd>A failure ratio plus a floor on sample size, so the breaker doesn't trip on 1 failure out of 1 call.</dd></div>
+          <div><dt>Break duration</dt><dd>How long to stay Open before probing (the reset timeout).</dd></div>
+          <div><dt>Half-open permit pool</dt><dd>A bounded counter controlling how many trial calls may run at once.</dd></div>
+          <div><dt>Fallback</dt><dd>Optional alternate path — cached value, default, degraded response — returned on short-circuit.</dd></div>
+        </dl>
+        <p>In the wider family it sits alongside <strong>retry</strong>, <strong>timeout</strong>, <strong>bulkhead</strong>, <strong>rate limiter</strong>, <strong>hedging</strong>, and <strong>fallback</strong>. Retry assumes a transient failure and tries again now; the breaker assumes a sustained one and refuses to try. A bulkhead bounds the <em>resources</em> a dependency may consume; the breaker bounds the <em>attempts</em>. In Polly v8 and resilience4j these are composable strategies in one pipeline, not competing options.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>A breaker sits at the <strong>client side of every outbound synchronous call</strong>, one instance per logical dependency (or, more aggressively, per upstream host). It can run at four distinct layers:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">1 · In-process library</div><p>Polly (.NET), resilience4j (JVM), Opossum (Node), gobreaker (Go), pybreaker (Python). State is per-instance and per-process. Rich, application-typed signals; typed fallbacks.</p></div>
+          <div class="card"><div class="card__title">2 · Sidecar proxy</div><p>Envoy enforces connection-pool and outlier detection transparently to the app; Linkerd's proxy similarly. L4/L7 wire signals only.</p></div>
+          <div class="card"><div class="card__title">3 · Service mesh control plane</div><p>Istio's <code>DestinationRule.trafficPolicy.outlierDetection</code> and <code>connectionPool</code> configure Envoy across the mesh declaratively.</p></div>
+          <div class="card"><div class="card__title">4 · API gateway / edge</div><p>Kong, NGINX, AWS API Gateway, and Azure APIM expose breaker-like upstream-health features.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App["Your service — one outbound synchronous call"]
+    App --> A["1 · In-process library (Polly, resilience4j, Opossum, gobreaker)"]
+    App --> B["2 · Sidecar proxy (Envoy, Linkerd outlier detection)"]
+    App --> C["3 · Service mesh control plane (Istio DestinationRule)"]
+    App --> D["4 · API gateway / edge (Kong, NGINX, APIM)"]
+    A --> U[(Downstream dependency)]
+    B --> U
+    C --> U
+    D --> U
+          </pre>
+          <figcaption class="diagram__caption">Four places the same guard can sit. In-process sees typed signals and serves typed fallbacks; mesh and edge see only the wire but cover every language with zero code change.</figcaption>
+        </figure>
+
+        <p>The in-process and mesh variants are not equivalent. An in-process breaker reads specific exception types, business error codes, and payload size. A mesh breaker sees only HTTP status, TCP errors, and latency — but applies uniformly across languages.</p>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You make synchronous outbound calls whose failure can stall caller threads or connections.</li>
+              <li>A dependency degrades <em>slowly</em> rather than failing fast — slow-call detection is where breakers genuinely save you.</li>
+              <li>You have an acceptable fallback, or fast failure itself beats a long hang.</li>
+              <li>You operate at fan-in scale where one slow dependency can deplete a shared worker pool.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The call is in-process — nothing to break.</li>
+              <li>The work is async and queue-based — the queue is the bulkhead.</li>
+              <li>It's an idempotent cheap read where retry-with-jitter alone is enough.</li>
+              <li>There's no acceptable fallback and the request must eventually succeed.</li>
+              <li>The system is small enough that a slow dependency cannot cascade.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Nygard named the pattern in 2007. Netflix open-sourced <strong>Hystrix</strong> in 2012 — the JVM default for half a decade — but it entered maintenance mode in 2018, and Netflix now points new projects at <strong>resilience4j</strong>. .NET's Polly followed the same arc; its <strong>v8</strong> release (Nov 2023) rewrote the API around a unified <code>ResiliencePipeline</code> with first-class telemetry.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a single request through a Polly-style pipeline (<code>Retry → CircuitBreaker → Timeout → HttpClient</code>):</p>
+        <ol class="steps">
+          <li><span class="steps__title">Pre-check.</span> Read the current state — atomic and lock-free in both resilience4j and Polly.</li>
+          <li><span class="steps__title">Open path.</span> If Open and the break duration hasn't elapsed, throw the short-circuit exception immediately. No thread held, no socket allocated.</li>
+          <li><span class="steps__title">Half-open path.</span> If Open and the timer has elapsed, transition to Half-Open and reset a permit counter. The first N callers each take a permit and run as probes; excess concurrent callers are rejected as if Open.</li>
+          <li><span class="steps__title">Closed path.</span> Forward the call and start a stopwatch.</li>
+          <li><span class="steps__title">Outcome capture.</span> Classify the result: success, exception, or
+            <span class="term">slow call</span>
+            <span class="term__gloss">a call whose latency exceeds slowCallDurationThreshold — counted as a failure even though it returned</span>.</li>
+          <li><span class="steps__title">Window update.</span> Append the outcome to the
+            <span class="term">sliding window</span>
+            <span class="term__gloss">the recent-outcomes buffer the failure ratio is computed from</span>.
+            The count-based window is a fixed ring buffer; the time-based window is a bucketed array (one bucket per second) so the ratio stays O(1) per call.</li>
+          <li><span class="steps__title">Threshold evaluation.</span> Only after
+            <span class="term">minimum throughput</span>
+            <span class="term__gloss">the minimum number of recorded calls before the ratio is even checked</span>
+            is the failure ratio computed. If it crosses <code>failureRateThreshold</code> — or the slow-call ratio crosses its own threshold — transition to Open and stamp the open-at time.</li>
+          <li><span class="steps__title">Half-open resolution.</span> Once the permitted probes complete, compute their failure ratio. Below threshold → Closed and reset the window. Above → Open and restart the break duration, often with exponential backoff in production.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Caller
+    participant B as Circuit Breaker
+    participant S as Service
+    C->>B: request
+    alt Open (break not elapsed)
+        B-->>C: short-circuit — fail fast (fallback)
+    else Half-Open (probe admitted)
+        B->>S: forward one probe
+        S-->>B: result
+        B->>B: probes ok → Closed · probes fail → Open
+        B-->>C: response or fail fast
+    else Closed
+        B->>S: forward, start stopwatch
+        S-->>B: result / error / slow call
+        B->>B: classify, update window, check threshold
+        B-->>C: response
+    end
+          </pre>
+          <figcaption class="diagram__caption">One request through the breaker. The three <code>alt</code> branches are exactly the three states.</figcaption>
+        </figure>
+
+        <h3>How the window decides to trip</h3>
+        <p>The breaker only trips once it has enough samples. Below, a count-based window of the last 10 calls: 6 failed, so the 60% ratio clears a 50% threshold and the breaker moves Closed → Open. The oldest outcome slides off the left as each new one arrives on the right.</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 560 210" role="img" aria-labelledby="winTitle winDesc" width="560" style="max-width:100%">
+            <title id="winTitle">Count-based sliding window</title>
+            <desc id="winDesc">Ten recent call outcomes; six are failures, giving a 60 percent failure ratio that crosses the 50 percent threshold and trips the breaker.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="24" fill="var(--text-muted)">← oldest slides off</text>
+              <text x="540" y="24" fill="var(--text-muted)" text-anchor="end">newest arrives →</text>
+              <text x="20" y="46" fill="var(--text-faint)" font-size="12">Window = last 10 outcomes</text>
+              <!-- 10 cells: F=fail(danger) S=ok(accent). Pattern S S F F S F F S F F = 6 fails -->
+              <g>
+                <rect x="20"  y="58" width="44" height="42" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="42"  y="84" fill="var(--accent)"  text-anchor="middle">ok</text>
+                <rect x="70"  y="58" width="44" height="42" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="92"  y="84" fill="var(--accent)"  text-anchor="middle">ok</text>
+                <rect x="120" y="58" width="44" height="42" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="142" y="84" fill="var(--danger)"  text-anchor="middle">fail</text>
+                <rect x="170" y="58" width="44" height="42" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="192" y="84" fill="var(--danger)"  text-anchor="middle">fail</text>
+                <rect x="220" y="58" width="44" height="42" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="242" y="84" fill="var(--accent)"  text-anchor="middle">ok</text>
+                <rect x="270" y="58" width="44" height="42" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="292" y="84" fill="var(--danger)"  text-anchor="middle">fail</text>
+                <rect x="320" y="58" width="44" height="42" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="342" y="84" fill="var(--danger)"  text-anchor="middle">fail</text>
+                <rect x="370" y="58" width="44" height="42" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="392" y="84" fill="var(--accent)"  text-anchor="middle">ok</text>
+                <rect x="420" y="58" width="44" height="42" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="442" y="84" fill="var(--danger)"  text-anchor="middle">fail</text>
+                <rect x="470" y="58" width="44" height="42" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="492" y="84" fill="var(--danger)"  text-anchor="middle">fail</text>
+              </g>
+              <line x1="20" y1="120" x2="514" y2="120" stroke="var(--border)"/>
+              <text x="20"  y="146" fill="var(--text)"      font-size="14">6 of 10 failed = 60%</text>
+              <text x="20"  y="170" fill="var(--danger)"    font-size="14">60% ≥ 50% threshold  ⇒  Closed → Open</text>
+              <text x="20"  y="194" fill="var(--text-faint)" font-size="12">Evaluated only after minimum-throughput samples are recorded.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A count-based window with a failure-ratio threshold and a sample floor — one bad call alone can never trip it.</figcaption>
+        </figure>
+
+        <h3>Library defaults — starting points, not production values</h3>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Polly v8 (.NET)</div>
+            <ul>
+              <li><code>FailureRatio</code> = 0.1 (10%)</li>
+              <li><code>MinimumThroughput</code> = 100</li>
+              <li><code>SamplingDuration</code> = 30s</li>
+              <li><code>BreakDuration</code> = 5s</li>
+              <li>Time-based window only; throws <code>BrokenCircuitException</code></li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">resilience4j (JVM)</div>
+            <ul>
+              <li><code>failureRateThreshold</code> = 50</li>
+              <li><code>slidingWindowSize</code> = 100</li>
+              <li><code>minimumNumberOfCalls</code> = 100</li>
+              <li><code>waitDurationInOpenState</code> = 60s</li>
+              <li><code>permittedNumberOfCallsInHalfOpenState</code> = 10</li>
+              <li><code>slowCallDurationThreshold</code> = 60s; throws <code>CallNotPermittedException</code></li>
+            </ul>
+          </div>
+        </div>
+        <p>A Polly v8 sketch, illustrative only — the runnable version lives in <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/circuit-breaker/code" target="_blank" rel="noopener">the code folder</a>:</p>
+        <pre><code>new ResiliencePipelineBuilder&lt;HttpResponseMessage&gt;()
+    .AddCircuitBreaker(new()
+    {
+        FailureRatio       = 0.5,   // trip at 50% failure
+        MinimumThroughput  = 20,    // need 20+ samples first
+        SamplingDuration   = TimeSpan.FromSeconds(30),
+        BreakDuration      = TimeSpan.FromSeconds(15),
+        ShouldHandle = new PredicateBuilder&lt;HttpResponseMessage&gt;()
+            .Handle&lt;HttpRequestException&gt;()
+            .HandleResult(r =&gt; (int)r.StatusCode &gt;= 500)
+    })
+    .Build();</code></pre>
+        <p>Both libraries' authors are explicit: these defaults are conservative starting points, and you must tune them to your own traffic.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Count-based window</td><td>Simple, predictable memory</td><td>Distorted by traffic bursts and idle periods</td></tr>
+              <tr><td>Time-based window</td><td>Stable under variable traffic</td><td>More memory, age-based eviction overhead</td></tr>
+              <tr><td>Per-host breaker (Envoy outlier detection)</td><td>Ejects only the sick replica</td><td>Many tiny state machines, harder to reason about globally</td></tr>
+              <tr><td>Per-service breaker (typical library)</td><td>One mental model per dependency</td><td>A single bad replica can trip the whole route</td></tr>
+              <tr><td>Short break duration (seconds)</td><td>Fast recovery on transient blips</td><td>Higher risk of re-tripping on slow-recovering deps</td></tr>
+              <tr><td>Long break duration (minutes)</td><td>Lets upstream actually recover</td><td>User-visible outage extended</td></tr>
+              <tr><td>Allow many half-open probes</td><td>Faster confidence to close</td><td>Bigger herd against a still-fragile service</td></tr>
+              <tr><td>Single half-open probe</td><td>Gentlest probing</td><td>Slow signal, slow recovery</td></tr>
+              <tr><td>Slow-call detection on</td><td>Catches latency-only failures (the dangerous kind)</td><td>Requires picking a defensible latency threshold</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Window too small + low threshold</p>
+            <p>Two timeouts trip a global breaker. Cause: <code>minimumThroughput</code> left at the default while real traffic is sparse.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Thundering herd on recovery</p>
+            <p>On Open → Half-Open, every pending caller races to probe and re-overloads the upstream. Cause: no permit gating, or a wide permit pool. Mitigation: small probe pool, jittered break duration, or serialised single-probe recovery.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">All-or-nothing breaker for a partial outage</p>
+            <p>One bad replica out of ten trips the service-level breaker for everyone. Cause: per-service rather than per-host state. Mitigation: Envoy outlier detection at the sidecar.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Breaker hides a config bug</p>
+            <p>100% of calls fail because of a wrong URL; the breaker sits Open forever with alarms silent. Cause: missing state-transition alerts. Fix: alert on Open-state duration, not just upstream errors.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Retries inside the breaker amplify failures</p>
+            <p>A 5× retry policy inside a 50% threshold breaker makes the breaker count one failure as five. Cause: pipeline order. Fix: breaker outside retry, or count attempt-bundles rather than individual attempts.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Per-process state, multi-pod fleet</p>
+            <p>Each pod has its own opinion, so one pod still hammers the upstream. Cause: in-process breakers don't share state. Fix: accept the eventual consistency, or push enforcement to the mesh.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Half-open starvation</p>
+            <p>Under heavy load every Half-Open transition burns its probes instantly and almost always re-trips. Cause: upstream recovers slowly relative to your traffic. Fix: longer break duration, or a gradual ramp instead of binary closed/open.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Synchronous RPC is the default in microservices, and synchronous calls couple <strong>liveness budgets</strong>. If A waits on B and B waits on C, then C's latency becomes A's latency and C's failure becomes A's resource exhaustion. The most expensive failure in production distributed systems is <strong>thread-pool or connection-pool starvation</strong> caused by waiting on a slow dependency — once the pool is empty, the caller stops serving <em>unrelated</em> traffic. The breaker puts a strict upper bound on how much of your own capacity one sick dependency can consume.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 520 185" role="img" aria-labelledby="poolTitle poolDesc" width="520" style="max-width:100%">
+            <title id="poolTitle">Pool exhaustion</title>
+            <desc id="poolDesc">Six of eight worker threads are blocked waiting on one slow dependency, leaving only two for other work.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="24" fill="var(--text-muted)">Worker pool (8 threads)</text>
+              <g>
+                <rect x="10"  y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="72"  y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="134" y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="196" y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="258" y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="320" y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="382" y="40" width="54" height="34" rx="6" fill="none" stroke="var(--border)"/>
+                <rect x="444" y="40" width="54" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              </g>
+              <text x="10"  y="104" fill="var(--text-faint)">↑ 6 blocked on the slow call</text>
+              <text x="382" y="104" fill="var(--text-faint)">2 left</text>
+              <rect x="196" y="130" width="128" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="260" y="152" fill="var(--danger)" text-anchor="middle">slow dependency</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Without a breaker, one slow dependency drains the shared pool until unrelated traffic also stalls. The breaker caps that.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>An obvious alternative — a global health-check daemon that pings each dependency and publishes "up/down" to all callers — was tried and largely abandoned:</p>
+        <ul>
+          <li><strong>Health checks lie.</strong> A <code>/health</code> endpoint that returns 200 in 10ms says nothing about whether the <em>expensive</em> code path is healthy.</li>
+          <li><strong>Real call outcomes are the only truthful signal.</strong> A breaker is driven by the traffic that actually matters.</li>
+          <li><strong>State must be local to be fast.</strong> Consulting a central oracle on every call adds a network hop to every call — the exact thing you're trying to avoid.</li>
+        </ul>
+        <p>The three-state machine (rather than just Open / Closed) exists to solve the <strong>recovery problem</strong>. With two states you either keep the circuit Open forever or flip it Closed and immediately blast a recovering service with full traffic. Half-Open is the controlled re-introduction of load — a deliberately small probe whose only job is a binary "are you better?" signal at minimal cost. The bounded permit count is what keeps the thundering herd from being baked into the pattern.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, almost every non-trivial backend calls at least one third-party API — payment, identity, LLM inference, search, analytics — whose tail latency you don't control. LLM and generative endpoints in particular have wide, unpredictable latency and frequent partial outages, and Polly v8's <code>AddStandardResilienceHandler</code> was explicitly shaped around that workload. Meshes have made the pattern cheaper (one Istio <code>DestinationRule</code> covers a namespace), and observability libraries finally treat state transitions as first-class events. There's no successor on the horizon — the next step is <em>adaptive</em> breakers that tune thresholds from live traffic, but the underlying state machine is unchanged.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

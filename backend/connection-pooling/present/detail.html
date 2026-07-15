@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connection Pooling · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Connection Pooling</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Connection Pooling</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/connection-pooling/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Connection Pooling</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A connection pool is a bounded, thread-safe cache of already-established database sessions that the app borrows with <code>acquire()</code> and returns with <code>release()</code>. It caps the number of concurrent physical connections, arbitrates contention between callers with a queue or semaphore, and owns connection health, lifetime, and eviction.</p>
+        <ul>
+          <li><strong>Not a raw socket.</strong> A "connection" here is a fully warmed session: TCP established, TLS negotiated, authentication done (SCRAM-SHA-256, MD5, an IAM token, ...), and session defaults (<code>search_path</code>, timezone, <code>application_name</code>) applied. Reusing that whole session is the point.</li>
+          <li><strong>TLS cost is real.</strong> TLS 1.3 needs 1 round trip to negotiate; TLS 1.2 needs 2, plus asymmetric-crypto CPU cost. Skipping that per query is most of the win.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Idle queue / free list</dt><dd>Holds released connections ready for reuse — a lock-free stack in HikariCP's <code>ConcurrentBag</code>, an unbounded channel in Npgsql, an <code>asyncio.Queue</code> in asyncpg.</dd></div>
+          <div><dt>Concurrency limiter (semaphore)</dt><dd>Caps outstanding acquisitions at <code>MaxPoolSize</code>; blocks or times out callers past that limit.</dd></div>
+          <div><dt>Physical connector</dt><dd>The driver-specific object owning the socket, the protocol state machine, and the parser.</dd></div>
+          <div><dt>Housekeeper / eviction thread</dt><dd>Periodically closes connections past <code>idleTimeout</code>, <code>maxLifetime</code>, or a failed health check. HikariCP runs this every 30 seconds by default.</dd></div>
+          <div><dt>Health-check hook</dt><dd>A lightweight validation query (<code>SELECT 1</code>, <code>SELECT 1 FROM DUAL</code>, or a protocol-level <code>Sync</code>) proving a connection is still alive before handing it out.</dd></div>
+          <div><dt>Wait queue / acquire timeout</dt><dd>Governs fairness and failure behavior once the pool is saturated. Getting this wrong is how "the app just hangs forever."</dd></div>
+        </dl>
+
+        <p>Pools sit inside a wider family of <strong>resource-lending patterns</strong>: HTTP keep-alive, thread pools, gRPC channel pools, Redis client pools, S3 SDK connection reuse — all exist because setup dominates cost. Within database access, an in-app pool is one option; its sibling is an <strong>external pooler</strong> (PgBouncer, RDS Proxy, ProxySQL, Pgpool-II) that concentrates thousands of client connections into far fewer backend sessions. The two coexist: an app pools connections to PgBouncer, and PgBouncer pools its own connections to Postgres.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>A pool can run at four different layers of the stack:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">1 · Driver / client library</div><p>In the app process itself — JDBC + HikariCP, Npgsql, psycopg, asyncpg, sqlx, pgx, node-postgres. Default for stateful services: containers, VMs, the JVM, .NET, long-lived Python/Go workers.</p></div>
+          <div class="card"><div class="card__title">2 · External pooler process</div><p>A separate process on the same host or a nearby node — PgBouncer as a sidecar, ProxySQL as a DaemonSet.</p></div>
+          <div class="card"><div class="card__title">3 · Managed service at the DB edge</div><p>Amazon RDS Proxy, Azure Database for PostgreSQL's built-in PgBouncer, Google Cloud SQL Auth Proxy (that last one is auth, not pooling — a common mix-up).</p></div>
+          <div class="card"><div class="card__title">4 · Inside the database engine</div><p>Rare, but real: SQL Server has a form of internal connection multiplexing; MySQL's thread pool plugin is adjacent but not the same thing.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App["Your app process"]
+    App --> A["1 - Driver / client library (HikariCP, Npgsql, SQLAlchemy, asyncpg)"]
+    App --> B["2 - External pooler process (PgBouncer sidecar, ProxySQL DaemonSet)"]
+    App --> C["3 - Managed service at the edge (RDS Proxy, Azure pooler, Cloud SQL Auth Proxy)"]
+    App --> D["4 - Inside the DB engine (SQL Server multiplexing, MySQL thread pool plugin)"]
+    A --> U[(Database)]
+    B --> U
+    C --> U
+    D --> U
+          </pre>
+          <figcaption class="diagram__caption">Four places the same idea can sit. Layers 1-3 are the common ones; layer 4 is engine-specific and rare.</figcaption>
+        </figure>
+
+        <p>You'll meet it by default in most stacks: HikariCP has been Spring Boot's default pool since Spring Boot 2.0; ASP.NET Core pools per connection string through Npgsql or <code>Microsoft.Data.SqlClient</code>; Django/FastAPI with SQLAlchemy defaults to <code>QueuePool</code>; Node's <code>pg</code>, <code>mysql2</code>, and the MongoDB driver all ship pooling built in; Rails' ActiveRecord pool is per-process, keyed by thread. Serverless functions can't hold a warm pool across invocations at all, which is why they delegate pooling to RDS Proxy or a similar managed pooler instead.</p>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>A long-lived process handles more than a handful of DB-touching requests per second.</li>
+              <li>Connection setup shows up in your latency budget — roughly, anything over ~1% of P50 latency is worth removing.</li>
+              <li>Your database is Postgres, which pays a heavy per-connection RAM cost (~10 MB per backend process).</li>
+              <li>You run a fleet of stateless workers (Lambdas, ECS tasks scaling to thousands) — reach for an <strong>external pooler</strong> in addition to any in-process pool.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The workload is a one-shot script, cron job, or migration tool — one connection, run, exit.</li>
+              <li>A caller genuinely needs isolated session state (temp tables, <code>SET LOCAL TIMEZONE</code>, session advisory locks) and you can't scope it to a transaction.</li>
+              <li>You're behind a transaction-mode PgBouncer and the app relies on named prepared statements, <code>LISTEN/NOTIFY</code>, <code>WITH HOLD</code> cursors, or session advisory locks — those break unless routed through a separate direct connection.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Object pools were mainstream OO practice by the mid-1990s. Database pools followed the first serious server-side web platforms: the JDBC 2.0 Optional Package (1999) formalized <code>javax.sql.DataSource</code> and pooling contracts; Apache DBCP shipped in 2001, c3p0 shortly after. Early CGI-style apps opened a fresh connection per request, and Postgres/Oracle simply couldn't sustain the churn. A second wave arrived once PaaS and serverless made "thousands of tiny clients, one database" the norm: PgBouncer (2007), ProxySQL (2015), RDS Proxy (2020).</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a single <code>acquire()</code> through a modern in-process pool (HikariCP, Npgsql):</p>
+        <ol class="steps">
+          <li><span class="steps__title">Fast path.</span> Try to grab an idle connection from the free list. HikariCP scans its <code>ConcurrentBag</code> thread-locally before touching shared state — sub-microsecond when uncontended.</li>
+          <li><span class="steps__title">Semaphore check.</span> Nothing idle? Try to take a permit against <code>MaxPoolSize</code>. No permit free — the caller joins the wait queue.</li>
+          <li><span class="steps__title">Grow.</span> A permit is free and the pool is below its ceiling: open a new physical connection. TCP SYN → TLS handshake → auth exchange → connection-init SQL. This is the expensive path: 20–100ms on a healthy LAN, more across regions, and 5–10x more CPU on the DB than resuming a session.</li>
+          <li><span class="steps__title">Validation.</span> Optionally run a liveness check. HikariCP uses JDBC4's <code>Connection.isValid(timeoutSec)</code> — a lightweight <code>Sync</code> round trip on Postgres; PgBouncer runs <code>server_check_query</code> (default <code>SELECT 1;</code>) once <code>server_check_delay</code> is exceeded.</li>
+          <li><span class="steps__title">Hand off.</span> The caller uses the connection. Calling <code>close()</code> (or <code>Dispose()</code> in .NET, or exiting a Python <code>with</code> block) returns the physical connection to the pool instead of actually closing it.</li>
+          <li><span class="steps__title">Reset.</span> Before reuse, session state is scrubbed. HikariCP resets <code>autoCommit</code>, transaction isolation, read-only, and catalog to their defaults; PgBouncer runs <code>server_reset_query</code> (default <code>DISCARD ALL</code>) between transactions in session mode.</li>
+          <li><span class="steps__title">Eviction.</span> A housekeeper thread periodically closes connections past <code>maxLifetime</code> (HikariCP default 30 minutes) or <code>idleTimeout</code> (default 10 minutes), so DNS changes, credential rotations, and failovers eventually propagate.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant App as Caller
+    participant Pool as Connection Pool
+    participant DB as Database
+    App->>Pool: acquire()
+    alt idle connection free
+        Pool-->>App: lease the existing connection
+    else pool below max
+        Pool->>DB: open new (TCP + TLS + auth)
+        DB-->>Pool: session ready
+        Pool-->>App: lease the new connection
+    else pool at max
+        Pool->>Pool: enqueue caller
+        Pool-->>App: lease once freed, or acquire-timeout error
+    end
+    App->>DB: run query
+    DB-->>App: result
+    App->>Pool: release()
+          </pre>
+          <figcaption class="diagram__caption">One acquire() call. The three branches are the fast path, the grow path, and the wait path.</figcaption>
+        </figure>
+
+        <p>External poolers add a step in front of all this. PgBouncer keeps its own pool of <em>server</em> connections to Postgres and multiplexes many <em>client</em> connections onto them. In <span class="term">transaction pooling</span><span class="term__gloss">the common production mode — a client gets a server connection only for the duration of one BEGIN..COMMIT</span> mode, a client holds a server connection only for one transaction and is otherwise detached; <code>PREPARE</code>, <code>SET</code>, <code>LISTEN</code>, and <code>WITH HOLD</code> cursors silently misbehave. Since PgBouncer 1.21 (October 2023), protocol-level prepared statements can be tracked with <code>max_prepared_statements</code> and survive transaction pooling — but SQL-level <code>PREPARE</code> still cannot.</p>
+
+        <p>RDS Proxy calls its version of the same trade-off <span class="term">pinning</span><span class="term__gloss">locking one client to one backend connection for the rest of its session, which defeats multiplexing</span>: when it sees behavior it can't safely <span class="term" data-gloss="one physical connection serving many concurrent logical clients via pipelining">multiplex</span> — temp tables, session variables, <code>SET</code>, prepared statements on some engines — it pins the client to that backend connection for the rest of the session. <code>DatabaseConnectionsCurrentlySessionPinned</code> in CloudWatch is the metric to watch.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Bigger <code>MaxPoolSize</code></td><td>More app-side concurrency before queuing</td><td>DB memory + context-switch overhead; can hurt throughput past a threshold (~2 × cores + spindles, per HikariCP guidance)</td></tr>
+              <tr><td>Aggressive validation query</td><td>Fewer stale-connection errors</td><td>Extra round trip on every acquire — kills sub-ms use cases</td></tr>
+              <tr><td>Long <code>maxLifetime</code></td><td>Fewer reconnect storms</td><td>Slower propagation of DB failover, DNS changes, and rotated IAM tokens</td></tr>
+              <tr><td>In-app pool only</td><td>Simple, no extra hop</td><td>Scales badly past ~thousands of app instances hitting one DB</td></tr>
+              <tr><td>External pooler in transaction mode</td><td>10–100x more app clients per DB</td><td>Breaks prepared statements, session state, <code>LISTEN/NOTIFY</code>, some cursors</td></tr>
+              <tr><td>Multiplexing (Npgsql, RDS Proxy)</td><td>Uses far fewer physical connections</td><td>Pinning gotchas; not compatible with everything (e.g. large <code>COPY</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Pool exhaustion under a slow query</p>
+            <p>One slow query holds a connection; incoming traffic drains the pool; every later request times out at the acquire timeout. Cause: no query timeout, and <code>MaxPoolSize</code> too low relative to <code>throughput × latency</code> — <span class="term" data-gloss="concurrency = arrival rate × average time in the system">Little's Law</span>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Connection leak</p>
+            <p>A code path throws before <code>release()</code> / <code>Dispose()</code>, and the connection is never returned. Cause: a missing <code>using</code>, <code>try-with-resources</code>, or context manager.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Stale connection after failover</p>
+            <p>The DB fails over to a replica; the pool still holds sockets pointing at the old primary. The next query returns <code>ECONNRESET</code> or hangs until the TCP timeout. Cause: no server-side <code>tcp_keepalives_idle</code>, no client <code>maxLifetime</code>, or an OS <code>net.ipv4.tcp_keepalive_time</code> left at its 7200-second Linux default.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Prepared-statement collision through transaction-mode PgBouncer</p>
+            <p><code>prepared statement "s0" already exists</code>. Cause: driver-managed prepared statements assumed a stable backend connection, which transaction pooling took away.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Pinning storm on RDS Proxy</p>
+            <p>A session-level <code>SET application_name</code> on every connection pins every client; the effective pool ratio collapses to 1:1. Cause: <code>SET</code> instead of <code>SET LOCAL</code>, or unavoidable prepared statements ahead of multiplexing support.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Thundering herd on cold start</p>
+            <p>The app starts with <code>MinIdle=0</code>; the first N requests all try to open connections at once. Cause: no warmup, or a misconfigured minimum-idle setting.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Pool-size / thread-pool mismatch</p>
+            <p>The app has 200 worker threads and a pool of 20 connections; 180 threads sit waiting on the pool, doing no work, while counted as "busy" upstream. Cause: sizing the pool to match thread count instead of the DB's real concurrency capacity.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Three first-principles reasons:</p>
+        <ul>
+          <li><strong>Setup cost dominates short queries.</strong> An indexed <code>SELECT id FROM users WHERE id=?</code> is about 0.2ms of DB work. Paying 30ms for TCP+TLS+auth to run it is 150x overhead.</li>
+          <li><strong>Databases have hard concurrency ceilings.</strong> Postgres forks a full backend process per connection, roughly 10 MB of RSS each. At 500 connections that's 5 GB spent on stack space, and only about 2× the core count can run CPU-bound work at once anyway.</li>
+          <li><strong>Apps need bounded, back-pressured access to a shared, scarce resource.</strong> A pool is a semaphore with objects attached; its queueing behavior gives operators a knob for graceful degradation instead of a runaway that kills the DB.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 220" role="img" aria-labelledby="memTitle memDesc" width="560" style="max-width:100%">
+            <title id="memTitle">Per-connection memory cost at scale</title>
+            <desc id="memDesc">Ten sample connections stand in for five hundred: each costs about ten megabytes of RAM whether it is doing work or not, but only about two times the core count can run CPU-bound work at any one moment.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="16" y="24" fill="var(--text-muted)">500 Postgres backend connections (10 shown to scale)</text>
+              <g>
+                <rect x="16"  y="40" width="46" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="39"  y="64" fill="var(--accent)" text-anchor="middle" font-size="11">CPU</text>
+                <rect x="70"  y="40" width="46" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="93"  y="64" fill="var(--accent)" text-anchor="middle" font-size="11">CPU</text>
+                <rect x="124" y="40" width="46" height="40" rx="6" fill="none" stroke="var(--border)"/><text x="147" y="64" fill="var(--text-faint)" text-anchor="middle" font-size="11">idle</text>
+                <rect x="178" y="40" width="46" height="40" rx="6" fill="none" stroke="var(--border)"/><text x="201" y="64" fill="var(--text-faint)" text-anchor="middle" font-size="11">idle</text>
+                <rect x="232" y="40" width="46" height="40" rx="6" fill="none" stroke="var(--border)"/><text x="255" y="64" fill="var(--text-faint)" text-anchor="middle" font-size="11">idle</text>
+                <rect x="286" y="40" width="46" height="40" rx="6" fill="none" stroke="var(--border)"/><text x="309" y="64" fill="var(--text-faint)" text-anchor="middle" font-size="11">idle</text>
+                <rect x="340" y="40" width="46" height="40" rx="6" fill="none" stroke="var(--border)"/><text x="363" y="64" fill="var(--text-faint)" text-anchor="middle" font-size="11">idle</text>
+                <rect x="394" y="40" width="46" height="40" rx="6" fill="none" stroke="var(--border)"/><text x="417" y="64" fill="var(--text-faint)" text-anchor="middle" font-size="11">idle</text>
+                <rect x="448" y="40" width="46" height="40" rx="6" fill="none" stroke="var(--border)"/><text x="471" y="64" fill="var(--text-faint)" text-anchor="middle" font-size="11">idle</text>
+                <rect x="502" y="40" width="46" height="40" rx="6" fill="none" stroke="var(--border)"/><text x="525" y="64" fill="var(--text-faint)" text-anchor="middle" font-size="11">idle</text>
+              </g>
+              <text x="16"  y="104" fill="var(--text-faint)" font-size="12">↑ only ~2 × cores do useful CPU work at once</text>
+              <text x="16"  y="126" fill="var(--text-faint)" font-size="12">↑ the rest still cost ~10 MB of RAM each, whether busy or idle</text>
+              <line x1="16" y1="146" x2="548" y2="146" stroke="var(--border)"/>
+              <text x="16" y="172" fill="var(--text)" font-size="14">500 connections × ~10 MB ≈ 5 GB of RAM</text>
+              <text x="16" y="196" fill="var(--danger)" font-size="14">— spent before a single query runs</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Every connection costs memory whether or not it's doing work. The pool caps how many exist, not just how fast they were opened.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative is "one connection per thread, forever" — the old Apache prefork model. That fails on two fronts: modern async frameworks run tens of thousands of logical tasks over a small OS thread pool, so per-thread ownership is meaningless; and it turns pool size into an emergent property of load rather than a policy, letting one buggy client take down a database shared with everyone else.</p>
+        <p>A less obvious alternative is <strong>multiplexing</strong> at the driver level — one physical connection serving many concurrent logical callers via pipelining, exactly what Npgsql's experimental multiplexing and RDS Proxy do. It works, but it inherits the same limits: any per-session state (temp tables, <code>SET</code>, prepared statements, cursors, open transactions) forces the driver to pin one physical connection to one logical caller anyway — a pool, just with more indirection. Plain pools survived because "one caller owns one connection for the duration of a transaction" is the coarsest granularity at which session state can be reasoned about safely.</p>
+        <p>The queue-plus-semaphore design won because it maps cleanly onto Little's Law (<code>L = λW</code>): given a target request rate and an observed DB latency, you can compute the <em>minimum</em> pool size that avoids queueing and cap it there. Anything larger trades DB CPU for nothing.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026 the shape of DB traffic has split in two: always-on Kubernetes workloads running well-behaved in-process pools on one end, and serverless/edge functions that can't hold state across invocations at all on the other. Both are growing, which is why external poolers — RDS Proxy, Supavisor, Neon's built-in pooler, PlanetScale's Vitess-based pooling — became first-class Postgres/MySQL infrastructure instead of a niche tool. Understanding pool internals is the difference between "our DB just fell over" and "our DB is fine, the app's <code>MaxPoolSize</code> was too high" — a distinction that decides whether the on-call fix is a config change or a hardware upgrade.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event Sourcing · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Event Sourcing</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Event Sourcing</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/event-sourcing/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Event Sourcing</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A normal database overwrites old values on every update, so history disappears the moment you write. Event sourcing keeps every change as a fact and rebuilds current state by replaying those facts in order.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Instead of one <code>orders</code> row that gets overwritten, the source of truth becomes an append-only log of facts: <code>OrderPlaced</code>, <code>ItemAdded</code>, <code>OrderPaid</code>, <code>OrderShipped</code>. The current state of an order is a value you compute by
+              <span class="term">folding</span>
+              <span class="term__gloss">combining a sequence of events, in order, into one current value</span>
+              those events together — not a row you read directly. Reach for this when <em>how</em> the data got to its current shape matters as much as the shape itself: audits, financial ledgers, regulated workflows, bug-hunting by replay.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of your bank account. Your bank does not store one row that says <code>balance: $1,432.18</code> and overwrite it every transaction. It stores a ledger — a list of entries — and the balance is just the sum of the ledger. If a transaction is disputed, the bank does not edit the past; it appends a <em>correcting</em> entry instead. Yesterday's balance is still recoverable by adding up entries only up through yesterday, and next month's audit is trivial because nothing was ever overwritten.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 230" role="img" aria-labelledby="ledgerTitle ledgerDesc" width="560" style="max-width:100%">
+            <title id="ledgerTitle">A bank ledger as an event log</title>
+            <desc id="ledgerDesc">Four ledger entries — salary, groceries, rent, interest — each shown with a running balance that ends at $1,432.18, followed by a later correcting entry that is appended rather than edited into the past.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="12" y="20" fill="var(--text-muted)">Entry (append-only, in order)</text>
+              <text x="420" y="20" fill="var(--text-muted)" text-anchor="end">Running balance</text>
+
+              <rect x="12" y="32" width="330" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="24" y="52" fill="var(--text)">Salary  +$2,000.00</text>
+              <text x="530" y="52" fill="var(--text)" text-anchor="end">$2,000.00</text>
+
+              <rect x="12" y="68" width="330" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="24" y="88" fill="var(--text)">Groceries  −$45.00</text>
+              <text x="530" y="88" fill="var(--text)" text-anchor="end">$1,955.00</text>
+
+              <rect x="12" y="104" width="330" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="24" y="124" fill="var(--text)">Rent  −$522.82</text>
+              <text x="530" y="124" fill="var(--text)" text-anchor="end">$1,432.18</text>
+
+              <rect x="12" y="140" width="330" height="30" rx="6" fill="var(--border-soft)" stroke="var(--border)"/>
+              <text x="24" y="160" fill="var(--text)">Interest  +$0.00</text>
+              <text x="530" y="160" fill="var(--text)" text-anchor="end">$1,432.18</text>
+
+              <line x1="12" y1="180" x2="548" y2="180" stroke="var(--border)" stroke-dasharray="4 4"/>
+              <text x="12" y="200" fill="var(--text-faint)" font-size="12">later — a transaction is disputed</text>
+
+              <rect x="12" y="206" width="330" height="20" rx="6" fill="var(--info)" fill-opacity="0.15" stroke="var(--info)"/>
+              <text x="24" y="221" fill="var(--info)" font-size="12">Reversal  −$45.00 — appended, not edited into the past</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Four real entries summing to $1,432.18, then a correction appended later. History is never rewritten.</figcaption>
+        </figure>
+
+        <p>Event sourcing applies that ledger discipline to any entity in your system, not just money. An <code>Order</code> is no longer a row — it is a stream of events. The table you actually query is a
+          <span class="term">projection</span>
+          <span class="term__gloss">a cached, rebuildable view derived by folding a stream of events</span>,
+          not the source of truth.</p>
+
+        <p>A concrete case: a shopping cart. In plain CRUD, adding item A, adding item B, then removing B leaves you with one fact — the cart contains <code>[A]</code>. You cannot answer "did the user briefly consider B?" — that fact was overwritten. Event-sourced, the same actions leave three events: <code>ItemAdded A</code>, <code>ItemAdded B</code>, <code>ItemRemoved B</code>. Folding them still gives you <code>[A]</code> as the current state — but you can also answer what got abandoned, which is useful for analytics, fraud detection, and recommendations.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not an audit log bolted onto CRUD.</strong> An audit log is a derived sidecar; here, the events <em>are</em> the database.</li>
+              <li><strong>Not <span class="term" data-gloss="Command Query Responsibility Segregation — splitting the write model from the read model">CQRS</span>.</strong> CQRS separates read and write models. It pairs well with event sourcing but is a distinct idea.</li>
+              <li><strong>Not message queues / Kafka-as-a-bus.</strong> A broker moves events between services; an event store is the durable source of truth for one service's own state.</li>
+              <li><strong>Not "just append rows and never delete."</strong> Soft deletes alone give you no replay, no projections, no queries against a past point in time.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You're building financial ledgers, billing, or double-entry accounting — every change must be defensible.</li>
+              <li>You're in a regulated domain (healthcare, insurance, trading) where auditors ask "what did the system know at 14:02?"</li>
+              <li>The domain has complex behavior over time — order workflows, claims processing, multi-step approvals.</li>
+              <li>You expect to add new read models later and want to rebuild them from history instead of backfilling.</li>
+              <li>Reproducing production bugs by replaying a real event stream would be valuable.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It's a simple CRUD admin screen, settings page, or content management system — the complexity tax isn't worth it.</li>
+              <li>You have hard "right to be forgotten" requirements with no appetite for crypto-shredding.</li>
+              <li>Your team is new to domain-driven design and distributed systems — missteps here are expensive.</li>
+              <li>The data has no historical value worth its storage and complexity cost.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Event</dt><dd>An immutable, past-tense fact (<code>OrderPlaced</code>) — never a command or an intent.</dd></div>
+          <div><dt>Event store</dt><dd>The append-only database that holds events, ordered per entity.</dd></div>
+          <div><dt>Stream</dt><dd>The ordered sequence of events for one entity — one order, one account.</dd></div>
+          <div><dt>Aggregate</dt><dd>The domain object whose state is rebuilt by folding its stream.</dd></div>
+          <div><dt>Projection / read model</dt><dd>A materialized view derived from events, optimized for queries.</dd></div>
+          <div><dt>Replay</dt><dd>Recomputing state or a projection by reading events from the start.</dd></div>
+          <div><dt>Snapshot</dt><dd>A cached state at version N so replay doesn't always start from event 1.</dd></div>
+          <div><dt>CQRS</dt><dd>Command Query Responsibility Segregation — a common companion pattern, not the same thing.</dd></div>
+          <div><dt>Upcaster / event versioning</dt><dd>Code that migrates old event shapes forward as your schema evolves.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

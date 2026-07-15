@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hydration · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Hydration</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Hydration</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/hydration/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Hydration</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A server turns your component tree into a string of HTML and ships it to the browser. The user sees real content right away, but clicking anything does nothing yet — no JavaScript has run.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>The framework's JS bundle then loads, walks the same component tree on the client, and lines itself up against the DOM that's already there: same nodes, same order, now wired up with handlers and state. That second pass is hydration. You get a fast first paint and search-engine-friendly HTML without giving up an interactive app.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of the server response as an unfurnished house that's already built — walls, floors, windows in the right places. The user can walk through it the moment they arrive. A moving truck (the JS bundle) shows up a few seconds later carrying the appliances, light switches, and remote controls.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 620 230" role="img" aria-labelledby="houseTitle houseDesc" width="620" style="max-width:100%">
+            <title id="houseTitle">The same house, before and after hydration</title>
+            <desc id="houseDesc">Two identical house outlines. The left house is the server response: the walls and windows are drawn but the outlets are unconnected, so nothing responds. The right house is the same structure after hydration: the same windows and doors are now wired, with listeners attached, so the house is interactive.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="125" y="22" fill="var(--text-muted)" text-anchor="middle">Server response</text>
+              <polygon points="35,95 125,45 215,95" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <rect x="45" y="95" width="160" height="90" rx="4" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <rect x="65" y="115" width="36" height="36" rx="4" fill="none" stroke="var(--border)"/>
+              <rect x="149" y="115" width="36" height="36" rx="4" fill="none" stroke="var(--border)"/>
+              <rect x="105" y="150" width="30" height="35" fill="none" stroke="var(--border)"/>
+              <circle cx="47" cy="133" r="5" fill="none" stroke="var(--text-faint)"/>
+              <line x1="52" y1="133" x2="63" y2="133" stroke="var(--text-faint)" stroke-dasharray="2,2"/>
+              <text x="125" y="207" fill="var(--text-faint)" text-anchor="middle" font-size="12">inert — clicking does nothing</text>
+
+              <text x="300" y="112" fill="var(--text-muted)" text-anchor="middle" font-size="12">hydrateRoot walks</text>
+              <text x="300" y="146" fill="var(--accent)" text-anchor="middle" font-size="26">→</text>
+              <text x="300" y="182" fill="var(--text-faint)" text-anchor="middle" font-size="12">same nodes, adopted</text>
+
+              <text x="475" y="22" fill="var(--text-muted)" text-anchor="middle">After hydration</text>
+              <polygon points="385,95 475,45 565,95" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="395" y="95" width="160" height="90" rx="4" fill="var(--bg-elev-2)" stroke="var(--accent)"/>
+              <rect x="415" y="115" width="36" height="36" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="499" y="115" width="36" height="36" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="455" y="150" width="30" height="35" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <circle cx="397" cy="133" r="5" fill="var(--accent)"/>
+              <line x1="402" y1="133" x2="415" y2="133" stroke="var(--accent)"/>
+              <text x="475" y="207" fill="var(--accent)" text-anchor="middle" font-size="12">interactive — clicks now respond</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Same walls, same layout, same DOM nodes on both sides — hydration only adds the wiring. If a wall were in the wrong spot the movers would complain loudly: that's a hydration mismatch.</figcaption>
+        </figure>
+
+        <p>The critical detail: the DOM is <strong>not</strong> thrown away and rebuilt. Hydration adopts what's already there. Re-rendering from scratch would defeat the speed win the server just gave you. If the client's tree doesn't line up with the server's — a wall in the wrong spot — that's a
+          <span class="term">hydration mismatch</span>
+          <span class="term__gloss">the server HTML and what the client would have rendered disagree</span>,
+          and the framework has to patch it up or throw the mismatched part away and re-render it.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not client-side rendering (CSR).</strong> CSR ships a near-empty <code>&lt;div id="root"&gt;</code> and makes the browser render everything from JS. No HTML until JS runs.</li>
+              <li><strong>Not plain server-side rendering (SSR).</strong> Pure SSR sends HTML and stops. The page is visible but inert — no state, no click handlers.</li>
+              <li><strong>Not server-side templating</strong> (Jinja, ERB, Razor). Those render HTML once and reload the whole page for every click; there's no client-side component tree to line up against.</li>
+              <li><strong>Not static site generation (SSG)</strong> by itself, though SSG output usually gets hydrated the same way SSR output does.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You need fast <span class="term" data-gloss="First Contentful Paint — when the user first sees real content">FCP</span> and good SEO, but the app has rich client-side interactivity (dashboards, e-commerce, social feeds).</li>
+              <li>You're using a meta-framework that defaults to it: Next.js, Nuxt, SvelteKit, SolidStart, Remix.</li>
+              <li>Your content is partly dynamic per user (logged-in state, personalization), so a pure static cache isn't enough.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It's a pure marketing site with no interactivity — ship static HTML and a sprinkle of vanilla JS; you don't need a framework runtime.</li>
+              <li>It's an internal tool behind a login where <span class="term" data-gloss="Time To Interactive — when the page actually responds to clicks">TTI</span> matters more than FCP — a plain CSR single-page app is simpler.</li>
+              <li>The content is truly static and SEO-driven — SSG without hydration, or with
+                <span class="term">islands</span>
+                <span class="term__gloss">mostly static HTML with a few isolated interactive regions that hydrate on their own</span>,
+                gives you smaller bundles.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>SSR</dt><dd>Server-side rendering — producing HTML on the server per request.</dd></div>
+          <div><dt>SSG</dt><dd>Static site generation — producing HTML once at build time.</dd></div>
+          <div><dt>CSR</dt><dd>Client-side rendering — the browser builds the DOM from JS.</dd></div>
+          <div><dt>FCP</dt><dd>First Contentful Paint — when the user first sees real content.</dd></div>
+          <div><dt>TTI</dt><dd>Time To Interactive — when the page actually responds to clicks.</dd></div>
+          <div><dt>Hydration mismatch</dt><dd>Server HTML and client render disagree; React logs an error and may discard the server tree.</dd></div>
+          <div><dt><code>hydrateRoot</code></dt><dd>The React 18+ API that hydrates a server-rendered tree (replaces the older <code>ReactDOM.hydrate</code>).</dd></div>
+          <div><dt>Partial / progressive hydration</dt><dd>Hydrating only some components, or hydrating them over time instead of all at once.</dd></div>
+          <div><dt>Islands architecture</dt><dd>Ship mostly static HTML with isolated interactive islands that hydrate independently (Astro, Fresh).</dd></div>
+          <div><dt>Resumability</dt><dd>Qwik's alternative to hydration; the server serializes enough state that the client can pick up without re-running component code.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

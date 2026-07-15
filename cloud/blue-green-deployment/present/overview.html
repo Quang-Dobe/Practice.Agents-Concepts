@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blue-Green Deployment · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Blue-Green Deployment</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Blue-Green Deployment</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/blue-green-deployment/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Blue-Green Deployment</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Shipping a new version usually risks two things: users seeing downtime, and you not being able to undo it fast if it breaks. Blue-green deployment fixes both by keeping two full copies of your app running side by side.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>You run two identical environments — <strong>blue</strong> (live) and <strong>green</strong> (standby). You deploy the new build to green, smoke-test it while no real user touches it, then point your router at green. If green misbehaves, you flip back to blue. The
+              <span class="term">cutover</span>
+              <span class="term__gloss">the moment traffic shifts from one environment to the other</span>
+              is the only risky-looking step, and by then the real risk is already behind you.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a stage with two identical sets behind a curtain:</p>
+        <ul>
+          <li>The audience — your users — is watching set A. That's <strong>blue</strong>.</li>
+          <li>Backstage, the crew dresses set B for the next act. That's <strong>green</strong>.</li>
+          <li>When B is ready, the curtain shifts and the audience is now looking at B.</li>
+          <li>Set A is still standing, fully dressed, lights on. If a prop falls on B mid-scene, you just shift the curtain back.</li>
+        </ul>
+        <p>Nobody rebuilds a set in front of a live audience. In cloud terms, the curtain is a load balancer with two
+          <span class="term" data-gloss="the pool of instances behind a listener; blue and green are two of these">target groups</span>,
+          a DNS record, or a weighted route. The two sets are two parallel fleets running on the same data, differing only in application version.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph Before["Before cutover"]
+        U1[Users] -->|100%| B1["BLUE v1.4 - live"]
+        U1 -.->|0%| G1["GREEN v1.5 - staged"]
+    end
+    subgraph After["After cutover"]
+        U2[Users] -.->|0%| B2["BLUE v1.4 - standby"]
+        U2 -->|100%| G2["GREEN v1.5 - live"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Same router, same two fleets, one number flipped: 100% moves from blue to green in a single step.</figcaption>
+        </figure>
+
+        <p>After the flip, in-flight requests on blue still need to finish. That's
+          <span class="term">drain</span>
+          <span class="term__gloss">letting requests already in progress on the old side complete before it's shut down</span>
+          — the router stops sending new traffic to blue but waits for the old connections to close naturally.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a rolling update.</strong> Rolling replaces instances in place, one batch at a time — there's no second full environment and no instant rollback target.</li>
+              <li><strong>Not a canary release.</strong> Canary sends a small slice of real users to the new version to measure it; blue-green is all-or-nothing on the cutover.</li>
+              <li><strong>Not feature flags.</strong> Flags toggle behavior inside one running build; blue-green swaps the build itself.</li>
+              <li><strong>Not a staging environment.</strong> Staging is a permanently separate, lower-fidelity world. In blue-green, both environments are production.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You need near-zero downtime and users notice every hiccup — payments, checkout, public APIs.</li>
+              <li>You want rollback measured in seconds, not "rebuild and redeploy."</li>
+              <li>Your release has a risky binary change that a flag can't easily reverse.</li>
+              <li>Your platform makes a second environment cheap and short-lived — ECS, Kubernetes, Lambda aliases, a weighted-target-group load balancer.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Your release makes a stateful, schema-breaking change to a shared database — both colors talk to the same data.</li>
+              <li>Doubling capacity is genuinely too expensive — large stateful clusters, GPU fleets.</li>
+              <li>You need to validate the change against a slice of real users first — that's canary's job.</li>
+              <li>Long-lived sticky sessions, websockets, or in-memory state make the cutover messy without extra work.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Blue / Green</dt><dd>The two environments. Names are arbitrary — some teams say A/B or current/next.</dd></div>
+          <div><dt>Cutover</dt><dd>The moment traffic shifts from one color to the other.</dd></div>
+          <div><dt>Target group</dt><dd>In AWS ALB terms, the pool of instances behind a listener. Blue and green are two target groups.</dd></div>
+          <div><dt>Weighted routing</dt><dd>Splitting traffic by percentage across target groups; blue-green typically uses 100/0 then 0/100.</dd></div>
+          <div><dt>Drain / connection draining</dt><dd>Letting in-flight requests on the old color finish before shutting it down.</dd></div>
+          <div><dt>Rollback</dt><dd>Flipping the switch back to the previous color when something goes wrong.</dd></div>
+          <div><dt>Cutover window</dt><dd>The short period both environments serve real traffic during the flip.</dd></div>
+          <div><dt>Backward-compatible migration</dt><dd>A schema or contract change that lets old and new code coexist — the unspoken prerequisite for clean blue-green on a shared database.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backpressure · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Backpressure</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Backpressure</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/backpressure/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Backpressure</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical SaaS backend, backpressure is the thing standing between a healthy ingestion pipeline and a 3 a.m. page reading "pod OOMKilled, restart loop, consumer lag 4M and climbing." Anywhere a Kafka topic feeds a worker, anywhere a webhook ingester writes to Postgres, the question "what happens when the next stage is slower?" is a backpressure question — whether or not the team uses the word.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS ingestion</div><p>Kafka topic → HTTP-calling worker, webhook ingester → Postgres, S3 multipart upload → transform.</p></div>
+          <div class="card"><div class="card__title">Data & ML platforms</div><p>The boundary between a fast event source (CDC, telemetry, model token stream) and a slower sink (vector DB write, downstream inference, warehouse insert).</p></div>
+          <div class="card"><div class="card__title">LLM agent pipelines</div><p>A single planner step can generate dozens of tool calls before any finish — the queue between planner and executor is the whole game.</p></div>
+          <div class="card"><div class="card__title">The edge</div><p>Gateways, ingress controllers, mobile clients: TCP <code>rwnd</code>, HTTP/2 <code>WINDOW_UPDATE</code>, and the 429 your service returns when admission control trips.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Pick the strategy from the data, not the framework</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Choose drop, buffer, block, or signal based on what the data tolerates. Telemetry and video frames: drop latest. Request queues: bounded buffer plus reject. File ingestion / ETL: block the producer. Service-to-service streams: signal via Reactive Streams or HTTP/2 windows.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The wrong strategy is silently lossy or silently fatal. Buffering metrics into a 10k-deep queue means alerting on data that's four minutes stale; blocking a webhook producer means its retries hammer you harder.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We'll just use a queue" without naming the strategy out loud.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Every queue has a bound, written down in the constructor</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>new ArrayBlockingQueue&lt;&gt;(1024)</code>, <code>Channels.CreateBounded&lt;T&gt;(new BoundedChannelOptions(1024))</code>, <code>make(chan T, 256)</code>, <code>tokio::sync::mpsc::channel(256)</code>. Size the bound to roughly 2–4× concurrency, not "a big number that feels safe."</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>LinkedBlockingQueue()</code> with no argument defaults to <code>Integer.MAX_VALUE</code> — an OOM with a polite name. Even when memory holds, deep queues bufferbloat: throughput looks fine, p99 latency is awful.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Unbounded queues "for now." There is no later.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Decide what "put" does when the bound is hit, and write the metric</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pick <code>Wait</code> (block), <code>DropOldest</code>, <code>DropNewest</code>, or <code>DropWrite</code> (reject) explicitly. Increment a counter on every drop or rejection so the loss is visible on a dashboard.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A silent drop is worse than a crash, because nobody notices for weeks. A queue with a dropped-items counter sitting at zero for 90 days is a queue you can trust.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>try { queue.offer(x) } catch { /* ignore */ }</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Reject with a real signal: 429 plus Retry-After</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>When
+              <span class="term">admission control</span>
+              <span class="term__gloss">the gate that rejects work once capacity runs out</span>
+              trips, return <code>429 Too Many Requests</code> with a <code>Retry-After</code> header. For internal RPC, surface a typed <code>RESOURCE_EXHAUSTED</code> (gRPC code 8). Pair with a
+              <span class="term" data-gloss="a component that dynamically caps in-flight requests, e.g. Netflix's adaptive concurrency or Envoy's adaptive_concurrency filter">concurrency limiter</span>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A well-behaved client backs off; a 500 or a timeout gets retried instantly with exponential rage. The retry storm after a bad rejection is the real outage.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Returning 200 with an empty body, or a 503 with no <code>Retry-After</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Propagate backpressure end-to-end, not just at the slow stage</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In a 4-stage pipeline (HTTP → queue → worker → DB), make every stage signal its predecessor: if Postgres slows, the worker's bounded write pool blocks, the Kafka consumer's <code>poll()</code> slows, and the producer eventually sees lag and either slows its source or sheds.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Backpressure that stops at the first stage just relocates the OOM to that stage. The point is pushing the decision back to the source, where it can actually be acted on.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Adding a "smoothing buffer" in front of the slow stage. Bufferbloat is the second outage after the first one.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    H[HTTP request] --> Q1[(Ingest queue)]
+    Q1 --> W[Worker]
+    W --> Q2[(Bounded write pool)]
+    Q2 --> DB[(Postgres)]
+    DB -.->|slows| Q2
+    Q2 -.->|blocks| W
+    W -.->|slows poll| Q1
+    Q1 -.->|lag rises| H
+          </pre>
+          <figcaption class="diagram__caption">End-to-end propagation: each stage's slowdown signals backward, so the source sees it instead of an earlier stage quietly filling up.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Use the runtime's idioms; don't reinvent the protocol</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Node — <code>stream.pipeline()</code> with a deliberate <code>highWaterMark</code>. Go — bounded channels with a <code>select</code>/<code>default</code> for shed-on-full. Rust — <code>tokio::sync::mpsc::channel(N)</code> over <code>unbounded_channel()</code>, always. Java — <code>BlockingQueue.put()</code> to block, never <code>add()</code> in a loop. .NET — <code>System.Threading.Channels</code> with <code>BoundedChannelFullMode</code>. JVM reactive — <code>Flowable</code> with an explicit overflow strategy, never <code>Observable</code> on a hot source.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Hand-rolled flow control is where deadlocks and lost-wakeup bugs live. The standard library has been beaten on for a decade; trust it.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Mixing a non-backpressured primitive (<code>Observable</code>, <code>unbounded_channel</code>, <code>EventEmitter</code>) into a hot path.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Treat HTTP/2 and gRPC windows as real budgets</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For long streaming RPCs, tune <code>initial_window_size</code> (default 65 KiB) and watch for <code>WINDOW_UPDATE</code> starvation. Check <code>isReady()</code> before each <code>onNext</code> on the server.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The default 64 KiB window throttles a single fat-pipe stream to a fraction of available bandwidth. Ignoring <code>isReady</code> queues messages in user-space and you OOM behind a wire that looked healthy.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"It's gRPC, it handles that for me." It handles the protocol; it does not handle your application loop.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Monitor lag, depth, and p99 — early warnings, not symptoms</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Expose a gauge per queue: depth, capacity, drops total, wait seconds. For Kafka, monitor lag per partition, not just the consumer-group total. Page on
+              <span class="term">lag-seconds</span>
+              <span class="term__gloss">lag divided by consumption rate — how stale the data is, in time, not message count</span>,
+              not lag-in-messages.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Aggregate lag hides a single hot partition stuck for hours. p99 processing latency climbing while throughput stays flat is the earliest signal you'll get.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Alerting on "messages/sec" alone.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Autoscale on the right signal</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For consumer workloads, autoscale on lag (KEDA's Kafka scaler, HPA with a Prometheus adapter on lag-seconds). Cap scale-out at the partition count.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>CPU-based autoscaling misses I/O-bound consumers entirely — they sit at 20% CPU while lag balloons. Lag-based scaling tracks the actual SLO: how fresh the data is.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Scaling to more consumers than partitions and wondering why it didn't help.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Make the lossy path observable and reversible</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>When you drop, drop with intent: tag the item's category, increment a labelled counter, and for non-trivial pipelines, write a sample to a
+              <span class="term" data-gloss="a side topic that captures dropped or failed items for later inspection">dead-letter topic</span>.
+              Sample 1% of drops at full fidelity.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>"We drop telemetry under load" is a fine policy if you can answer how much, of what kind, when. It's a debugging nightmare if you can't.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A swallowed exception in a <code>catch</code> block as your drop strategy.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Unbounded queue plus retry loop</p>
+            <p>A <code>LinkedBlockingQueue()</code> fed by a retrying HTTP client. Under a downstream stall, retries pile in faster than work drains and the heap climbs linearly — OOM in about 20 minutes. Better: bounded queue, a circuit breaker, and <code>Retry-After</code> on the client.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Swallowing 429s</p>
+            <p>Client code catches a 429 and retries immediately, often with no backoff. The signal you designed becomes the next retry storm. Better: respect <code>Retry-After</code>, full-jitter exponential backoff, retry budget capped around 10% of request volume.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Hiding backpressure behind a cache</p>
+            <p>"Reads are slow, so we cached them." The cache fills, eviction thrashes, and the underlying DB still gets hammered on misses. Caches amortize load; they don't shed it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>highWaterMark</code> worship</p>
+            <p>Bumping Node's <code>highWaterMark</code> to 1 MiB to "fix" backpressure warnings. That moves the OOM later and makes GC pauses worse. Better: fix the consumer or shed at the source.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The smoothing buffer</p>
+            <p>An "in-memory queue to absorb spikes," sized at "a few seconds of traffic." Under sustained overload it's a delayed OOM; under bursts it stretches p99 by exactly its depth.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Ignoring downstream errors</p>
+            <p>Treating 5xx from a dependency as a transient blip and retrying. If the dependency is shedding because of you, retries make it worse. Better: classify errors as retryable versus shed-signal, and back off on the latter.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Push pipelines on hot sources</p>
+            <p><code>Observable.fromEventEmitter(socket)</code> or an RxJS <code>Subject</code> on a high-rate stream with no buffer strategy. Memory grows until the tab dies. Better: <code>Flowable</code>, <code>ReadableStream</code>, or an async iterator with explicit backpressure.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Alerting on absolute lag</p>
+            <p><code>lag &gt; 10000</code> fires at 3 a.m. during normal batch traffic and gets ignored during a real incident. Better: alert on lag-seconds versus SLO, calculated as lag ÷ consumption rate.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Event ingestion at SaaS scale</div>
+            <p>Multi-tenant analytics pipeline: HTTP ingester → Kafka → Flink → ClickHouse. The ingester runs a token bucket per tenant and returns 429 when its bounded queue is above 80% full. Flink consumer lag drives autoscaling (KEDA, target lag-seconds &lt; 30). <em>Lesson:</em> the Kafka topic feels like infinite headroom, but ClickHouse merges are the real bottleneck — the Flink sink's bounded write pool is what actually holds the line.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Streaming gRPC for live updates</div>
+            <p>A trading dashboard pushes per-symbol price ticks over server-streaming gRPC to ~50k browsers. The server checks <code>isReady()</code> per stream and coalesces updates while waiting — a drop-and-replace-latest buffer per stream. <em>Lesson:</em> per-stream backpressure beats per-connection; HTTP/2's per-stream window is the right granularity, but the app has to cooperate.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">LLM agent pipeline</div>
+            <p>A planner LLM emits tool calls into a bounded executor channel (capacity = 2× worker concurrency). When full, the planner's emission blocks, which propagates back as token-stream backpressure to the model client. <em>Lesson:</em> agent pipelines are textbook backpressure problems wearing a new costume.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Webhook fan-out</div>
+            <p>A CRM fans out webhook deliveries to ~100k customer endpoints using bounded per-destination queues with <code>DropOldest</code>, plus a circuit breaker that opens on 5 consecutive 5xx or any 429. <em>Lesson:</em> apply backpressure at the destination granularity, not the global pool — one slow destination shouldn't block the others.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li>Every queue, channel, and stream buffer has a capacity argument — search for <code>LinkedBlockingQueue()</code>, <code>unbounded_channel</code>, and unsized <code>make(chan</code> calls.</li>
+              <li>Each bounded buffer exports depth, capacity, drops-total, and wait-seconds, with drops labelled by reason.</li>
+              <li>HTTP overload returns 429 plus <code>Retry-After</code>; internal RPC returns <code>RESOURCE_EXHAUSTED</code>. Both are exercised in a load test, not just unit tests.</li>
+              <li>Consumer lag is monitored per partition and alerted on lag-seconds versus SLO, not absolute message count.</li>
+              <li>Autoscaling is wired to lag or queue depth, not just CPU. Max replicas stay ≤ partition count for Kafka.</li>
+              <li>A chaos test throttles the slowest stage; the system sheds visibly, p99 stays bounded, nothing OOMs.</li>
+              <li>Client libraries honor <code>Retry-After</code> with full-jitter exponential backoff, and the retry budget is capped.</li>
+              <li>Drops have a sample path — dead-letter topic or sampled log — so "what got shed" is answerable after an incident.</li>
+              <li>A new engineer can find the queue capacities, the rejection metric, and the autoscaler config in under 10 minutes.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">No backpressure, first OOM.</span> Teams start with whatever queue primitive is closest to hand — an unbounded list, an <code>EventEmitter</code>, a plain <code>LinkedBlockingQueue</code>. Everything works at 10 RPS. The first real incident is almost always an OOM during a traffic spike, and the easy fix is bounding that one queue.</li>
+          <li><span class="steps__title">The painful end-to-end migration.</span> Bounding the single hottest queue just moves the problem one stage upstream. Teams introduce admission control at the edge, wire bounded queues at every async boundary, and start monitoring lag-seconds — a multi-quarter project touching client libraries, autoscalers, dashboards, and runbooks at once.</li>
+          <li><span class="steps__title">Backpressure as a platform concern.</span> A standard concurrency-limiter library, a standard rejection envelope, a shared dashboard template, and a chaos test in the deploy pipeline that throttles a dependency and asserts the system sheds rather than crashes. Engineers stop thinking about backpressure per-feature and start treating it like TLS — infrastructure that's just there.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.reactive-streams.org/" rel="noopener">Reactive Streams Specification 1.0.4</a> — the contract every JVM/JS/.NET backpressure library implements; short and worth reading directly.</li>
+          <li><a href="https://nodejs.org/learn/modules/backpressuring-in-streams" rel="noopener">Node.js — Backpressuring in Streams</a> — the official guide; explains <code>highWaterMark</code>, <code>drain</code>, and <code>pipeline()</code> at the right depth.</li>
+          <li><a href="https://queue.acm.org/detail.cfm?id=2071893" rel="noopener">BufferBloat: What's Wrong with the Internet? (Gettys & Nichols, ACM Queue 2011)</a> — the canonical argument for why "just buffer more" is wrong.</li>
+          <li><a href="https://brooker.co.za/blog/" rel="noopener">Marc Brooker — blog on overload, queueing, and Little's Law</a> — unmatched writing on load shedding and admission control from an AWS principal engineer.</li>
+          <li><a href="https://netflixtechblog.medium.com/performance-under-load-3e6fa9a60581" rel="noopener">Netflix Tech Blog — Performance Under Load</a> — origin story of the adaptive concurrency algorithms now underpinning Envoy's <code>adaptive_concurrency</code> filter.</li>
+          <li><a href="https://medium.com/@systemdesignwithsage/the-backpressure-mistake-we-did-not-see-coming-750c4843830d" rel="noopener">The Backpressure Mistake We Did Not See Coming</a> — a post-mortem-style walkthrough of a real ingestion-pipeline failure.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/backpressure/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

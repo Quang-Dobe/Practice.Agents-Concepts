@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Components · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Web Components</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Web Components</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/web-components/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Web Components</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">You can invent your own HTML tag. Give it a private DOM tree and private CSS, wire up behavior in a small JavaScript class, and register it once with the browser. From then on it works everywhere HTML works.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>A Web Component is a custom tag — say <code>&lt;user-card&gt;</code> — that ships with its own
+              <span class="term">Shadow DOM</span>
+              <span class="term__gloss">a private DOM subtree; outside CSS and JS queries can't see or touch what's inside it</span>.
+              You define it once in JavaScript and it runs in React, Angular, Vue, a plain <code>.html</code> file, or a Rails view — no bundler, no rewrite per framework.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a <strong>sealed appliance</strong>, like a microwave. From the outside it has a clean interface: a few buttons, a power cord, a door where you put your food. Inside, it has its own wiring and its own casing — the kitchen's electrics can't reach in and rearrange the magnetron, and your page's global CSS can't bleed in and repaint the microwave's display.</p>
+        <ul>
+          <li>The buttons are <strong>attributes</strong> — you configure the component from markup.</li>
+          <li>The cord is <strong>events</strong> — the component talks back out to the page.</li>
+          <li>The door is a <strong>
+            <span class="term">slot</span>
+            <span class="term__gloss">a placeholder in the private tree where the tag's own children get displayed</span>
+            </strong> — the plain HTML you put between the tags still shows up, just projected into a spot the component chose.</li>
+          <li>The sealed casing is <strong>Shadow DOM</strong> — the private tree that outside styles and queries cannot cross.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 580 260" role="img" aria-labelledby="applianceTitle applianceDesc" width="580" style="max-width:100%">
+            <title id="applianceTitle">A Web Component as a sealed appliance</title>
+            <desc id="applianceDesc">A custom element boundary encloses a private shadow tree. Attributes configure it from outside, composed events escape it, light DOM content enters through a slot, and outside page CSS is blocked at the boundary.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+              <rect x="8" y="8" width="564" height="244" rx="8" fill="none" stroke="var(--border)"/>
+              <text x="20" y="26" fill="var(--text-muted)">Host page — global CSS lives out here</text>
+
+              <text x="386" y="42" fill="var(--text-muted)" text-anchor="middle">page CSS</text>
+              <line x1="386" y1="48" x2="332" y2="68" stroke="var(--text-faint)" stroke-dasharray="4 3"/>
+              <g stroke="var(--danger)" stroke-width="2.5">
+                <line x1="322" y1="62" x2="334" y2="74"/>
+                <line x1="334" y1="62" x2="322" y2="74"/>
+              </g>
+
+              <text x="290" y="62" fill="var(--accent)" font-weight="600" text-anchor="middle" font-size="13">custom element (sealed)</text>
+              <rect x="140" y="70" width="300" height="150" rx="12" fill="none" stroke="var(--accent)" stroke-width="3"/>
+
+              <rect x="170" y="95" width="240" height="55" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="290" y="118" fill="var(--accent)" text-anchor="middle">shadow tree —</text>
+              <text x="290" y="136" fill="var(--accent)" text-anchor="middle">own style + DOM, sealed off</text>
+
+              <rect x="170" y="165" width="240" height="32" rx="6" fill="none" stroke="var(--border)" stroke-dasharray="4 3"/>
+              <text x="290" y="185" fill="var(--text-muted)" text-anchor="middle">slot — light DOM children project here</text>
+
+              <text x="80" y="104" fill="var(--text-muted)" text-anchor="middle">attributes</text>
+              <line x1="30" y1="112" x2="136" y2="112" stroke="var(--text-muted)"/>
+              <path d="M 136 112 L 126 107 L 126 117 Z" fill="var(--text-muted)"/>
+              <text x="80" y="212" fill="var(--text-faint)" font-size="11" text-anchor="middle">configure from outside</text>
+
+              <text x="500" y="104" fill="var(--text-muted)" text-anchor="middle">events</text>
+              <line x1="444" y1="112" x2="550" y2="112" stroke="var(--text-muted)"/>
+              <path d="M 550 112 L 540 107 L 540 117 Z" fill="var(--text-muted)"/>
+              <text x="500" y="212" fill="var(--text-faint)" font-size="11" text-anchor="middle">composed events escape the seal</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A Web Component behaves like a sealed appliance: attributes and events cross the boundary on purpose. Page CSS does not — the shadow tree is genuinely private.</figcaption>
+        </figure>
+
+        <p>The children you write between the opening and closing tag — <code>&lt;hello-badge&gt;Quang&lt;/hello-badge&gt;</code> — stay visible to the outside page as the
+          <span class="term">light DOM</span>
+          <span class="term__gloss">the element's own children, written by whoever uses the tag; they live outside the shadow tree</span>.
+          The
+          <span class="term">Custom Element</span>
+          <span class="term__gloss">a class extending HTMLElement, registered under a hyphenated tag name</span>
+          class decides what happens once that tag lands in the page. Put a shadow root, a template, and a custom-element class together and you get a component with the isolation a framework component wishes it had — shipped by the browser, no bundler required.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a framework.</strong> React, Vue, and Svelte give you rendering, state, and routing. Web Components give you one primitive: a custom tag with isolation.</li>
+              <li><strong>Not iframes.</strong> An iframe is a separate document with its own URL and network context. A Web Component shares the page's JS runtime — it's just scoped DOM.</li>
+              <li><strong>Not React components.</strong> A React component is a compile-time abstraction the browser never sees. A Web Component is a real DOM node the browser understands natively.</li>
+              <li><strong>Not WebAssembly.</strong> WASM runs sandboxed binary code. A Web Component is plain JavaScript that produces DOM.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You're building a design system that has to work across React, Angular, and legacy jQuery pages.</li>
+              <li>You ship an embeddable widget — a chat bubble, a checkout button — that must survive an unknown host site's CSS.</li>
+              <li>Different teams pick different frameworks in a micro-frontend setup but need to share one tag.</li>
+              <li>You want one interactive island on an otherwise static page, without pulling in a framework.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You're already all-in on one framework and never plan to leave — its own component model has better tooling and server-rendering support.</li>
+              <li>You need heavy SSR with fine-grained streaming — the ecosystem here is still thinner than Next.js or SvelteKit.</li>
+              <li>The component is trivial and used only once. A plain function or partial is lighter.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Custom Element</dt><dd>A class extending <code>HTMLElement</code>, registered under a hyphenated tag name.</dd></div>
+          <div><dt>Shadow DOM</dt><dd>An encapsulated DOM subtree attached to an element; styles and queries do not cross the boundary.</dd></div>
+          <div><dt>HTML Template</dt><dd>A <code>&lt;template&gt;</code> tag whose contents are parsed but inert until cloned.</dd></div>
+          <div><dt>Slot</dt><dd>A placeholder inside the shadow tree where the host's light-DOM children get projected.</dd></div>
+          <div><dt>Light DOM</dt><dd>The children written between the opening and closing custom tag, visible to the outside page.</dd></div>
+          <div><dt>Lifecycle callbacks</dt><dd><code>connectedCallback</code>, <code>disconnectedCallback</code>, <code>attributeChangedCallback</code>, <code>adoptedCallback</code>.</dd></div>
+          <div><dt><code>customElements.define</code></dt><dd>The browser API that ties a tag name to a class.</dd></div>
+          <div><dt>Declarative Shadow DOM</dt><dd>Server-rendered shadow trees via a <code>template</code> with <code>shadowrootmode="open"</code> — no JS needed for first paint.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

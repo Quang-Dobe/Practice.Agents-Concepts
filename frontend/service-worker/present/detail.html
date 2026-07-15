@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Service Worker · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Service Worker</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Service Worker</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/service-worker/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Service Worker</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~9 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A Service Worker is an event-driven script, standardized by the <a href="https://www.w3.org/TR/service-workers/" rel="noopener">W3C</a>, that the browser runs in its own worker context — a
+          <span class="term">ServiceWorkerGlobalScope</span>
+          <span class="term__gloss">the worker's global object; there is no DOM, no window, no document</span> —
+          separate from any document, scoped to an origin and a URL prefix. It intercepts HTTP requests from clients in its scope and can answer on their behalf. The spec models it as a state machine attached to a registration record stored per origin in the browser's storage.</p>
+        <ul>
+          <li><strong>Core idea.</strong> One script, one registration per origin, that gets a first look at every in-scope request.</li>
+          <li><strong>Runtime environment.</strong> <code>self</code> is the global; <code>self.registration</code>, <code>self.clients</code>, and <code>self.caches</code> give it control over updates, controlled pages, and the Cache API. There is no <code>window</code>, no synchronous <code>XMLHttpRequest</code>, no <code>localStorage</code>.</li>
+          <li><strong>State is not durable.</strong> The browser can end the worker between events. On the next event it spins up fresh, and any plain JavaScript variables are gone — anything that must last goes to <code>caches</code> or <code>indexedDB</code>.</li>
+          <li><strong>Family.</strong> It belongs to the Web Workers family (Dedicated, Shared, Service). Only Service Workers persist past the page's lifetime and intercept network traffic. The closest cross-platform cousin is an edge worker — Cloudflare Workers, Deno Deploy, Vercel Edge — which shares the same <code>fetch</code>-event model on the server side. Its deprecated predecessor was Application Cache (AppCache), removed from browsers around 2021.</li>
+        </ul>
+
+        <h3>The lifecycle state machine</h3>
+        <p>A registration holds up to three worker objects — <code>installing</code>, <code>waiting</code>, <code>active</code> — and each one walks this ordering:</p>
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    [*] --> parsed
+    parsed --> installing: install event dispatched
+    installing --> redundant: install rejects
+    installing --> waiting: install succeeds
+    waiting --> activating: old clients gone, or skipWaiting() called
+    activating --> activated: activate settles — even if it rejects
+    activated --> redundant: replaced by a newer worker, or unregister() called
+    note right of waiting: also called the installed state
+    note right of activated: only now does it receive fetch, message, push, sync
+          </pre>
+          <figcaption class="diagram__caption">Six states from script download to retirement. If <code>install</code> rejects the worker dies immediately; if <code>activate</code> rejects the worker is still considered activated — it is a cleanup chance, not a gate.</figcaption>
+        </figure>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>A Service Worker is a programmable proxy that sits on the client, between the page's <code>fetch</code>/resource-loading code and the network stack:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Process boundary</div><p>Chromium runs it out-of-process in its own service worker process with its own event loop. Firefox and Safari use a separate worker thread. Either way: no shared memory with any page, message-passing only.</p></div>
+          <div class="card"><div class="card__title">Script location &amp; scope</div><p>The script must be same-origin. Its URL's directory caps the scope: <code>/sw.js</code> can claim up to <code>/</code>; <code>/static/sw.js</code> can only claim <code>/static/</code>. Breaking out of that requires the server to send a <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Service-Worker-Allowed" rel="noopener"><code>Service-Worker-Allowed</code></a> header naming a broader path — why tutorials insist the worker live at the site root.</p></div>
+          <div class="card"><div class="card__title">Security model</div><p>HTTPS-only, with <code>localhost</code>/<code>127.0.0.1</code> exempted for development. Same-origin everything. The browser also clamps the worker script's own cache lifetime to 86400 seconds (24 hours) and refetches it if the last fetch is older than that — so a buggy worker can't pin itself forever.</p></div>
+        </div>
+        <p>You'll meet it in the wild inside <strong>Workbox</strong> (Google's library that compiles caching strategies into a worker), framework wrappers built on it (Next.js's <code>next-pwa</code>, Nuxt's PWA module, the Vite PWA plugin), web push delivery (FCM, OneSignal — the <code>push</code> handler must live in a worker), <strong>Mock Service Worker (MSW)</strong> for browser-side test mocking, and production sites like Google Docs, Twitter/X, YouTube Music, and Pinterest.</p>
+
+        <!-- WHEN -->
+        <h2>When things happen</h2>
+        <h3>When each event fires</h3>
+        <ul>
+          <li><code>install</code> — once per worker version, right after the script is parsed and accepted.</li>
+          <li><code>activate</code> — once, when the worker leaves the waiting state, either because every controlled client is gone or because <code>skipWaiting()</code> was called.</li>
+          <li><code>fetch</code> — for every in-scope request from a controlled client, including the page's own HTML navigation, every subresource, and explicit <code>fetch()</code> calls.</li>
+          <li><code>message</code>, <code>push</code>, <code>sync</code> / <code>periodicsync</code>, <code>notificationclick</code> / <code>notificationclose</code> — client messages, push-service deliveries, background-sync runs, and notification interactions.</li>
+        </ul>
+        <h3>When updates happen</h3>
+        <p>On every in-scope navigation, and after roughly 24 hours idle, the browser refetches the script and does a
+          <span class="term">byte-for-byte comparison</span>
+          <span class="term__gloss">an exact comparison of the script's bytes against the stored copy to detect changes</span>
+          against the stored copy. Since Chrome 78 that comparison also covers any scripts pulled in via <code>importScripts()</code> — change one of those and the parent worker counts as updated even with identical top-level bytes (see <a href="https://github.com/w3c/ServiceWorker/pull/1023" rel="noopener">w3c/ServiceWorker PR #1023</a>). The <code>updateViaCache</code> setting defaults to <code>imports</code> — cache the imports, but always revalidate the top-level script. If any byte differs, a new worker enters <code>installing</code> while the old one keeps serving traffic.</p>
+        <h3>When skipWaiting / clients.claim take effect</h3>
+        <ul>
+          <li><code>skipWaiting()</code> only matters while the new worker is <code>installing</code> or <code>waiting</code>. Called from <code>install</code>, it lets the new worker activate the moment install finishes, regardless of open tabs.</li>
+          <li><code>clients.claim()</code> is called from <code>activate</code> (or later). It sets <code>controller</code> on every same-origin in-scope client that currently has none, or that the previous worker controlled. Without it, clients keep their original controller until they reload — the first load after registration is always uncontrolled.</li>
+        </ul>
+        <h3>When the browser kills the worker</h3>
+        <p>After about 30 seconds with no events (the figure Chromium's extension docs cite; timing elsewhere is similar but unspecified), under memory pressure, or when a single handler runs past a hard ceiling (5 minutes in Chromium). It spins back up on the next event.</p>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk a request through a typical cache-first worker:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Register.</span> The page calls <code>navigator.serviceWorker.register('/sw.js', { scope: '/' })</code> once.</li>
+          <li><span class="steps__title">Install.</span> The <code>install</code> handler wraps its cache-population promise in
+            <span class="term">event.waitUntil</span>
+            <span class="term__gloss">extends an event's lifetime until the given promise settles</span>,
+            so the worker stays <code>installing</code> until the shell is cached.</li>
+          <li><span class="steps__title">Activate.</span> The <code>activate</code> handler sweeps caches whose name isn't the current version, also inside <code>event.waitUntil</code>. No <code>fetch</code> events arrive yet.</li>
+          <li><span class="steps__title">Intercept.</span> On <code>fetch</code>, the handler must call <code>event.respondWith(promise)</code> <em>synchronously</em> — the async work happens inside that promise, not before the call.</li>
+          <li><span class="steps__title">Answer.</span> Check <code>cache.match(request)</code>; return it on a hit. On a miss, fetch the network, clone the response into the cache, and return it.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant P as Page
+    participant SW as Service Worker
+    participant C as Cache API
+    participant N as Network
+    P->>SW: fetch(request)
+    SW->>SW: event.respondWith(handle(request)) — called synchronously
+    SW->>C: cache.match(request)
+    alt cache hit
+        C-->>SW: cached Response
+    else cache miss
+        SW->>N: fetch(request)
+        N-->>SW: Response
+        SW->>C: cache.put(request, response.clone())
+    end
+    SW-->>P: Response
+          </pre>
+          <figcaption class="diagram__caption">A cache-first interception. <code>respondWith</code> must be called before the microtask queue drains, or the request has already gone to the network.</figcaption>
+        </figure>
+
+        <h3>The named caching strategies</h3>
+        <ul>
+          <li><strong>Cache-first</strong> — check cache, fall back to network. Best for immutable, fingerprinted assets.</li>
+          <li><strong>Network-first</strong> — try network with a timeout, fall back to cache. Best for HTML and API responses that change often.</li>
+          <li><strong>Stale-while-revalidate</strong> — return the cache immediately, refresh it in the background for next time. Best for content that can be a little stale.</li>
+          <li><strong>Cache-only</strong> — return cache or fail. Used for precached app-shell assets.</li>
+          <li><strong>Network-only</strong> — never touch the cache. Used for <code>POST</code>s, analytics, anything mutating.</li>
+        </ul>
+        <p>None of these are browser primitives — they're conventions. Workbox ships them as ready-made classes; hand-rolled, each is roughly 10 lines.</p>
+
+        <p>Cache versioning is the entire migration story — bump one constant and the old cache is swept on the next activation. Illustrative only; the runnable version lives in <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/service-worker/code" target="_blank" rel="noopener">the code folder</a>:</p>
+        <pre><code>const CACHE = 'app-shell-v7';
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL_URLS)));
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+    )
+  );
+});</code></pre>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gained</th><th scope="col">Given up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Run in a separate thread, no DOM</td><td>No main-thread blocking, no race conditions on <code>document</code></td><td>Can't read the DOM, must message-pass</td></tr>
+              <tr><td>HTTPS-only</td><td>Worker can't be MITM'd into existence</td><td>No plain-HTTP dev, no IP-served LAN demos</td></tr>
+              <tr><td>Staged install / activate</td><td>Old tabs keep working during deploy</td><td>Two-deploy lag for new behavior (without <code>skipWaiting</code>)</td></tr>
+              <tr><td>Termination allowed any time</td><td>Low memory and battery cost</td><td>No in-memory state; warm-up latency on first event</td></tr>
+              <tr><td>Byte-diff update check</td><td>Cheap, automatic</td><td>Whitespace-only edits ship a "new" worker</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">The worker pins a stale index.html</p>
+            <p>Cause: cache-first applied to the navigation request. The user can never see the new HTML.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">A new worker never activates</p>
+            <p>Cause: a long-lived tab is still controlled by the old one, and <code>skipWaiting()</code> is missing.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">First load after install is uncontrolled</p>
+            <p>Working as designed — but surprising if you wanted immediate control and forgot <code>clients.claim()</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>event.respondWith()</code> rejects, browser shows a network error</p>
+            <p>Cause: an unhandled exception in the async handler. Always <code>catch</code> and return a fallback <code>Response</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Worker dies mid-request</p>
+            <p>Cause: long-running work happening outside <code>event.waitUntil()</code> — the browser doesn't know the worker is still busy.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Quota exceeded</p>
+            <p>Cause: unbounded cache growth. Nothing evicts the Cache API for you — use LRU or explicit max-entry caps.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">CORS / opaque responses fill the cache with 0-byte holes</p>
+            <p>Cause: storing responses where <code>response.type === 'opaque'</code>. They count against quota at a padded size and can't be inspected.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p><strong>No DOM access.</strong> The worker runs in parallel with any number of pages. If it could read or write the DOM, every property access would need cross-thread synchronization, and JavaScript's single-threaded determinism would fall apart. Message-passing forces an explicit, serializable interface instead:</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 520 190" role="img" aria-labelledby="isoTitle isoDesc" width="520" style="max-width:100%">
+            <title id="isoTitle">Message-passing isolation</title>
+            <desc id="isoDesc">The page has a DOM and window; the Service Worker has neither. The only connection between them is postMessage in both directions — there is no direct or shared-memory link.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="10" y="30" width="220" height="130" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="120" y="55" fill="var(--accent)" text-anchor="middle" font-weight="bold">Page (renderer)</text>
+              <text x="120" y="80" fill="var(--text)" text-anchor="middle">DOM · window</text>
+              <text x="120" y="100" fill="var(--text)" text-anchor="middle">document · localStorage</text>
+
+              <rect x="290" y="30" width="220" height="130" rx="8" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="400" y="55" fill="var(--text)" text-anchor="middle" font-weight="bold">Service Worker</text>
+              <text x="400" y="80" fill="var(--text-muted)" text-anchor="middle">ServiceWorkerGlobalScope</text>
+              <text x="400" y="100" fill="var(--text-muted)" text-anchor="middle">no DOM · no window</text>
+
+              <line x1="230" y1="75" x2="290" y2="75" stroke="var(--danger)" stroke-width="2"/>
+              <line x1="235" y1="65" x2="285" y2="85" stroke="var(--danger)" stroke-width="2"/>
+              <line x1="285" y1="65" x2="235" y2="85" stroke="var(--danger)" stroke-width="2"/>
+              <text x="260" y="120" fill="var(--danger)" text-anchor="middle" font-size="11">no shared memory</text>
+
+              <path d="M120 160 Q260 185 400 160" stroke="var(--text-muted)" fill="none" marker-end="url(#arrow)"/>
+              <path d="M400 160 Q260 178 120 160" stroke="var(--text-muted)" fill="none" marker-end="url(#arrow)"/>
+              <text x="260" y="150" fill="var(--text-muted)" text-anchor="middle" font-size="11">postMessage (both directions)</text>
+
+              <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M0 0L10 5L0 10z" fill="var(--text-muted)"/>
+                </marker>
+              </defs>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The only link between page and worker is explicit messages. Neither can reach into the other's memory.</figcaption>
+        </figure>
+
+        <p><strong>HTTPS-only.</strong> A Service Worker is a network man-in-the-middle running with the page's authority. If a coffee-shop Wi-Fi could install one over plain HTTP, every site visited from that network could be rewritten silently on future visits. TLS is the prerequisite for trusting the script came from the claimed origin.</p>
+        <p><strong>Staged install/activate.</strong> At deploy time, pages already loaded against the previous worker hold references to old asset URLs. If the new worker activated instantly and wiped the old cache, those tabs would break the moment they next requested a resource. The waiting state is the version-skew guard.</p>
+        <p><strong>Allowed to be killed and resurrected.</strong> Keeping a JS context alive per origin, across dozens of installed sites, would burn battery and memory on mobile. The spec's answer: assume cold start, store anything that must last in
+          <span class="term">quota</span>
+          <span class="term__gloss">the storage limit the browser enforces per origin for caches and IndexedDB</span>-bound storage, and treat in-memory state as scratch space.</p>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative — a declarative cache manifest, which is exactly what AppCache tried — was abandoned. Real caching policy is conditional: different strategies per route, version negotiation, fallback chains, none of which a static manifest can express. The Service Worker design replaces the manifest with a full event handler written in JavaScript. That is a sharper foot-gun — a broken worker can brick the site for returning visitors — mitigated by the 24-hour script-cache cap, the byte-diff update check, and <code>clients.claim()</code> only ever firing when a developer opts in.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, Service Workers are the foundation of the entire PWA story — install prompts, offline behavior, push, background sync — and table stakes for any site that wants to feel fast on flaky connections. They are also what makes browser-side request mocking (MSW) and edge-worker portability possible, since edge platforms share the same <code>fetch</code>-event signature. The API itself is past its churn phase; every evergreen browser ships it, and the interesting movement is in the surrounding APIs — Background Fetch, Periodic Sync, Web Push — not the core.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

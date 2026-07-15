@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sharding · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sharding</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sharding</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/sharding/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sharding</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Sharding is <strong>horizontal partitioning of one logical dataset across independent physical database instances</strong>. Each instance — a shard — owns a disjoint slice of the keyspace and handles both reads and writes for that slice. A routing function decides ownership.</p>
+        <ul>
+          <li><strong>Core idea.</strong> The union of all shards reconstitutes the original table; the intersection of any two shards is empty. Rows are not copied across shards — that's replication's job, and it happens <em>inside</em> each shard, not between them.</li>
+          <li><strong>Architecture.</strong> This is a
+            <span class="term">share-nothing</span>
+            <span class="term__gloss">shards do not share memory, disk, or a write log — coordination across them is explicit and costly</span>
+            design in Michael Stonebraker's sense.</li>
+          <li><strong>Family.</strong> It sits in the data-distribution family alongside replication (same data, many nodes, for fault tolerance), federation (different services own different tables), and vertical partitioning (different columns, different stores). Most sharded systems also replicate each shard for high availability — Cassandra and DynamoDB fold both concerns into one ring; MongoDB and Vitess keep them separate, so each shard is itself a replica set. NewSQL systems (Spanner, CockroachDB, TiDB) shard automatically underneath a plain SQL surface.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Shard key</dt><dd>The column(s) the routing function reads. The choice is permanent in most systems — changing it means a full data migration.</dd></div>
+          <div><dt>Routing function</dt><dd>A pure function from key to shard. Three families: hash (<code>hash(key) % N</code>, or consistent hashing), range (<code>key ∈ [lo, hi)</code>), or directory (lookup in a metadata table).</dd></div>
+          <div><dt>Router / query layer</dt><dd>Runs the routing function and forwards the query. Lives in the client driver (Cassandra), a proxy (Vitess <code>vtgate</code>, MongoDB <code>mongos</code>), or the database itself (Citus coordinator).</dd></div>
+          <div><dt>Shard map / topology</dt><dd>Metadata describing which shard owns which range, stored in a strongly-consistent store — Zookeeper or etcd (Vitess), Spanner's universe master, MongoDB's config servers.</dd></div>
+          <div><dt>Rebalancer / mover</dt><dd>Background process that migrates data between shards when adding capacity or fixing skew — MongoDB's balancer, Vitess's <code>VReplication</code>, Citus's <code>rebalance_table_shards()</code>.</dd></div>
+          <div><dt>Reference / global tables</dt><dd>Small, mostly-read tables (currencies, country codes) copied to every shard so joins never go cross-shard.</dd></div>
+        </dl>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Sharding sits at the data tier, but the routing piece can live at three different layers:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">1 · Client-side</div><p>The Cassandra driver computes the token from the key and contacts the owning replica directly. Lowest latency, but every client must know the topology.</p></div>
+          <div class="card"><div class="card__title">2 · Proxy</div><p><code>vtgate</code> (Vitess), <code>mongos</code> (MongoDB), ProxySQL, Figma's <code>DBProxy</code>. Clients speak unmodified SQL; the proxy parses, rewrites, and routes. Adds a hop, centralizes logic.</p></div>
+          <div class="card"><div class="card__title">3 · Database engine</div><p>Spanner, CockroachDB, YugabyteDB, Citus handle sharding internally — the client sees one plain SQL endpoint.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App[Application query with a shard key]
+    App --> A["1 · Client-side routing (Cassandra driver)"]
+    App --> B["2 · Proxy routing (vtgate, mongos, ProxySQL)"]
+    App --> C["3 · Engine-side routing (Spanner, CockroachDB, Citus)"]
+    A --> U[(Owning shard)]
+    B --> U
+    C --> U
+          </pre>
+          <figcaption class="diagram__caption">Three places the same routing function can run. Client-side is fastest but couples every client to the topology; engine-side hides it completely behind SQL.</figcaption>
+        </figure>
+
+        <p>Systems you'll actually run into: Vitess (sharded MySQL at YouTube, Slack, GitHub, Shopify), Citus (distributed Postgres, now Azure Cosmos DB for PostgreSQL), MongoDB sharded clusters, Cassandra/ScyllaDB (a consistent-hashing ring, no router process), DynamoDB (partitioning is automatic and invisible), Spanner/CockroachDB/TiDB (automatic range-sharded storage), and Elasticsearch/OpenSearch (index sharding for search).</p>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>One primary can't take the write rate after vertical scaling, read replicas, and connection pooling are exhausted.</li>
+              <li>The hot working set exceeds RAM on the largest economical instance — typically 256 GB–2 TB depending on the cloud SKU.</li>
+              <li>Data residency requires geographic partitioning — EU users on EU shards under GDPR Article 44+.</li>
+              <li>There's a natural tenant boundary where over 95% of queries scope to a single tenant.</li>
+              <li>You're already on a system with first-class sharding (Vitess, Spanner, DynamoDB), so adding a shard is cheap.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The bottleneck is a missing index, an N+1 query, or unbatched writes. Profile first.</li>
+              <li>The workload is OLAP with full-table aggregations — use a columnar warehouse instead.</li>
+              <li>You need cross-entity ACID transactions touching arbitrary rows.</li>
+              <li>Total hot data is under roughly 100 GB — the operational tax exceeds the savings.</li>
+              <li>The team has never operated a distributed database and has no SRE bandwidth.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>The commercial roots trace to Google's late-1990s search index and eBay's early-2000s "functional and horizontal segmentation." The term went mainstream through Flickr's 2006 engineering post, "Federation at Flickr: Doing Billions of Queries Per Day," and the LiveJournal/Friendster/MySpace era popularized the per-user-bucket pattern. NoSQL systems — BigTable (2006), Dynamo (2007), Cassandra (2008) — then made sharding a built-in property instead of an application-level retrofit.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <h3>Reading through a sharded cluster</h3>
+        <p>Concrete example: a Vitess cluster with 4 shards keyed on <code>customer_id</code>.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Parse.</span> The router (<code>vtgate</code>) parses the SQL and finds predicates on the shard key — e.g. <code>WHERE customer_id = 12345</code>.</li>
+          <li><span class="steps__title">Route.</span> It applies the routing rule — Vitess calls it a <span class="term" data-gloss="Vitess's name for its per-column routing function">vindex</span> — e.g. <code>hash(12345)</code> maps into keyspace range <code>[0x40, 0x80)</code>, currently owned by shard <code>-80</code>.</li>
+          <li><span class="steps__title">Look up topology.</span> The shard-to-tablet map is read from the topology service (etcd or Consul), usually cached in-process with a TTL of a few seconds.</li>
+          <li><span class="steps__title">Forward.</span> The query goes to the primary tablet of shard <code>-80</code> — an ordinary MySQL instance.</li>
+          <li><span class="steps__title">Execute locally.</span> MySQL plans and runs the query against its slice — a normal InnoDB table containing only that key range's rows.</li>
+          <li><span class="steps__title">Return.</span> Result rows stream back through <code>vtgate</code> to the client.</li>
+        </ol>
+        <p>Queries <em>without</em> the shard key in the predicate — <code>SELECT * FROM orders WHERE status='pending'</code> — trigger
+          <span class="term">scatter-gather</span>
+          <span class="term__gloss">the router sends the query to every shard in parallel, then merges, dedupes, and sorts the results itself</span>.
+          Cost scales with the number of shards.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant R as Router (vtgate)
+    participant T as Topology service
+    participant S as Shard (MySQL)
+    C->>R: query WHERE customer_id = 12345
+    R->>R: apply vindex - hash(12345) maps to a range
+    R->>T: look up owning shard (cached a few seconds)
+    T-->>R: shard -80
+    R->>S: forward query
+    S-->>R: result rows
+    R-->>C: response
+          </pre>
+          <figcaption class="diagram__caption">One read through a Vitess-style cluster: parse, route, look up topology, forward, execute, return.</figcaption>
+        </figure>
+
+        <h3>How resharding works</h3>
+        <p>Resharding splits shard <code>-80</code> into <code>-60</code> and <code>60-80</code> because it grew hot:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Provision.</span> Spin up the two new shards empty.</li>
+          <li><span class="steps__title">Snapshot.</span> Snapshot the source shard at a logical position — a binlog GTID for MySQL, a change-feed cursor for MongoDB.</li>
+          <li><span class="steps__title">Bulk-copy.</span> Copy rows whose hash falls in each new range to the matching destination.</li>
+          <li><span class="steps__title">Catch up.</span> Tail the binlog and apply ongoing writes to both destinations — Vitess <code>VReplication</code>, MongoDB chunk migration.</li>
+          <li><span class="steps__title">Verify.</span> Check row counts and checksums; throttle if replication lag grows.</li>
+          <li><span class="steps__title">Cut over.</span> Briefly stop writes — Vitess reports a few seconds of read-only — update the shard map, resume on the new shards.</li>
+          <li><span class="steps__title">Retire.</span> Drop or archive the old shard.</li>
+        </ol>
+        <p>Figma's 2023 team avoided physical resharding as long as possible: they built logical "sharded views" on one still-unsharded Postgres instance, routed through their own <code>DBProxy</code>, and flipped reads/writes with a feature flag they could revert in seconds.</p>
+
+        <h3>Why the router matters when you rebalance</h3>
+        <p>Growing a cluster costs very different amounts of data movement depending on the routing function. The MVP code in this topic prints exactly this when going from 4 to 5 shards over 12 sample keys:</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 560 190" role="img" aria-labelledby="rebalTitle rebalDesc" width="560" style="max-width:100%">
+            <title id="rebalTitle">Rebalancing cost when growing from 4 to 5 shards</title>
+            <desc id="rebalDesc">Of 12 sample keys, hash-modulo routing remaps 10 when a shard is added, while consistent hashing with virtual nodes remaps only 3.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="22" fill="var(--text-muted)">12 keys, growing from 4 to 5 shards</text>
+
+              <text x="10" y="56" fill="var(--text)">Hash-modulo</text>
+              <rect x="150" y="42" width="380" height="24" rx="4" fill="none" stroke="var(--border)"/>
+              <rect x="150" y="42" width="317" height="24" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="150" y="86" fill="var(--danger)">10 / 12 keys moved</text>
+
+              <text x="10" y="122" fill="var(--text)">Consistent hashing</text>
+              <rect x="150" y="108" width="380" height="24" rx="4" fill="none" stroke="var(--border)"/>
+              <rect x="150" y="108" width="95" height="24" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="150" y="152" fill="var(--accent)">3 / 12 keys moved</text>
+
+              <line x1="10" y1="164" x2="536" y2="164" stroke="var(--border)"/>
+              <text x="10" y="182" fill="var(--text-faint)" font-size="12"><code>hash(key) % N</code> remaps ~(N-1)/N of all keys; consistent hashing moves only ~K/N.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Same 12 keys, same growth step — hash-modulo rewrites most of the map; consistent hashing with virtual nodes barely touches it. That gap is why Cassandra and Dynamo use a ring.</figcaption>
+        </figure>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Hash sharding</td><td>Even distribution, no hotspots from monotonic keys</td><td>Range scans become scatter-gather</td></tr>
+              <tr><td>Range sharding</td><td>Locality for time-series and range queries</td><td>Tail-end hotspots (latest timestamp = one shard)</td></tr>
+              <tr><td>Directory sharding</td><td>Arbitrary key-to-shard mapping; easy to rebalance one tenant</td><td>The lookup table is a single point of failure and a cache target</td></tr>
+              <tr><td>Consistent hashing with vnodes (Cassandra)</td><td>Adding a node moves only 1/N of keys</td><td>Per-node memory for vnode tokens; less precise control</td></tr>
+              <tr><td>Jump consistent hash (Google, 2014)</td><td>Zero memory, near-perfect distribution, O(ln N)</td><td>Cannot remove an arbitrary bucket — only the last one</td></tr>
+              <tr><td>Co-locating related tables on the same shard key (Citus, Vitess)</td><td>Local joins, single-shard transactions</td><td>All tables sharing the key must reshard together</td></tr>
+              <tr><td>Cross-shard 2PC (Vitess <code>TwoPC</code>, Spanner)</td><td>Atomic multi-shard writes</td><td>Commit latency bounded by the slowest participant; a coordinator failure stalls every participant</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Celebrity hot key</p>
+            <p>One key — a viral post, a celebrity account — draws 100x the traffic of any other. The shard that owns it saturates while its siblings idle.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Monotonic shard key on range sharding</p>
+            <p>Sharding <code>events</code> by timestamp puts every new write on the rightmost shard. Auto-increment IDs hit the same trap.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Low-cardinality shard key</p>
+            <p>Sharding by <code>country_code</code> when 70% of users are in the US. MongoDB creates at most one chunk per unique value, so you end up with one giant US chunk.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Cross-shard query storm</p>
+            <p>A feature change adds a query without the shard key in its predicate. Every request now scatters to all shards and tail latency explodes.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Resharding lag spiral</p>
+            <p>Bulk copy can't keep up with the source shard's write rate, so the catch-up phase never finishes.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Shard-map cache staleness</p>
+            <p>Clients keep routing to the old owner after a split. Reads return phantom-empty results; writes hit a tablet that's already demoted.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">DynamoDB hot partition</p>
+            <p>A single partition key exceeds the hard 3,000 RCU / 1,000 WCU per-partition ceiling. Adaptive capacity and "split for heat" help, but with a delay.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Schema migration drift</p>
+            <p>A DDL succeeds on 7 of 8 shards and fails on the 8th. Queries hitting that column now fail for one slice of users.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>A single machine has finite CPU, RAM, disk, and network. Once a workload crosses that ceiling, there are two paths: build a pricier single machine (vertical), or split the work across many machines (horizontal). Vertical scaling hits physics — the largest cloud VMs cap around a few TB of RAM — and a price curve where the top SKU costs more than 10x the median box. Horizontal scaling, which sharding is the stateful-storage form of, is the only path that keeps cost-per-unit roughly linear.</p>
+        <p>Sharding also buys two other things directly: a smaller <strong>blast radius</strong> (a failed shard takes down 1/N of users, not everyone) and <strong>geographic locality</strong> (a Frankfurt shard serves EU users at sub-20 ms latency a Virginia primary can't match).</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 520 140" role="img" aria-labelledby="blastTitle blastDesc" width="520" style="max-width:100%">
+            <title id="blastTitle">Blast radius when one shard fails</title>
+            <desc id="blastDesc">Eight shard boxes; one is down, the other seven keep serving their own slice of users unaffected.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">8 shards, each owns 1/8 of the users</text>
+              <g>
+                <rect x="10"  y="34" width="54" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+                <text x="37" y="58" fill="var(--danger)" text-anchor="middle" font-size="12">down</text>
+                <rect x="72"  y="34" width="54" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="134" y="34" width="54" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="196" y="34" width="54" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="258" y="34" width="54" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="320" y="34" width="54" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="382" y="34" width="54" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="444" y="34" width="54" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              </g>
+              <text x="10" y="96" fill="var(--text-faint)">↑ 1 shard down</text>
+              <text x="72" y="96" fill="var(--text-faint)">7 shards keep serving their own users</text>
+              <text x="10" y="122" fill="var(--text)">1/8 of users affected, not 100% — the whole point of splitting the machine up.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A monolith has one blast radius: everyone. A sharded system fails one slice at a time.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>"Pick the shard key up front, keep the routing function essentially fixed" is not the only possible design. Spanner-class engines instead do <strong>automatic range splitting</strong>: no user-chosen key, the system watches load and splits ranges itself. That approach never won for MySQL/Postgres-based sharding, for two reasons:</p>
+        <ul>
+          <li>Automatic splitting needs the storage engine to expose stable, ordered ranges as a first-class primitive — Spanner's <em>splits</em>, CockroachDB's <em>ranges</em>. InnoDB and Postgres heap files don't expose that, so retrofitting means building an entirely new storage layer.</li>
+          <li>Co-locating related rows — a user and their orders on the same shard, for a cheap join — is far easier to reason about when the key is explicit and stable. The trade is one annoying up-front decision in exchange for predictable single-shard transactions and joins.</li>
+        </ul>
+        <p>The same logic explains why <strong>consistent hashing with virtual nodes</strong> (Cassandra, Dynamo) beat plain modulo hashing: <code>hash(k) % N</code> moves (N-1)/N of the keys whenever N changes; consistent hashing moves only K/N. Jump consistent hash is more memory-efficient still, but only lets you remove the <em>last</em> bucket — fine for a stateless cache, unacceptable for storage where any specific node may need retiring.</p>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026 the relevance is shifting, not fading. DIY application-level sharding (Flickr-style user buckets) is in retreat — too expensive operationally for most teams. But the concept is more common than ever, just hidden: every serverless database (DynamoDB, Cosmos DB, Aurora DSQL, Spanner, Turso) is sharded under the hood, and understanding the shard key is still the difference between a $200/month bill and a $20,000/month one. Vitess, Citus, and Spanner all shipped meaningful resharding and online-DDL improvements in 2024–2025, and Figma's 2023 write-up has become a reference architecture. Above mid-five-figure QPS or low-terabyte data, sharding is in your stack somewhere — the only question is whether you run it yourself or pay a vendor to hide it.</p>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Worth checking on your own system</p>
+            <ul>
+              <li>What fraction of your queries actually carry the shard key? Below ~95% will hurt under scatter-gather.</li>
+              <li>What's the real cardinality and access skew of your candidate key? Group and count before committing.</li>
+              <li>How does your system handle a node failure mid-resharding — a forced kill, not just a clean shutdown?</li>
+              <li>What's the real p50/p99 cost of a cross-shard 2PC commit in your environment, measured, not assumed?</li>
+              <li>For DynamoDB/Cosmos: what's your write distribution per partition key over a 5-minute window?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

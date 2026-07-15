@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Service Mesh · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Service Mesh</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Service Mesh</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/service-mesh/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Service Mesh</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Every microservice needs the same plumbing: encryption, retries, timeouts, "is that service even up?", request tracing. A service mesh pulls that plumbing out of your app and runs it in the network instead.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Split a monolith into 40 microservices and every team starts rebuilding the same networking code, each slightly differently. A mesh moves that code out of the apps and into the infrastructure. Your <code>OrderService</code> still makes a plain call to <code>http://payments</code>; the mesh quietly adds encryption, load balancing, metrics, and a retry on a 503 — no code change, no library upgrade in 40 repos.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a city of microservices, each one a building:</p>
+        <ul>
+          <li><strong>Without a mesh</strong> — every building hires its own security guard, postal worker, translator, and accountant, and they all do the job slightly differently.</li>
+          <li><strong>With a mesh</strong> — the city installs a standardized concierge outside every building's front door. Your app only ever talks to its own concierge, in plain language ("send this to payments"); concierges talk to each other in encrypted, logged, retry-capable conversations.</li>
+        </ul>
+        <p>The concierges are the
+          <span class="term">data plane</span>
+          <span class="term__gloss">the proxies that sit in the request path and actually move traffic — usually Envoy</span>.
+          Above them sits City Hall, the
+          <span class="term">control plane</span>
+          <span class="term__gloss">the piece that never touches a packet, but hands every proxy its rulebook: routing weights, identity checks, fresh certificates</span>. Change a rule in City Hall and every concierge updates within seconds. Dumb-but-fast proxies in the request path, smart-but-out-of-band rule-maker on the side — that split is the architectural heart of every mesh.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["Orders app calls http://payments"] --> B["Local sidecar intercepts the call"]
+    B --> C["Encrypt, pick an endpoint, retry on failure"]
+    C --> D["Payments sidecar decrypts, checks identity"]
+    D --> E["Payments app — plain HTTP, unaware of any of this"]
+    F["Control plane"] -. rules and certs .-> B
+    F -. rules and certs .-> D
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: your app makes an ordinary call, the sidecars do the encrypting, routing, and retrying, and the control plane keeps every sidecar's rulebook current.</figcaption>
+        </figure>
+
+        <p>The classic deployment is the
+          <span class="term">sidecar</span>
+          <span class="term__gloss">a proxy container that runs next to your app in the same pod and shares its network</span>:
+          in Kubernetes your pod runs two containers — your app and an Envoy proxy — and the proxy quietly steals all inbound and outbound traffic. Your app thinks it's calling <code>localhost</code>. The industry is also shifting toward sidecar-less "ambient" modes, where the proxy runs once per node instead of once per pod — same mental model, less overhead. Detail covers that trade-off properly.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not an API gateway.</strong> A gateway handles north-south traffic (client → cluster); a mesh handles east-west (service → service).</li>
+              <li><strong>Not a load balancer.</strong> A mesh does load balance, but that's one feature among many — a plain LB has no identity, policy, or tracing layer.</li>
+              <li><strong>Not a framework or library.</strong> The whole point is that it lives outside your code, so polyglot teams get the same features for free.</li>
+              <li><strong>Not Kubernetes itself.</strong> Kubernetes gives you basic service discovery; a mesh sits on top and adds the smart networking.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You have 10+ microservices and observability is already a mess of inconsistent logs.</li>
+              <li>You need zero-trust networking — mutual TLS between every service, with rotating certs.</li>
+              <li>You want progressive delivery: canary releases, traffic shifting by header, fault injection in staging.</li>
+              <li>Compliance demands every internal call be encrypted and audited, and you can't patch 40 services to do it.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You have 3 services. The mesh is more moving parts than the system it manages.</li>
+              <li>Latency is sacred (HFT, real-time gaming) — every hop through a proxy costs microseconds.</li>
+              <li>No one on the team owns Kubernetes or the control plane. A mesh's failure modes are not friendly to part-timers.</li>
+              <li>A single-language framework already gives you most of this (e.g. Spring Cloud) and you aren't polyglot.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Data plane</dt><dd>The proxies in the request path.</dd></div>
+          <div><dt>Control plane</dt><dd>The brain that configures the proxies.</dd></div>
+          <div><dt>Sidecar</dt><dd>A proxy container running next to your app in the same pod.</dd></div>
+          <div><dt>Envoy</dt><dd>The C++ proxy most meshes use as their data plane.</dd></div>
+          <div><dt>mTLS</dt><dd>Mutual TLS — both sides prove identity with certificates.</dd></div>
+          <div><dt>Ambient mode</dt><dd>Sidecar-less mesh; proxies run per node, not per pod.</dd></div>
+          <div><dt>Istio / Linkerd / Cilium</dt><dd>The three meshes you'll hear about most.</dd></div>
+          <div><dt>Waypoint proxy</dt><dd>An optional L7 proxy used in ambient mode for richer policy.</dd></div>
+          <div><dt>East-west traffic</dt><dd>Service-to-service traffic — the mesh's home turf.</dd></div>
+          <div><dt>Ingress / Egress gateway</dt><dd>Mesh-managed edge points for traffic entering or leaving the cluster.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
