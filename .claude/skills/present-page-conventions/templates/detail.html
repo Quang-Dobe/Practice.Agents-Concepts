@@ -1,0 +1,240 @@
+<!doctype html>
+<!--
+  ============================================================================
+  TEMPLATE: present/detail.html  —  re-authored from docs/02-deep-dive.md
+  ============================================================================
+  SECTION MAP (source doc  ->  present block):
+    "What"               -> h2 + prose broken into bullets; .vocab for "building blocks"
+    "Where"              -> h2 + bullet lists / .card-grid of layers
+    "When"               -> h2 + do-dont (when to use / when not) OR bullets + callout
+    "How"               -> h2 + .steps (the lifecycle) + a MERMAID diagram (flow/state/sequence)
+    "Key trade-offs" TBL -> .tradeoff table (KEEP EVERY ROW — this is load-bearing)
+    "Common failure modes" -> stacked .callout--danger / --warn blocks
+    "Why"               -> h2 + prose; optional inline-SVG concept diagram
+  This template intentionally shows BOTH diagram kinds:
+    - a MERMAID sequence/flow (for the "How")
+    - a bespoke INLINE SVG (for a spatial/geometric idea)
+  Pick whichever fits each concept; you need >= 1 diagram on this page.
+  KEEP ALL NUMBERS AND THE ENTIRE TRADE-OFF TABLE. Shorten words, not facts.
+  ============================================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sample Topic · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sample Topic</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- SIDEBAR — copy identically across all four pages -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sample Topic</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sample Topic</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~8 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Open with one precise sentence. Then break the doc's dense definition into bullets:</p>
+        <ul>
+          <li><strong>Core idea.</strong> The one mechanism everything else hangs off.</li>
+          <li><strong>Building blocks.</strong> Name each part in a word or two.</li>
+          <li><strong>Family.</strong> The neighborhood of related patterns it belongs to.</li>
+        </ul>
+
+        <p>When the doc lists the parts, a <code>.vocab</code> list reads better than a paragraph:</p>
+        <dl class="vocab">
+          <div><dt>State machine</dt><dd>The named states and the moves between them.</dd></div>
+          <div><dt>Outcome classifier</dt><dd>Decides what counts as a failure (errors, 5xx, slow calls).</dd></div>
+          <div><dt>Health window</dt><dd>Aggregates recent outcomes — e.g. the last 100 calls.</dd></div>
+        </dl>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Describe the layers it can sit at. A <code>.card-grid</code> makes parallel options scannable:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">In-process library</div><p>Richest signals, per-process state.</p></div>
+          <div class="card"><div class="card__title">Sidecar proxy</div><p>Language-agnostic, wire-level signals only.</p></div>
+          <div class="card"><div class="card__title">Mesh / edge</div><p>Declarative, fleet-wide, zero app code.</p></div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <p>Summarize the trigger conditions in a tight list, and flag the boundaries with a callout.</p>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Rule of thumb</p>
+            <p>Reach for it around synchronous calls whose slowness can exhaust your own capacity — not for cheap in-process work.</p>
+          </div>
+        </div>
+
+        <!-- HOW: steps + a MERMAID diagram -->
+        <h2>How it works</h2>
+        <p>Walk the lifecycle of a single request. The <code>.steps</code> list numbers each stage:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Pre-check.</span> Read current state (atomic, lock-free).</li>
+          <li><span class="steps__title">Open path.</span> If open, fail fast — no thread held, no socket used.</li>
+          <li><span class="steps__title">Half-open path.</span> Admit a bounded number of probe calls.</li>
+          <li><span class="steps__title">Record + evaluate.</span> Classify the outcome, update the window, re-check the threshold.</li>
+        </ol>
+
+        <!-- MERMAID sequence/flow for the "How" -->
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Caller
+    participant B as Breaker
+    participant S as Service
+    C->>B: request
+    alt switch is open
+        B-->>C: fail fast (fallback)
+    else switch is closed
+        B->>S: forward
+        S-->>B: result / error
+        B->>B: record outcome, re-check threshold
+        B-->>C: response
+    end
+          </pre>
+          <figcaption class="diagram__caption">One request through the switch — the happy path and the short-circuit.</figcaption>
+        </figure>
+
+        <!-- KEY TRADE-OFFS: reproduce EVERY row from the doc's table. -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">Gain</th><th scope="col">Give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Count-based window</td><td>Simple, predictable memory</td><td>Distorted by traffic bursts</td></tr>
+              <tr><td>Time-based window</td><td>Stable under variable traffic</td><td>More memory, eviction overhead</td></tr>
+              <tr><td>Short cool-down</td><td>Fast recovery on blips</td><td>Re-trips on slow-recovering deps</td></tr>
+              <tr><td>Many probes</td><td>Faster confidence to recover</td><td>Bigger herd on a fragile service</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES: stacked danger/warn callouts -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Window too small + low threshold</p>
+            <p>Two failures trip a global switch. Cause: sample-size floor left at its default under sparse traffic.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Thundering herd on recovery</p>
+            <p>Every pending caller races to probe at once and re-overloads the service. Fix: a small probe pool and jittered cool-down.</p>
+          </div>
+        </div>
+
+        <!-- WHY: prose + a BESPOKE INLINE SVG concept diagram.
+             This SVG is hand-authored (no JS, theme-aware via currentColor and
+             CSS vars). Use inline SVG for spatial/geometric ideas Mermaid can't
+             draw well. Keep width 100% and a viewBox so it scales. -->
+        <h2>Why it exists</h2>
+        <p>Explain the failure it prevents. Here, a slow dependency draining a shared pool until unrelated traffic also stalls:</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 520 180" role="img" aria-labelledby="poolTitle poolDesc" width="520" style="max-width:100%">
+            <title id="poolTitle">Pool exhaustion</title>
+            <desc id="poolDesc">Worker threads fill up waiting on one slow dependency, leaving none for other work.</desc>
+            <!-- uses CSS custom properties so it re-themes with the page -->
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="24" fill="var(--text-muted)">Worker pool (8 threads)</text>
+              <!-- eight slots: 6 stuck (accent), 2 free (border) -->
+              <g>
+                <rect x="10"  y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="72"  y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="134" y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="196" y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="258" y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="320" y="40" width="54" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <rect x="382" y="40" width="54" height="34" rx="6" fill="none" stroke="var(--border)"/>
+                <rect x="444" y="40" width="54" height="34" rx="6" fill="none" stroke="var(--border)"/>
+              </g>
+              <text x="10"  y="104" fill="var(--text-faint)">↑ 6 blocked on the slow call</text>
+              <text x="382" y="104" fill="var(--text-faint)">2 left</text>
+              <!-- the slow dependency -->
+              <rect x="196" y="128" width="128" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="260" y="150" fill="var(--danger)" text-anchor="middle">slow dependency</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The switch caps how much of your own capacity one sick dependency can eat.</figcaption>
+        </figure>
+
+        <p>Close with why the design looks the way it does — the reasoning the doc gives, in shorter words.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

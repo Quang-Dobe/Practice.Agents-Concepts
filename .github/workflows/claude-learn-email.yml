@@ -26,10 +26,35 @@ jobs:
         env:
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          set -euo pipefail
           SUBJECT=$(printf '%s\n' "$HEAD_COMMIT_MESSAGE" | head -n 1)
           echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+
+          # Derive the live presentation-site URL for this topic's landing page.
+          # TOPIC_SUMMARIZATION.md ends with:  Full notes: https://github.com/<owner>/<repo>/tree/main/<category>/<slug>/
+          # Turn that into the GitHub Pages URL of the topic's present/index.html.
+          PRESENT_URL=""
+          NOTES=$(grep -oE 'https://github\.com/[^ ]+/tree/main/[^ ]+' TOPIC_SUMMARIZATION.md | head -n1 || true)
+          if [ -n "$NOTES" ]; then
+            NOTES="${NOTES%/}"                         # strip trailing slash
+            REST="${NOTES#https://github.com/}"        # <owner>/<repo>/tree/main/<cat>/<slug>
+            OWNER="${REST%%/*}"                         # <owner>
+            REST2="${REST#*/}"                          # <repo>/tree/main/<cat>/<slug>
+            REPO="${REST2%%/*}"                         # <repo>
+            TOPIC_PATH="${REST2#*/tree/main/}"          # <cat>/<slug>
+            OWNER_LC="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+            if [ -f "$TOPIC_PATH/present/index.html" ]; then
+              PRESENT_URL="https://${OWNER_LC}.github.io/${REPO}/${TOPIC_PATH}/present/index.html"
+            fi
+          fi
+
           {
             echo "body<<__EOF__"
+            if [ -n "$PRESENT_URL" ]; then
+              echo "Read it on the site:"
+              echo "$PRESENT_URL"
+              echo ""
+            fi
             cat TOPIC_SUMMARIZATION.md
             echo "__EOF__"
           } >> "$GITHUB_OUTPUT"

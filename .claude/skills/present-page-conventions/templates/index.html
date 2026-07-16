@@ -1,0 +1,170 @@
+<!doctype html>
+<!--
+  ============================================================================
+  TEMPLATE: present/index.html  —  TOPIC LANDING PAGE
+  ============================================================================
+  IMPLEMENTER, READ THIS FIRST:
+  - This is a reference for ONE fictional topic ("Sample Topic", category
+    "backend"). Copy it into  CATEGORY/TOPIC-SLUG/present/index.html  and
+    replace every  {{PLACEHOLDER}}  and every  IMPLEMENTER note (the HTML
+    comments that begin with the word IMPLEMENTER, below).
+  - This page lives EXACTLY 3 levels deep, so assets are ALWAYS  ../../../assets/...
+  - Set the body class to your category:  cat-ai | cat-backend | cat-frontend
+    | cat-database | cat-cloud | cat-general-concept
+  - The <title>, sidebar title, topbar title, pill, and hero all name the topic.
+  - This landing page = a HERO + a "what you'll find" map + a HERO DIAGRAM
+    (mental-model). Keep it short; the real content is on the other 3 pages.
+  - DO NOT edit ../docs or ../code. This present/ tree is re-authored, not 1:1.
+  ============================================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sample Topic — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<!-- IMPLEMENTER: change cat-backend to your category class -->
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <!-- Mobile top bar (shows under 860px; hamburger toggles the sidebar) -->
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sample Topic</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR (identical on all 4 pages) ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sample Topic</h1>
+        <!-- IMPLEMENTER: pill text = category name -->
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <!-- points at the topic's runnable MVP; relative from present/ -->
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN CONTENT ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <!-- breadcrumb: All topics / <Category> / <Topic> -->
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <!-- IMPLEMENTER: link to dashboard filtered by category is fine, or plain text -->
+          <span>backend</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Sample Topic</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">backend</span>
+            <!-- IMPLEMENTER: 1-3 short tag badges, optional -->
+            <span class="badge">resilience</span>
+            <span class="badge">patterns</span>
+          </div>
+          <h1 class="hero__title">Sample Topic</h1>
+          <!-- IMPLEMENTER: one plain-language sentence = the topic's "30-second version" hook -->
+          <p class="hero__tagline">A one-line, jargon-free promise of what this topic is and why it earns a place in your toolbox.</p>
+        </header>
+
+        <!-- STAT TILES: pull 3-4 hard numbers straight from the docs (defaults,
+             thresholds, measured results). IMPLEMENTER: keep real numbers only. -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">3</div><div class="stat__label">core states / parts</div></div>
+          <div class="stat"><div class="stat__num">50%</div><div class="stat__label">a real default from the docs</div></div>
+          <div class="stat"><div class="stat__num">2007</div><div class="stat__label">a date that grounds it</div></div>
+          <div class="stat"><div class="stat__num">~5 min</div><div class="stat__label">to read all four pages</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED on the landing page): the mental model.
+             Use Mermaid for a flow/state view, OR an inline SVG for a spatial
+             metaphor. This template shows a MERMAID state diagram; the detail
+             template shows an inline-SVG example you can move here instead. -->
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Closed
+    Closed --> Open: failures cross threshold
+    Open --> HalfOpen: cool-down elapses
+    HalfOpen --> Closed: probes succeed
+    HalfOpen --> Open: probes fail
+          </pre>
+          <figcaption class="diagram__caption">The mental model in one picture — replace with your topic's core shape.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP: link out to the three content pages. -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, a mental model, and what this is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: what it is, where it lives, when to use it, how it works, and why it exists.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Real-world best practices, anti-patterns, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <!-- Optional single orienting callout -->
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail or Practice.</p>
+          </div>
+        </div>
+
+        <!-- next-nav: on the landing page, "next" points to Overview -->
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Scripts: mermaid FIRST (defines window.mermaid), then site.js. No defer. -->
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

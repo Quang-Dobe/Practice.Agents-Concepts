@@ -1,0 +1,230 @@
+<!doctype html>
+<!--
+  ============================================================================
+  TEMPLATE: present/practice.html  —  re-authored from docs/03-practice.md
+  ============================================================================
+  SECTION MAP (source doc  ->  present block):
+    "where you'll meet it"      -> short prose + .card-grid of contexts
+    "Best practices" (numbered) -> one .practice-card PER practice, each with
+                                    Do / Why / Avoid rows (keep the triad!)
+    "Anti-patterns"             -> stacked .callout--danger blocks (or a do-dont)
+    "Real-world usage patterns" -> .card-grid, one card per case study (keep numbers)
+    "Operational checklist"     -> .callout--success with a checkbox-style LIST
+    "How it evolves"            -> .steps (the typical migration path)
+    "Further reading"           -> plain <ul> of links (these MAY point to the
+                                    real external URLs from the doc)
+  A comparison DIAGRAM (Mermaid or a small table/SVG) is encouraged here to
+  satisfy the ">= 1 diagram per content page" rule. This template uses one.
+  KEEP every measured number (percentages, latencies, dimensions, costs).
+  ============================================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sample Topic · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sample Topic</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- SIDEBAR — copy identically across all four pages -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sample Topic</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sample Topic</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~9 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Two or three sentences on the real settings this shows up in, then a scannable grid:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">In a SaaS product</div><p>Sitting behind the API tier, blamed second and found guilty first.</p></div>
+          <div class="card"><div class="card__title">In a platform team</div><p>One shared config every service inherits.</p></div>
+          <div class="card"><div class="card__title">At the edge</div><p>Declared once, applied fleet-wide.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES — one practice-card per item; keep Do/Why/Avoid -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Set the sample-size floor before the threshold</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Require a real minimum number of calls (e.g. 20+) before the ratio can trip.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Otherwise one failure out of one call flips a global switch during quiet hours.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Leaving the library default under sparse traffic and calling it "configured".</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Put the switch outside the retry</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Order the pipeline so retries happen inside, and the switch counts attempt-bundles.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>A 5x retry inside a 50% threshold makes one failure look like five and trips early.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Nesting them the wrong way and blaming the switch for being "too sensitive".</p>
+          </div>
+        </article>
+
+        <!-- IMPLEMENTER: repeat one .practice-card per best practice in the doc.
+             Do NOT collapse the Do/Why/Avoid triad into a single sentence. -->
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Switch hides a config bug</p>
+            <p>100% of calls fail because of a wrong URL; the switch sits open forever with alarms silent. Alert on open-state duration, not just upstream errors.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">All-or-nothing for a partial outage</p>
+            <p>One bad replica out of ten trips the switch for everyone. Push per-host ejection down to the sidecar.</p>
+          </div>
+        </div>
+
+        <!-- REAL-WORLD USAGE PATTERNS — card-grid of mini case studies -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Mid-size SaaS</div>
+            <p>One switch per dependency, 50% threshold over 30s, 15s cool-down. Biggest win came from alerting on state transitions.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multi-pod fleet</div>
+            <p>Per-process state accepted as eventually consistent; enforcement pushed to the mesh for fleet-wide behavior.</p>
+          </div>
+        </div>
+
+        <!-- COMPARISON DIAGRAM (satisfies the per-page diagram rule) -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Library["In-process library"]
+      L1[Rich typed signals]
+      L2[Per-process state]
+    end
+    subgraph Mesh["Service mesh"]
+      M1[Wire-level signals]
+      M2[Fleet-wide, zero code]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Two enforcement points, two different trade-offs.</figcaption>
+        </figure>
+
+        <!-- OPERATIONAL CHECKLIST — success callout with a list -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li>Does the classifier match your real failure mode? (429 usually should <em>not</em> trip it.)</li>
+              <li>Does the fallback actually work end-to-end when the switch is open?</li>
+              <li>How long after it opens does an alert fire — and is that within your SLO?</li>
+              <li>Do N pods mean N independent states you're OK with, or do you need the mesh?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES — steps of the typical migration path -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Tutorial stack.</span> Default thresholds, one instance, ships fine for the demo.</li>
+          <li><span class="steps__title">First incident.</span> A quiet-hours false trip forces real tuning of the sample floor.</li>
+          <li><span class="steps__title">Scale.</span> Multi-pod drift pushes enforcement toward the mesh.</li>
+          <li><span class="steps__title">Maturity.</span> State transitions become first-class alerts and dashboards.</li>
+        </ol>
+
+        <!-- FURTHER READING — external links allowed here -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://example.com/release-it" rel="noopener">Release It! — the origin of the pattern</a> — keep the doc's real links.</li>
+          <li><a href="https://example.com/resilience" rel="noopener">Your library's resilience docs</a> — the current defaults and knobs.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="../code/">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

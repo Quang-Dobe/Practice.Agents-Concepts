@@ -1,0 +1,182 @@
+<!doctype html>
+<!--
+  ============================================================================
+  TEMPLATE: present/overview.html  —  re-authored from docs/01-overview.md
+  ============================================================================
+  SECTION MAP (source doc  ->  present block):
+    "30-second version"    -> .lead paragraph + a .callout--info
+    "mental model"         -> a DIAGRAM (Mermaid or inline SVG) + short prose
+    "what it is NOT"       -> .callout--warn with a bullet LIST
+    "when you would reach" -> .do-dont col--do  (bullets)
+    "when you would NOT"   -> .do-dont col--avoid (bullets)
+    "key vocabulary"       -> .vocab definition list
+    "what's next"          -> .next-nav (points to Detail)
+  RULES: break dense paragraphs into bullet LISTS. Use <span class="term">…</span>
+  with a gloss the FIRST time a piece of jargon appears. Keep ALL numbers.
+  No banned marketing words (see DESIGN-SPEC.md).
+  ============================================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sample Topic · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Sample Topic</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- SIDEBAR — copy identically across all four pages -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Sample Topic</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="../code/">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Sample Topic</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <!-- meta-row: approximate, honest numbers -->
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">One or two plain sentences that a smart beginner could repeat at lunch. This is the whole idea in the smallest words that are still true.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Restate the core promise once more, concretely. If the doc gives a number here (a default, a ratio, a size), keep it —
+              e.g. a <span class="term" data-gloss="the ratio of failed calls that flips the switch">failure threshold</span> of 50%.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Give the reader one picture to hang everything on. Prefer a concrete metaphor from the source doc. Then show it:</p>
+
+        <!-- Mental-model diagram. This example is a simple Mermaid flow. You may
+             instead paste the inline-SVG example from detail.html if a spatial
+             metaphor fits better. Either way: ONE diagram minimum on this page. -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[Incoming request] --> B{Is the switch open?}
+    B -- no --> C[Let it through]
+    B -- yes --> D[Fail fast, use fallback]
+    C --> E[Record the outcome]
+    E --> B
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop, drawn once so the words below are easy.</figcaption>
+        </figure>
+
+        <p>A short paragraph tying the picture back to the metaphor. Introduce a second term inline:
+          <span class="term">fallback</span>
+          <span class="term__gloss">a cheaper backup answer used when the real call is skipped</span>.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a retry.</strong> A retry tries again now; this refuses to try at all.</li>
+              <li><strong>Not a health check.</strong> It reads real traffic, not a synthetic ping.</li>
+              <li><strong>Not free.</strong> It adds tuning and monitoring you have to own.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT TO — do-dont two columns -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You make synchronous calls that can stall your own threads.</li>
+              <li>A dependency degrades slowly instead of failing fast.</li>
+              <li>You have an acceptable fallback, or fast failure beats a long hang.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The call is in-process — nothing to isolate.</li>
+              <li>The work is async and queue-based — the queue is the buffer.</li>
+              <li>The system is small enough that one slow dep can't cascade.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY — vocab definition list -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Term one</dt><dd>The shortest true definition, in plain words.</dd></div>
+          <div><dt>Term two</dt><dd>Keep any number the doc attaches to it (e.g. default = 100).</dd></div>
+          <div><dt>Term three</dt><dd>One line. If it needs two, it belongs in Detail, not here.</dd></div>
+        </dl>
+
+        <!-- WHAT'S NEXT -->
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

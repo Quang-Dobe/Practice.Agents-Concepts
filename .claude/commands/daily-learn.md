@@ -23,7 +23,7 @@ Print one short line acknowledging the pick (e.g. `Today's topic: Service Worker
 Execute the orchestration described in `.claude/commands/learn.md` verbatim, with `$ARGUMENTS = PICKED_TOPIC`. That covers:
 
 - Stage 0 of `/learn`: invoke `topic-folder-manager` — capture `CATEGORY`, `SLUG`, `PATH`, `NEXT_STEP`. From this point on, `CATEGORY` from `topic-folder-manager` is authoritative — it may differ from `PICKED_CATEGORY` and that is fine.
-- Stages 1–4 of `/learn`: `overview-explainer` → `deep-analyzer` → `practitioner` → `code-implementer`.
+- Stages 1–5 of `/learn`: `overview-explainer` → `deep-analyzer` → `practitioner` → `code-implementer` → `present-builder`. The final stage writes the topic's `present/` HTML pages and regenerates the root dashboard (`node scripts/gen-dashboard.mjs`); the `git add -A` in Stage 3 below will pick up both the new `present/` folder and the regenerated `index.html`.
 
 If `/learn` aborts at any stage (a quality gate fails, a subagent writes nothing), **stop the whole `/daily-learn` command immediately**. Do not write the summary file, do not commit, do not push. Print which stage failed and exit.
 
