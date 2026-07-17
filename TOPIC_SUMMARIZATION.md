@@ -1,11 +1,11 @@
-# Connection Pooling
+# Write-Ahead Log
 
-Connection pooling is the practice of keeping a small stash of already-open database connections around and lending them out to your code, instead of opening a brand new one every time the application needs to talk to the database. The pool sits inside your app (or in a separate process like PgBouncer or RDS Proxy) and hides all of the borrow-and-return bookkeeping behind the driver.
+A Write-Ahead Log, or WAL, is a durability trick that databases and storage engines use to make sure a committed write is never lost, even if the process crashes a millisecond later. Every change is first appended as a small record to a sequential on-disk log file, and only after that record is safely flushed to physical storage does the system confirm the commit. The real data pages get updated later, in the background.
 
-It matters because opening a database connection is surprisingly expensive — a TCP handshake, a TLS handshake, authentication, and session setup can add up to 20–100 milliseconds before you send a single query. In a web service under real traffic, that cost quickly dominates the request budget and makes the database server work far harder than it needs to. Engineers reach for a pool anytime a service, worker, or API is going to fire many queries against the same database. They skip it only for one-shot scripts or extremely low-traffic tools where a single connection is enough.
+Engineers reach for a WAL whenever they need durable, atomic writes without paying the cost of scattered random I/O on every commit. It is the pattern underneath Postgres, MySQL's InnoDB, SQLite in WAL mode, RocksDB, and even filesystem journals like ext4. The same log doubles as a free source of truth for point-in-time recovery, streaming replication, and change data capture — you already wrote the changes down, so you may as well ship them.
 
-Think of a busy hotel that used to send one concierge up and down from the top floor for every guest. The fix is to station ten concierges permanently in the lobby and have guests take a numbered ticket, grabbing whichever one is free. If all ten are busy, guests wait briefly in line. That lobby is the pool, the concierges are the open connections, and your application code is the guest — the driver quietly hands out and collects tickets on its behalf.
+The mental model is a busy kitchen ticket rail. When an order comes in, the waiter clips a ticket to the rail in order; that single act is fast and cannot be lost. The chef then cooks the dishes in whatever order is efficient. If the power flickers mid-service, the chef just walks back to the rail and reads the tickets in order. The WAL is the rail, log records are the tickets, and the data files are the plated dishes that eventually catch up.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/backend/connection-pooling/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/database/write-ahead-log/

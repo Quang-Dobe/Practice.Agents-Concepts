@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Write-Ahead Log · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Write-Ahead Log</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Write-Ahead Log</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/write-ahead-log/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Write-Ahead Log</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>You meet the WAL the first time your Postgres primary refuses writes because <code>pg_wal/</code> filled the disk, or the first time your MySQL replica lags by twelve hours and you cannot figure out why. Nobody talks about the WAL when the system is healthy — it is the on-call topic that only surfaces when a knob is wrong, a slot is leaking, or a checkpoint is stalling your P99.</p>
+        <p>You also meet it as a <em>product surface</em>. Any change-data-capture pipeline (Debezium, Fivetran, Materialize) sits on top of a database's WAL. Any Raft-backed control plane (etcd, Consul, CockroachDB) writes to a WAL on the hot path of every write. Cloud-native OLTP (Aurora, AlloyDB, Neon) has literally disaggregated the WAL into a network service. Once you know the pattern, you see it everywhere your writes are supposed to survive a crash.</p>
+        <p>Third place you meet it: capacity planning. WAL bytes-per-second is the number that sets your replication bandwidth, your archive-storage bill, and your worst-case RPO. Get it wrong and you find out during a failover.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">The 3-a.m. disk-full page</div><p><code>pg_wal/</code> filled the volume. Usually one of three suspects: stuck slot, failing archiver, long transaction.</p></div>
+          <div class="card"><div class="card__title">CDC product surface</div><p>Debezium / Fivetran / Materialize decoding the WAL into Kafka. The slot is a hard dependency of the primary's disk health.</p></div>
+          <div class="card"><div class="card__title">Raft-backed control plane</div><p>etcd, Consul, CockroachDB — every write is a WAL append on a quorum of peers.</p></div>
+          <div class="card"><div class="card__title">Cloud-native OLTP</div><p>Aurora, AlloyDB, Neon: the WAL is disaggregated into its own network service and shipped to page servers.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Match <code>synchronous_commit</code> / <code>innodb_flush_log_at_trx_commit</code> to the business, not the benchmark</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default to <code>synchronous_commit = on</code> (Postgres) and <code>innodb_flush_log_at_trx_commit = 1</code> (InnoDB) for anything transactional. Only relax to <code>off</code> / <code>2</code> for a specific workload — ingestion buffers, metrics, ephemeral queues — after you have measured the throughput win.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>synchronous_commit = off</code> loses up to ~3 × <code>wal_writer_delay</code> of committed transactions on crash (~600 ms with defaults, per the Postgres docs). <code>innodb_flush_log_at_trx_commit = 2</code> survives a <code>mysqld</code> crash but loses ~1 s of transactions on OS crash or power loss.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A cluster-wide flag flip because "it made TPC-C faster." Scope the relaxation per-session for the write path that can tolerate it.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Cap replication-slot WAL retention, always</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set <code>max_slot_wal_keep_size</code> to something finite (5–20 GB is a common starting point on a mid-size cluster). Alert when any slot's retained bytes crosses 50% of that cap.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The default <code>-1</code> lets a single abandoned logical
+              <span class="term">slot</span><span class="term__gloss">a per-consumer bookmark that pins WAL segments until the consumer catches up — abandon it and the log grows forever</span>
+              pin the entire <code>pg_wal/</code> volume until the disk fills and the primary goes read-only. This is the single most common WAL incident in production.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting that "nobody would leave a slot behind." Dev teams create slots for one-off Debezium tests and forget them.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Tune checkpoints so they trickle, not spike</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Keep <code>checkpoint_completion_target = 0.9</code> (Postgres default since 9.5) and size <code>max_wal_size</code> so <code>checkpoint_timeout</code> (default 5 min) is the trigger, not the size limit. Similarly on InnoDB: <code>innodb_io_capacity</code> and <code>innodb_io_capacity_max</code> should reflect the actual sustainable IOPS of the data volume.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A size-triggered checkpoint bursts write I/O to hit the deadline. That is the classic "P99 spike every N minutes" pattern you see on write-heavy OLTP.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Turning checkpoints off or pushing <code>checkpoint_timeout</code> to hours to "get more throughput." You just shifted the pain to a multi-hour crash-recovery replay.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Archive the WAL from day one if you claim PITR</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Wire up <code>archive_mode = on</code> with a real <code>archive_command</code> (or use <code>pgBackRest</code>, <code>WAL-G</code>, <code>Barman</code>). The command must return non-zero on failure, and you must monitor <code>pg_stat_archiver</code> for <code>last_failed_time</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A silently failing <code>archive_command</code> returns 0, Postgres thinks the segment is safe, and it recycles the file. You discover this the day you need
+              <span class="term">PITR</span><span class="term__gloss">Point-in-Time Recovery — restore a base backup then replay archived WAL up to a chosen timestamp</span>
+              and cannot rebuild the archive chain.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A shell one-liner with <code>cp ... || true</code>. Every WAL-archive outage I have seen started with an <code>|| true</code> swallowing an S3 5xx.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Kill long-running transactions before they kill your WAL</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set <code>idle_in_transaction_session_timeout</code> (Postgres) and <code>statement_timeout</code> at the pool or role level. Monitor <code>pg_stat_activity</code> for transactions older than, say, five minutes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An open transaction pins <code>xmin</code>, which pins WAL segments needed to keep the transaction's snapshot valid. It also blocks vacuum. A forgotten <code>BEGIN;</code> in a <code>psql</code> session is enough to fill a 500 GB disk over a weekend.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>ORMs that hold a connection with an open transaction across a slow external HTTP call. That is a WAL-pinning bug with a Java stack trace.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Treat replica lag as two numbers, not one</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Track lag in <em>bytes</em> (<code>pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)</code>) <strong>and</strong> in <em>seconds</em> (<code>now() - pg_last_xact_replay_timestamp()</code>). Alert on both, and on divergence between them.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Bytes tell you disk-and-network health; seconds tell you replay throughput. A replica that is 0 bytes behind but 10 seconds behind is stuck on a single-threaded replay of a large index build. A replica that is 5 GB behind but 0.5 seconds behind is bandwidth-starved.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single "lag" metric that is really <code>now() - replay_timestamp</code>. It hides all the interesting failure modes.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Enable full-page writes; enable WAL compression if bandwidth is the pain</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Leave <code>full_page_writes = on</code> (Postgres default). Turn on <code>wal_compression = on</code> if you see FPI dominating the WAL bytes-per-second (visible in <code>pg_stat_wal</code>).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Full-page images heal
+              <span class="term">torn writes</span><span class="term__gloss">a partial 8 KB page write left half-updated by a power loss — recovery needs the whole old image to fix it</span>
+              after power loss on 4 KB-sector storage. Compression trades CPU for ~30–70% smaller WAL, which flows into cheaper archive storage and less replication bandwidth.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Disabling FPI to "save WAL" on a system where you have not confirmed the storage stack guarantees atomic 8 KB writes. That is silent-corruption territory.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Verify <code>fsync</code> actually flushes</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run <code>pg_test_fsync</code> (or equivalent on your storage) and compare the ops/sec to your drive's spec sheet. Confirm the drive has power-loss protection (PLP) if it is a consumer SSD masquerading as enterprise.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A lying <code>fsync</code> — hardware that acks before the write reaches non-volatile media — voids every durability promise the WAL makes. This is not theoretical; it is why the Postgres project shipped the "fsyncgate" changes in 2018.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting cloud block storage without checking. EBS gp3, GCP PD, Azure Premium SSD all honour <code>fsync</code>, but layered stacks (ZFS on top, LVM snapshots, network filesystems) can break the guarantee.</p></div>
+        </article>
+
+        <!-- COMPARISON DIAGRAM: LSN timeline with checkpoint & crash -->
+        <figure class="diagram">
+          <svg viewBox="0 0 700 220" role="img" aria-labelledby="lsnTitle lsnDesc" width="700" style="max-width:100%">
+            <title id="lsnTitle">LSN timeline — checkpoint, crash, recovery windows</title>
+            <desc id="lsnDesc">A horizontal LSN axis showing the last checkpoint marker, the crash point, the redo window from RecLSN to crash, and the retained WAL beyond the crash for point-in-time recovery.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- baseline arrow -->
+              <line x1="30" y1="130" x2="670" y2="130" stroke="var(--border)" stroke-width="2"/>
+              <polygon points="670,130 660,124 660,136" fill="var(--border)"/>
+              <text x="30"  y="122" fill="var(--text-faint)">LSN →</text>
+
+              <!-- ticks for key events -->
+              <line x1="120" y1="120" x2="120" y2="140" stroke="var(--accent)" stroke-width="2"/>
+              <text x="120" y="160" fill="var(--accent)" text-anchor="middle" font-size="12">last checkpoint</text>
+              <text x="120" y="176" fill="var(--text-faint)" text-anchor="middle" font-size="11">CHECKPOINT record + pg_control updated</text>
+
+              <line x1="240" y1="120" x2="240" y2="140" stroke="var(--text-muted)" stroke-width="2"/>
+              <text x="240" y="160" fill="var(--text-muted)" text-anchor="middle" font-size="12">min(RecLSN)</text>
+
+              <line x1="480" y1="115" x2="480" y2="145" stroke="var(--danger)" stroke-width="3"/>
+              <text x="480" y="160" fill="var(--danger)" text-anchor="middle" font-size="12">crash</text>
+
+              <line x1="600" y1="120" x2="600" y2="140" stroke="var(--info)" stroke-width="2"/>
+              <text x="600" y="160" fill="var(--info)" text-anchor="middle" font-size="12">PITR target</text>
+
+              <!-- ranges as horizontal bars -->
+              <text x="30" y="34" fill="var(--text-muted)" font-size="12">ANALYSIS (scan forward from checkpoint)</text>
+              <rect x="120" y="42" width="360" height="18" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="300" y="56" text-anchor="middle" fill="var(--accent)" font-size="12">checkpoint → crash</text>
+
+              <text x="30" y="80" fill="var(--text-muted)" font-size="12">REDO (idempotent; skips records whose pageLSN is already up to date)</text>
+              <rect x="240" y="88" width="240" height="18" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="360" y="102" text-anchor="middle" fill="var(--accent)" font-size="12">min(RecLSN) → crash</text>
+
+              <text x="30" y="198" fill="var(--text-muted)" font-size="12">PITR replay (archived WAL beyond crash — restore + replay to any timestamp)</text>
+              <rect x="480" y="184" width="150" height="18" rx="4" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="555" y="198" text-anchor="middle" fill="var(--info)" font-size="12">crash → PITR target</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The LSN axis is a straight line. Recovery reads Analysis→Redo→Undo across the checkpoint-to-crash range; PITR keeps replaying archived WAL beyond that point.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>fsync = off</code> in production</p>
+            <p>Someone benchmarks with <code>fsync</code> off, sees a 10× speedup, and never puts it back. On the next power event you lose committed transactions and, worse, may get on-disk corruption because the WAL invariant is now broken. <strong>Alternative:</strong> use <code>synchronous_commit = off</code> for the specific write path that tolerates loss, and leave <code>fsync = on</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Dropping a replication slot to "free space"</p>
+            <p>Disk is full, the slot is holding 200 GB of WAL, someone drops it. Space is freed, the replica reconnects, discovers its <code>restart_lsn</code> is gone, and needs a full re-clone from <code>pg_basebackup</code>. <strong>Alternative:</strong> fix the consumer, or accept the re-clone consciously.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Treating the WAL as a general-purpose event log</p>
+            <p>A team plugs Debezium into Postgres and starts using logical decoding as their company-wide event bus. Then a schema change breaks decoding, a slow consumer pins WAL for hours, and the primary destabilises. <strong>Alternative:</strong> use the WAL to <em>feed</em> Kafka (a proper event log with independent retention), not as Kafka.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Uncoordinated <code>checkpoint_timeout</code> and <code>max_wal_size</code></p>
+            <p><code>max_wal_size</code> is too small, so size-triggered checkpoints fire constantly, generating a torrent of full-page images (every first-touch of a page after checkpoint gets an 8 KB FPI). WAL volume triples, replication lags, archive bill spikes. <strong>Alternative:</strong> size <code>max_wal_size</code> so time triggers dominate under peak load.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Long-running analytics transactions on the primary</p>
+            <p>A BI query runs for two hours inside a transaction. WAL segments and dead tuples accumulate the entire time. <strong>Alternative:</strong> run analytics on a hot standby with <code>hot_standby_feedback = on</code> (and understand <em>that</em> also pins WAL on the primary — pick your poison).</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Assuming logical replication is free</p>
+            <p>Enabling <code>wal_level = logical</code> roughly doubles WAL volume for update-heavy workloads because Postgres logs before-images for changed columns. If you flip the knob without measuring, your archive storage bill doubles overnight.</p>
+          </div>
+        </div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">High-volume SaaS OLTP on Postgres</div>
+            <p>A B2B SaaS running ~5k writes/s on a 3-node cluster with sync replication (<code>synchronous_commit = remote_apply</code> to one standby, async to the other). <em>Non-obvious lesson:</em> the sync standby's <code>fsync</code> latency becomes the primary's commit latency. A single degraded EBS volume on the standby raises every write's P99 on the primary. Monitor the standby's disk as if it were the primary's.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">CDC pipeline into a data warehouse</div>
+            <p>Fintech uses Debezium reading a Postgres logical slot, feeding Kafka, landing in Snowflake. <em>Non-obvious lesson:</em> the slot is a hard dependency of the primary's disk health. When the warehouse team pauses ingestion for a "quick" schema migration, WAL accumulates at 40 GB/hour. They now have a runbook: never pause the consumer without first increasing the disk or dropping-and-re-snapshotting the slot.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Multi-region PITR with <code>WAL-G</code></div>
+            <p>E-commerce backend ships WAL to S3 every 60 s, takes a base backup nightly. RPO is ~60 s, RTO is ~15 min for a 500 GB database. <em>Non-obvious lesson:</em> restoring PITR is I/O-bound on WAL replay throughput, not on network. Parallel <code>restore_command</code> (WAL-G's <code>--fetch-parallelism</code>) is the single biggest RTO knob.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Raft-backed control plane (etcd-shaped)</div>
+            <p>A Kubernetes-style control plane where every API write is a Raft append. <em>Non-obvious lesson:</em> the WAL <code>fsync</code> latency on the <em>slowest</em> Raft peer sets the write latency of the entire cluster. One noisy-neighbour VM on one etcd member makes every <code>kubectl apply</code> slow.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">RocksDB inside a stateful streaming job</div>
+            <p>Flink / Kafka Streams uses RocksDB's WAL for exactly-once state. <em>Non-obvious lesson:</em> turning off the RocksDB WAL is safe <em>only if</em> the framework can rebuild state from an upstream source of truth (the Kafka log) on failure. Otherwise you have silently opted out of durability.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> WAL bytes/sec written, checkpoint duration, <code>fsync</code> p99 latency, replica lag in both bytes and seconds, <code>pg_stat_archiver.last_failed_time</code>, per-slot <code>pg_wal_lsn_diff</code> retained bytes.</li>
+              <li><strong>Failure handling:</strong> what happens if <code>archive_command</code> fails for one hour? For 24 hours? Is that tested in a game day?</li>
+              <li><strong>Slot hygiene:</strong> is there an alert for slots older than N hours with no consumer? Is <code>max_slot_wal_keep_size</code> set?</li>
+              <li><strong>Recovery drill:</strong> have you actually run PITR to a random timestamp in the last 90 days? RTO measured, not estimated?</li>
+              <li><strong>Security foot-gun:</strong> WAL archives contain every row you have ever written. Is the S3 bucket encrypted, versioned, and access-logged?</li>
+              <li><strong>Cost:</strong> WAL archive size per day, tracked and forecast. Enabling logical replication or dropping <code>wal_compression</code> can double it silently.</li>
+              <li><strong>Onboarding:</strong> can a new SRE, on day one, find the runbook for "primary disk 85% full, WAL is growing"? That runbook should list the three usual causes (stuck slot, failing archiver, long transaction) in order.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it typically evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Stage one — ignore it.</span> Postgres works, MySQL works, defaults are fine, checkpoints happen invisibly. The first WAL incident is almost always a disk-full page at 3 a.m. caused by one of the three usual suspects, and the team learns that <code>pg_wal/</code> is a thing.</li>
+          <li><span class="steps__title">Stage two — replicas and archives.</span> The team enables WAL archiving for backups, adds a replica, and starts caring about replication lag. This is where they first hit the "single-threaded WAL replay" ceiling and either accept it (<code>hot_standby_feedback</code>, careful long-query hygiene) or route analytical load elsewhere.</li>
+          <li><span class="steps__title">Stage three — CDC as product surface.</span> The team plugs Debezium into a logical slot for CDC. WAL is no longer just a durability primitive — it is a product surface with SLAs. Slot leaks, <code>wal_level = logical</code> doubling WAL volume, decoding lag correlating with primary CPU — all of it becomes on-call territory.</li>
+          <li><span class="steps__title">Mature end-state.</span> WAL bytes/sec is treated as a first-class capacity metric alongside CPU and memory. Every consumer of the WAL (replicas, archivers, CDC slots) is treated as a dependency that can, and eventually will, take the primary down if not bounded.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.postgresql.org/docs/current/wal.html" rel="noopener">PostgreSQL: Reliability and the Write-Ahead Log</a> — the canonical chapter; short, precise, and the authoritative source on every <code>wal_*</code> knob.</li>
+          <li><a href="https://www.postgresql.org/docs/current/wal-async-commit.html" rel="noopener">PostgreSQL: Asynchronous Commit</a> — the exact durability window <code>synchronous_commit = off</code> buys you, from the source.</li>
+          <li><a href="https://www.enterprisedb.com/blog/postgresql-13-dont-let-slots-kill-your-primary" rel="noopener">EDB — PostgreSQL 13: Don't let slots kill your primary</a> — the reference post on <code>max_slot_wal_keep_size</code> and why the old default was dangerous.</li>
+          <li><a href="https://www.morling.dev/blog/mastering-postgres-replication-slots/" rel="noopener">Gunnar Morling — Mastering Postgres Replication Slots</a> — practical Debezium-oriented guidance on slot lifecycle in production.</li>
+          <li><a href="https://www.cybertec-postgresql.com/en/why-does-my-pg_wal-keep-growing/" rel="noopener">Cybertec — Why does my <code>pg_wal</code> keep growing?</a> — the three usual causes, in the order you should check them at 3 a.m.</li>
+          <li><a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_flush_log_at_trx_commit" rel="noopener">MySQL Reference — <code>innodb_flush_log_at_trx_commit</code></a> — the InnoDB counterpart to <code>synchronous_commit</code>, with the exact loss window per setting.</li>
+          <li>Mohan et al., <em>ARIES</em> (ACM TODS 1992) — the original paper. Long, but the recovery algorithm every RDBMS still uses is defined here.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/write-ahead-log/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

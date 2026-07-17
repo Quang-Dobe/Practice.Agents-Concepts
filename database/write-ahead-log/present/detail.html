@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Write-Ahead Log · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Write-Ahead Log</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Write-Ahead Log</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/write-ahead-log/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Write-Ahead Log</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>A Write-Ahead Log is an append-only, sequentially written file (or ring of files) of change records that a storage engine uses to satisfy the <strong>WAL invariant</strong>:</p>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">The WAL invariant</p>
+            <p>Every log record describing a change to page P must be durable on stable storage <strong>before</strong> the modified image of P is written back to the data files, <strong>and</strong> all log records for a transaction T must be durable before T is reported committed.</p>
+          </div>
+        </div>
+        <ul>
+          <li><strong>Log-before-page</strong> is what makes crash recovery possible without double-writing the data.</li>
+          <li><strong>Log-before-ack</strong> is what makes durability (the D in ACID) a real promise instead of a hope.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Log record</dt><dd>A fixed header plus a payload describing one change. In PostgreSQL the header includes <code>xl_tot_len</code>, <code>xl_xid</code> (transaction id), <code>xl_prev</code> (byte offset of the previous record — the prev-LSN chain), <code>xl_info</code> (rmgr flags), <code>xl_rmid</code> (resource manager, e.g. Heap, Btree, XLOG), and <code>xl_crc</code>. In ARIES-style engines the header also carries a <code>PageID</code>, <code>PrevLSN</code> for this transaction (so undo can walk backwards), and a type tag (update / compensation / commit / checkpoint).</dd></div>
+          <div><dt>LSN (Log Sequence Number)</dt><dd>A monotonically increasing 64-bit identifier. In PostgreSQL an LSN literally <em>is</em> a byte offset into the logical log stream, so <code>lsn_b - lsn_a</code> gives the bytes of WAL between them. Every data page carries a <code>pageLSN</code> header pointing at the last record that modified it — recovery uses this to decide "skip or redo".</dd></div>
+          <div><dt>prev-LSN chain</dt><dd>Each record for a given transaction points at that transaction's previous record. Undo walks this backward chain instead of scanning the whole log.</dd></div>
+          <div><dt>WAL buffer</dt><dd>An in-memory ring that in-flight records are appended to before they hit the OS.</dd></div>
+          <div><dt>WAL segment file</dt><dd>The on-disk unit. Postgres uses <strong>16 MB</strong> segments by default (tunable via <code>--wal-segsize</code> at <code>initdb</code>); InnoDB uses circular <code>#innodb_redo/*</code> files sized by <code>innodb_redo_log_capacity</code> (default <strong>100 MB</strong> in MySQL 8.0.30+).</dd></div>
+          <div><dt>Flush / fsync</dt><dd>The OS call that pushes writes past the kernel page cache to persistent media. WAL correctness hinges on this actually happening; a lying <code>fsync</code> is why "power-loss protection" matters for enterprise SSDs.</dd></div>
+          <div><dt>Checkpoint</dt><dd>(1) Writes all dirty buffer-pool pages older than a chosen LSN to the data files, (2) records a checkpoint marker in the log, and (3) updates a control file (<code>pg_control</code> in Postgres) so recovery knows where to start replay. WAL older than the checkpoint LSN becomes reclaimable.</dd></div>
+          <div><dt>Logging discipline</dt><dd><strong>Physical</strong> (byte images of pages), <strong>logical</strong> (semantic operations like "insert row R into table T"), or <strong>physiological</strong> (logical <em>within</em> a page, physical <em>between</em> pages). ARIES uses physiological. Postgres is mostly physical with full-page images; InnoDB's redo log is physical, its undo log is logical.</dd></div>
+        </dl>
+
+        <h3>How it fits in the broader landscape</h3>
+        <p>WAL is one implementation of the broader idea of <strong>journalling for crash-consistent updates</strong>. Its siblings:</p>
+        <ul>
+          <li><strong>Shadow paging</strong> — SQLite's default rollback-journal mode is a variant. Write new pages, then atomically swap.</li>
+          <li><strong>Copy-on-write B-trees</strong> — LMDB, ZFS, Btrfs. The tree root pointer is the commit.</li>
+          <li><strong>Log-structured storage</strong> — LSM trees like RocksDB, or fully log-structured filesystems like F2FS. The log <em>is</em> the data.</li>
+        </ul>
+        <p>WAL wins where you want fast in-place updates <em>and</em> durability without paying random-write latency per commit.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>WAL sits in the <strong>storage engine layer</strong> of a database, below the query planner and above the OS file system. It is a private durability primitive: applications never talk to it directly, they just see the durability guarantee that flows out of it. In distributed systems that need consensus (etcd, TiKV, CockroachDB) the WAL sits under the Raft log, and Raft appends <em>are</em> WAL appends.</p>
+
+        <h3>Where you typically encounter it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">PostgreSQL</div><p><code>pg_wal/</code> directory of 16 MB segments; <code>pg_control</code> tracks the redo LSN.</p></div>
+          <div class="card"><div class="card__title">MySQL / InnoDB</div><p>A redo log (physical, in <code>#innodb_redo/</code>) plus an undo log (logical, in undo tablespaces), plus a separate <code>binlog</code> one layer up that drives replication.</p></div>
+          <div class="card"><div class="card__title">SQLite (WAL mode)</div><p><code>PRAGMA journal_mode=WAL</code>: writes go to <code>&lt;db&gt;-wal</code>, readers consult a <code>&lt;db&gt;-shm</code> shared-memory index. The default remains rollback journal for backwards compatibility.</p></div>
+          <div class="card"><div class="card__title">RocksDB / LevelDB</div><p>Every <code>Put</code> first goes to a WAL file, then to the in-memory memtable. Flushing the memtable to an SSTable is the effective checkpoint; the WAL segment then gets purged.</p></div>
+          <div class="card"><div class="card__title">etcd</div><p>Raft entries are persisted through a WAL before the leader considers them committed; recovery replays the WAL and then applies committed entries to the key-value store.</p></div>
+          <div class="card"><div class="card__title">Filesystems</div><p>ext4's <code>jbd2</code> journal, XFS's transaction log, NTFS <code>$LogFile</code>. Same pattern: intent recorded first, metadata (or data, in <code>data=journal</code> mode) updated after.</p></div>
+          <div class="card"><div class="card__title">Kafka</div><p>The pattern is inverted: the log <em>is</em> the primary data structure, consumers read directly from segment files. There is no separate "data file to flush to." Kafka is best thought of as WAL-as-a-product.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App["Application / SQL"]
+    App --> SE["Storage engine (Postgres, InnoDB, RocksDB, WiredTiger…)"]
+    SE --> WAL["WAL / redo log (append-only)"]
+    SE --> BP["Buffer pool"]
+    BP --> DATA["Data files (heap, indexes)"]
+    WAL --> FS["File system + fsync"]
+    DATA --> FS
+    FS --> DISK[("Block storage — HDD / SSD / NVMe / EBS")]
+    WAL -. "downstream consumers" .-> R["Replicas (physical, logical)"]
+    WAL -. "downstream consumers" .-> CDC["CDC (Debezium, Kafka Connect)"]
+    WAL -. "downstream consumers" .-> ARCH["PITR archives (pgBackRest, WAL-G)"]
+          </pre>
+          <figcaption class="diagram__caption">WAL sits under the buffer pool, above the file system. Everything downstream — replicas, CDC, backups — is a re-consumer of the same append stream.</figcaption>
+        </figure>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Inspection / debugging</strong> — <code>pg_waldump</code> (Postgres), <code>mysqlbinlog</code> (MySQL binlog; the redo log itself is not user-inspectable), <code>ldb dump_wal</code> (RocksDB), SQLite's <code>PRAGMA wal_checkpoint</code>.</li>
+          <li><strong>Replication / CDC</strong> — Postgres logical decoding (<code>pgoutput</code>, <code>wal2json</code>, Debezium), MySQL binlog readers (Debezium, Maxwell), Kafka Connect. All downstream consumers of a WAL.</li>
+          <li><strong>Backup / PITR</strong> — <code>pg_basebackup</code> + WAL archiving (<code>archive_command</code>, or tools like <code>pgBackRest</code>, <code>WAL-G</code>, <code>Barman</code>). InnoDB uses Percona XtraBackup / <code>mysqlbackup</code>.</li>
+          <li><strong>Consensus atop WAL</strong> — Raft implementations (etcd, hashicorp/raft, tikv/raft-rs) always have a WAL under the hood.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>The formal treatment is Mohan et al., <em>"ARIES: A Transaction Recovery Method Supporting Fine-Granularity Locking and Partial Rollbacks Using Write-Ahead Logging"</em> (IBM, ACM TODS 1992). Before ARIES, systems either used <strong>shadow paging</strong> (System R) — which forced a full page copy per update and interacted badly with fine-grained locking — or <strong>force-at-commit</strong>, which turned every commit into a random-I/O storm. ARIES gave you no-force / steal buffer management with a rigorous recovery algorithm on top. Every major relational engine that shipped after ~1995 is a direct descendant.</p>
+          </div>
+        </div>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for a WAL when</p>
+            <ul>
+              <li>You are building a storage layer that must survive <code>kill -9</code> or power loss without losing acknowledged writes.</li>
+              <li>You do in-place page updates (B-tree, heap file) and want cheap atomic multi-page transactions.</li>
+              <li>You need a linearizable stream of state changes — for replication, CDC, or Raft.</li>
+              <li>Your workload is write-heavy on media where random I/O is expensive (spinning disks, network-attached storage, cheap SSDs without power-loss protection).</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Avoid it when</p>
+            <ul>
+              <li>The data structure is already a log (Kafka topic, event store, append-only file). Adding another WAL is pure overhead.</li>
+              <li>You have no durability requirement (in-process cache, scratch buffer).</li>
+              <li>The whole dataset is smaller than one page and rewriting it is faster than log-and-checkpoint bookkeeping.</li>
+              <li>You need transactional guarantees across independent systems — that is what two-phase commit or Sagas are for; a WAL only covers a single storage engine.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Walk one transaction from client call to durable commit in a Postgres-shaped engine — the shape generalizes to InnoDB, RocksDB, etc.:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Modify in the buffer pool.</span> A backend pins page P, applies the change in memory, bumps <code>page.pageLSN</code>, and marks the buffer dirty.</li>
+          <li><span class="steps__title">Format a WAL record.</span> Serialize the change as <code>{LSN, prev-LSN, xid, rmid, payload}</code>. If this is the first modification of P since the last checkpoint, include a <span class="term">full-page image</span><span class="term__gloss">an 8 KB copy of the whole page inside the WAL record — the fix for torn-write corruption</span> to protect against torn writes.</li>
+          <li><span class="steps__title">Append to WAL buffer.</span> Copy the record into the shared WAL buffer under a lightweight lock; the LSN is stamped from the current insertion pointer.</li>
+          <li><span class="steps__title">On COMMIT.</span> Write a <code>COMMIT</code> record, then block on <code>XLogFlush(commitLSN)</code>. That call issues a <code>write()</code> up to <code>commitLSN</code> and an <code>fsync()</code> (or <code>fdatasync()</code>, or <code>O_DIRECT</code> write, per <code>wal_sync_method</code>). Multiple committing transactions coalesce into a <span class="term">group commit</span><span class="term__gloss">many transactions ride one fsync — throughput goes from ~1 / fsync_latency to hundreds of commits per flush</span>; Postgres exposes this via <code>commit_delay</code> / <code>commit_siblings</code>.</li>
+          <li><span class="steps__title">Ack the client.</span> Only now. Under <code>synchronous_commit = on</code> this is the default. With <code>synchronous_commit = off</code> the ack returns before flush, capping data-loss risk at <code>3 × wal_writer_delay</code> (default <code>wal_writer_delay = 200 ms</code>, so up to <strong>~600 ms</strong> of committed transactions can vanish on a crash — durability traded for latency).</li>
+          <li><span class="steps__title">Later, in the background.</span> The bgwriter / page cleaner asynchronously writes dirty pages back to the data files. The WAL invariant holds because a dirty page P is never written to disk before its highest <code>pageLSN</code> has been flushed in the WAL.</li>
+          <li><span class="steps__title">Checkpoint.</span> Periodically (Postgres: <code>checkpoint_timeout</code> default <strong>5 min</strong>, or <code>max_wal_size</code> default <strong>1 GB</strong>, whichever hits first), all pages dirtied before the checkpoint LSN are flushed, a <code>CHECKPOINT</code> record is written and fsynced, and <code>pg_control</code> is updated. WAL segments older than the checkpoint's redo LSN become eligible for recycling or archiving.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant BE as Backend
+    participant BP as Buffer pool
+    participant WB as WAL buffer
+    participant WAL as WAL file
+    participant DAT as Data files
+    C->>BE: BEGIN + UPDATE + COMMIT
+    BE->>BP: modify page P, bump pageLSN
+    BE->>WB: append log record (+FPI if first-touch)
+    BE->>WAL: write() up to commitLSN
+    BE->>WAL: fsync()  ← group commit batches here
+    WAL-->>BE: durable
+    BE-->>C: COMMIT ok
+    Note over BP,DAT: later — bgwriter flushes dirty pages, but only after their pageLSN is durable in WAL
+    BP-->>DAT: flush dirty page P
+          </pre>
+          <figcaption class="diagram__caption">One transaction: the client hears "COMMIT ok" only after fsync. The data page reaches disk later — that's the whole point.</figcaption>
+        </figure>
+
+        <h3>Crash recovery — the ARIES three-pass structure</h3>
+        <ol class="steps">
+          <li><span class="steps__title">Analysis.</span> Scan forward from the last checkpoint record. Rebuild the Transaction Table (which transactions were live) and the Dirty Page Table (which pages had unflushed changes, tagged with <code>RecLSN</code>, the earliest LSN that dirtied them).</li>
+          <li><span class="steps__title">Redo.</span> Scan forward from <code>min(RecLSN)</code>. For each record whose target page has <code>pageLSN &lt; recordLSN</code>, re-apply it. This is <strong>idempotent</strong>: replaying a redo whose effect is already on disk is a no-op because the LSN comparison filters it — that's what makes recovery deterministic and restartable.</li>
+          <li><span class="steps__title">Undo.</span> For every transaction still in the Transaction Table (never committed), walk its prev-LSN chain backward, applying the inverse of each change and writing a <span class="term">Compensation Log Record</span><span class="term__gloss">CLR — a log entry that records an undo and points past the record it compensates, so a crash during undo still resumes correctly</span> (CLR) for each undo. CLRs point past the record they compensate (their <code>undoNext</code>) so a crash <em>during</em> undo still resumes correctly.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Analysis: crash detected, replay begins at last checkpoint
+    Analysis --> Redo: rebuild Transaction Table + Dirty Page Table
+    Redo --> Undo: reapply each record whose pageLSN is older than recordLSN
+    Undo --> [*]: roll back losers, write CLRs, engine online
+    note right of Redo: idempotent — LSN check makes replay safe to restart
+    note right of Undo: prev-LSN chain walks each loser's records backward
+          </pre>
+          <figcaption class="diagram__caption">ARIES recovery in three deterministic passes. Redo makes committed writes real; Undo erases uncommitted ones.</figcaption>
+        </figure>
+
+        <h3>Two logging disciplines worth naming</h3>
+        <ul>
+          <li><strong>Physiological logging (ARIES).</strong> "On page 42, at slot 3, replace bytes 8..40 with X". The <em>page 42</em> part is physical (which page). The <em>slot 3</em> part is logical (survives page reorganizations within the page). This is what allows in-page compaction without invalidating the log.</li>
+          <li><strong>Logical logging (InnoDB undo, MySQL binlog).</strong> "INSERT (1, 'foo') into table T". Smaller, replayable across schema-compatible instances, but harder to apply deterministically after a crash mid-statement.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gained</th><th scope="col">Given up</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Sequential append vs. in-place writes</td>
+                <td>Turns random 4–16 KB commit I/O into a stream — modern NVMe hits ~7 GB/s sequential vs. ~1 ms per random <code>fsync</code>; a 1 KB WAL record at ~50 μs of <code>fsync</code> on Optane is orders of magnitude cheaper than a random page flush.</td>
+                <td>An extra write per change — data hits disk twice (log + data files). This is the "write amplification of durability."</td>
+              </tr>
+              <tr>
+                <td>Physical / full-page images</td>
+                <td>Bulletproof recovery — torn pages are healed by re-applying the full image.</td>
+                <td>WAL volume balloons (a full-page image costs 8 KB per touched page per checkpoint cycle). Postgres <code>wal_compression</code> mitigates.</td>
+              </tr>
+              <tr>
+                <td>Physiological logging</td>
+                <td>Small records + page-format flexibility (compaction, slot reordering).</td>
+                <td>Cannot be applied out-of-order; replay must respect LSN ordering strictly.</td>
+              </tr>
+              <tr>
+                <td>Group commit</td>
+                <td>Amortizes one <code>fsync</code> across many transactions — throughput goes from ~1 / <code>fsync_latency</code> to hundreds of commits per flush.</td>
+                <td>Individual commit latency rises by up to <code>commit_delay</code>. Bad for latency-sensitive OLTP if tuned aggressively.</td>
+              </tr>
+              <tr>
+                <td>No-force / steal buffer management</td>
+                <td>Buffer pool can flush dirty pages any time and need not flush at commit. Removes I/O from the commit path.</td>
+                <td>Requires the full undo machinery for crash recovery — you may crash with uncommitted changes already on disk.</td>
+              </tr>
+              <tr>
+                <td>Replication piggybacking on WAL</td>
+                <td>Free — the stream already exists. Byte-perfect physical replicas.</td>
+                <td>Physical replicas must be exact binary copies (same version, same architecture, same page layout). MySQL's separate binlog trades this rigidity for cross-version flexibility.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Lying <code>fsync</code></p>
+            <p>Consumer SSDs without power-loss protection ack <code>fsync</code> before the write reaches flash. Correctness is voided; use enterprise drives or file-system barriers.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Torn page</p>
+            <p>Power loss between the first and last sector of an 8 KB write leaves a half-updated page. Mitigation: full-page images in WAL (Postgres <code>full_page_writes = on</code>, default) or InnoDB's doublewrite buffer.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">WAL disk fills up</p>
+            <p>A long-running transaction or a lagging replica pins segments. Postgres refuses new writes; production incidents follow. Symptoms: <code>pg_wal/</code> grows without bound. Tune <code>max_slot_wal_keep_size</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Checkpoint stall</p>
+            <p>A <code>checkpoint_timeout</code> fires and the bgwriter cannot keep up, so a huge write spike hits the data disk. Symptoms: latency spikes every 5 minutes. Tune <code>checkpoint_completion_target</code> (Postgres default 0.9) or shorten intervals.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Recovery time regression</p>
+            <p>Infrequent checkpoints let the log-to-replay grow into hours of REDO after a crash. The RTO trade-off is real.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>synchronous_commit = off</code> on a system that promised durability</p>
+            <p>Silent data loss window of hundreds of ms per crash. Legitimate for logs/metrics; catastrophic for payments.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Every durable database has the same core problem: a commit implies persistence, but persistence to random locations across many pages is slow, and doing it atomically across those pages is even harder. WAL decouples the two: <strong>commit means "the intent to change is durable"</strong>, not "the change is in place." The actual data movement can be batched, reordered, and coalesced. First principles: sequential I/O is 10–1000× cheaper than random I/O on every storage medium invented so far (HDD, SATA SSD, NVMe, network block storage). Turning <code>N</code> random writes into <code>1</code> sequential write plus <code>1</code> <code>fsync</code> is the cheapest possible way to buy the D in ACID.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 620 200" role="img" aria-labelledby="seqTitle seqDesc" width="620" style="max-width:100%">
+            <title id="seqTitle">Sequential append vs. random writes</title>
+            <desc id="seqDesc">One sequential append plus one fsync to the WAL takes orders of magnitude less time than five scattered random page writes to the data files.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- Top row: random writes on data files -->
+              <text x="10" y="24" fill="var(--text-muted)">Without WAL — commit forces N scattered writes</text>
+              <g>
+                <rect x="10"  y="40" width="70" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="45"  y="62" fill="var(--danger)" text-anchor="middle">random</text>
+                <rect x="120" y="40" width="70" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="155" y="62" fill="var(--danger)" text-anchor="middle">random</text>
+                <rect x="240" y="40" width="70" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="275" y="62" fill="var(--danger)" text-anchor="middle">random</text>
+                <rect x="360" y="40" width="70" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="395" y="62" fill="var(--danger)" text-anchor="middle">random</text>
+                <rect x="480" y="40" width="70" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="515" y="62" fill="var(--danger)" text-anchor="middle">random</text>
+              </g>
+              <text x="10" y="94" fill="var(--text-faint)" font-size="12">≈ 5 × 1 ms random fsync latency on typical block storage</text>
+
+              <!-- Divider -->
+              <line x1="10" y1="112" x2="610" y2="112" stroke="var(--border)"/>
+
+              <!-- Bottom row: sequential append -->
+              <text x="10" y="134" fill="var(--text-muted)">With WAL — one sequential append + one fsync</text>
+              <g>
+                <rect x="10"  y="150" width="470" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <text x="245" y="172" fill="var(--accent)" text-anchor="middle">sequential append (~7 GB/s on NVMe)</text>
+                <rect x="490" y="150" width="120" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+                <text x="550" y="172" fill="var(--accent)" text-anchor="middle">1 × fsync</text>
+              </g>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A 1 KB WAL record at ~50 μs of <code>fsync</code> on Optane is orders of magnitude cheaper than a random page flush. The "cost of durability" collapses.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative — <strong>shadow paging</strong> — updates copies of pages, then atomically swaps a root pointer. It sounds cleaner (no separate log, no replay). But it interacts badly with concurrency: fine-grained row locks assume in-place updates, and shadow paging forces a full-page copy for a single-row change. It also fragments the on-disk layout because logical page order and physical page order diverge. ARIES chose in-place updates + WAL specifically to preserve clustering, support fine-grained locking, and keep dirty pages out of the commit path (no-force). The complexity of undo/redo/CLRs is the price paid; the payoff is that a busy OLTP system can commit thousands of small transactions per second on a single spinning disk — a workload shadow paging cannot touch.</p>
+
+        <h3>Why it matters now</h3>
+        <p>The pattern has quietly become the substrate of modern distributed systems. Every Raft-backed system (etcd, Consul, TiKV, CockroachDB, MongoDB) uses a WAL under its consensus layer. Every cloud-native OLTP database (Aurora, AlloyDB, Neon, PlanetScale) is architected around <strong>disaggregating the WAL from the page store</strong> — the log becomes the network-shipped source of truth, and page servers rebuild state from it. Change Data Capture, event-driven architectures, and streaming analytics all depend on the WAL being replayable. In 2026, if you understand WAL, you understand the shape of about 80% of the persistence layer of the systems you actually run.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

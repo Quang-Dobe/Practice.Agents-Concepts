@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Write-Ahead Log · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Write-Ahead Log</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Write-Ahead Log</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/write-ahead-log/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Write-Ahead Log</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A Write-Ahead Log (WAL) is a durability trick: every change is appended to a sequential on-disk log <em>before</em> the actual data files are touched, so a crash can never lose a committed write.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Every mutation — an <code>INSERT</code>, an index update, a page split — is first written as a small record to an append-only file. Only after that record is safely on disk (<span class="term">fsync</span><span class="term__gloss">the OS call that forces buffered writes past the kernel cache and onto physical storage</span>'d) does the database confirm the commit. The real data pages get updated later, in the background. If the process dies mid-flight, recovery replays the log and the database wakes up in a consistent state. This one idea is how Postgres, MySQL/InnoDB, SQLite, RocksDB, and even ext4 all keep their promises without writing everything twice at full speed.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a busy restaurant kitchen. Orders come in fast. If the head chef tried to plate every dish the moment it was ordered — walking to the pantry, fetching ingredients from three shelves, chopping, cooking, plating — the line would collapse.</p>
+
+        <p>Instead there's a <strong>ticket rail</strong>. The moment an order is taken, the waiter clips a ticket to the rail in order. That single act is atomic and fast. Now the kitchen can cook in whatever order is most efficient — batching, parallelizing, using the oven while the pan heats up. And if the power flickers and the chef forgets what she was doing, she walks back to the rail and reads the tickets in order. No order is lost.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant Waiter as Waiter (client)
+    participant Rail as Ticket rail (WAL)
+    participant Kitchen as Kitchen (data files)
+    Waiter->>Rail: clip ticket (append + fsync)
+    Rail-->>Waiter: "got it" (COMMIT ack)
+    Note over Kitchen: chef cooks later, in whatever order is efficient
+    Rail->>Kitchen: plate the dishes (background flush)
+    Note over Rail,Kitchen: power flickers? read the rail top-to-bottom and finish the un-plated orders
+          </pre>
+          <figcaption class="diagram__caption">The rail is the log. Tickets are log records. Plated dishes are data pages. The rail is the source of truth between commit and checkpoint.</figcaption>
+        </figure>
+
+        <p>The WAL is the ticket rail. The <span class="term">log record</span><span class="term__gloss">one entry describing a single change — which page, old value, new value, or a logical op</span>s are the tickets. The plated dishes are the data pages on disk. The rail is written in one direction, sequentially — and that is the whole point: <strong>sequential writes to one file are dramatically faster than scattered random writes across many files.</strong> WAL turns durability from an expensive random-I/O problem into a cheap append.</p>
+
+        <p>The leave-with-this insight: during the window between "commit" and <span class="term">checkpoint</span><span class="term__gloss">the periodic operation that flushes dirty data pages and marks WAL up to that point safe to discard</span>, the log <em>is</em> the source of truth. The data files are lagging projections that will eventually catch up.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a replication log</strong> (though it's often reused as one). Replication is a downstream consumer of the WAL, not its purpose.</li>
+              <li><strong>Not an audit log.</strong> WAL records are physical or logical change records for recovery, not human-readable history.</li>
+              <li><strong>Not the same as a redo log alone.</strong> Some engines (InnoDB) split redo and undo; WAL is the general pattern that covers both approaches.</li>
+              <li><strong>Not a backup.</strong> The log is truncated once its changes are safely in the data files. It only protects against crashes, not against <code>DROP TABLE</code>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You are building any storage engine that promises durability of committed writes.</li>
+              <li>You need atomic multi-page updates (a B-tree split, a transaction touching multiple rows) without writing each page twice.</li>
+              <li>You want cheap point-in-time recovery or streaming replication — the log is already there, just ship it.</li>
+              <li>You need fast commits on spinning disks or network-attached storage where random I/O is punishingly slow.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Pure in-memory caches where losing data on crash is acceptable (Redis without AOF, memcached).</li>
+              <li>Append-only immutable stores where the "data file" already <em>is</em> a sequential log (Kafka segments, event stores) — the pattern is baked in, not bolted on.</li>
+              <li>Tiny embedded configs where a full rewrite of the file is faster than log-and-checkpoint machinery.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Log record</dt><dd>One entry describing a single change (which page, old value, new value, or a logical op).</dd></div>
+          <div><dt>LSN (Log Sequence Number)</dt><dd>A monotonically increasing ID for each record — the log's clock.</dd></div>
+          <div><dt>fsync</dt><dd>The OS call that forces buffered writes to physical storage. WAL's guarantee lives or dies on this.</dd></div>
+          <div><dt>Checkpoint</dt><dd>A point where dirty data pages are flushed to disk and the log up to that LSN becomes safe to discard.</dd></div>
+          <div><dt>Redo</dt><dd>Replay a committed change during recovery.</dd></div>
+          <div><dt>Undo</dt><dd>Roll back an uncommitted change during recovery.</dd></div>
+          <div><dt>Group commit</dt><dd>Batching many transactions' fsyncs together to amortize disk cost.</dd></div>
+          <div><dt>WAL mode (SQLite)</dt><dd>SQLite's specific opt-in variant (<code>PRAGMA journal_mode=WAL</code>) that swaps its default rollback-journal for a proper WAL file.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
