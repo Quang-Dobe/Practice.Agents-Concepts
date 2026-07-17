@@ -81,6 +81,11 @@ code/
 ├── mvp.<ext>        # written by code-implementer
 ├── (optional second file, e.g. server.<ext>)
 └── README.md        # written by code-implementer
+present/
+├── index.html       # written by present-builder (Stage 5) — see the present-page-conventions skill
+├── overview.html    # written by present-builder
+├── detail.html      # written by present-builder
+└── practice.html    # written by present-builder
 ```
 
 If an agent feels the urge to create `requirements.md`, `analyzed.md`, `summary.md`, or any other file outside this list — **don't**. The four-doc structure is the contract. If something genuinely doesn't fit, raise it instead of silently adding new files.

@@ -1,5 +1,5 @@
 ---
-description: Full learning pipeline for a new tech topic — overview → deep dive → practice → MVP code.
+description: Full learning pipeline for a new tech topic — overview → deep dive → practice → MVP code → present pages.
 argument-hint: <topic name>
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Task, WebSearch, WebFetch
 model: opus
@@ -7,13 +7,13 @@ model: opus
 
 # /learn — Full Learning Pipeline
 
-You are orchestrating a four-stage learning workflow for the topic: **$ARGUMENTS**
+You are orchestrating a five-stage learning workflow for the topic: **$ARGUMENTS**
 
 If `$ARGUMENTS` is empty, stop and ask the user for a topic name before doing anything else.
 
 ## Your job as orchestrator
 
-You are **not** writing the docs yourself. You are coordinating the specialist subagents and skills below in sequence. Each stage produces one artifact on disk; you do not summarize those artifacts in chat — you simply confirm they exist and move on.
+You are **not** writing the docs, code, or HTML yourself. You are coordinating the specialist subagents and skills below in sequence. Each stage produces one artifact on disk; you do not summarize those artifacts in chat — you simply confirm they exist and move on.
 
 ## The pipeline
 
@@ -26,12 +26,14 @@ Invoke the `topic-folder-manager` skill with the topic name `$ARGUMENTS`. It wil
 
 Capture `CATEGORY`, `SLUG`, `PATH`, and `NEXT_STEP` from its response. From here on, refer to the topic folder as `<topic-folder>` = `<CATEGORY>/<SLUG>`.
 
-If `NEXT_STEP` is `complete`, all four artifacts already exist. Print:
-> All four artifacts for `<topic-folder>` already exist. Use `/learn-overview <topic>`, `/learn-deep <topic>`, `/learn-practice <topic>`, or `/learn-code <topic>` to regenerate a specific stage.
+If `NEXT_STEP` is `complete`, the docs and code already exist. **Check whether `<topic-folder>/present/index.html` exists**:
+- If it exists too, print:
+  > All artifacts for `<topic-folder>` already exist (docs, code, and present pages). Use `/learn-overview`, `/learn-deep`, `/learn-practice`, `/learn-code`, or `/learn-present` to regenerate a specific stage.
 
-…and stop.
+  …and stop.
+- If `present/` is missing, skip straight to **Stage 5** and build it.
 
-Otherwise, **resume from `NEXT_STEP`** and run every remaining stage in order.
+Otherwise, **resume from `NEXT_STEP`** and run every remaining stage in order, ending with Stage 5.
 
 ### Stage 1 — Overview (if missing)
 Use the **`overview-explainer`** subagent. Pass it the topic name and the absolute path to `<topic-folder>`. Wait for it to confirm `01-overview.md` has been written.
@@ -45,6 +47,9 @@ Use the **`practitioner`** subagent. Pass it the topic name and the absolute pat
 ### Stage 4 — MVP code (if missing)
 Use the **`code-implementer`** subagent. Pass it the topic name and the absolute path to `<topic-folder>`. It will read all three prior docs. Wait for confirmation that `code/mvp.*` and `code/README.md` exist.
 
+### Stage 5 — Present pages (if missing)
+Use the **`present-builder`** subagent. Pass it the topic name and the absolute path to `<topic-folder>`. It loads the `present-page-conventions` skill, reads the three docs + `code/README.md`, and re-authors them into four dark-themed HTML pages under `<topic-folder>/present/` (`index.html`, `overview.html`, `detail.html`, `practice.html`), then regenerates the root dashboard with `node scripts/gen-dashboard.mjs`. Wait for confirmation that the four pages exist.
+
 ## Quality gates between stages
 
 Between each stage:
@@ -52,26 +57,30 @@ Between each stage:
 2. Verify it is not empty (size > 200 bytes is a reasonable floor — an aborted write would be smaller).
 3. If a stage failed to produce its output, **stop the pipeline**, report which stage failed, and do not proceed to the next.
 
+After Stage 5, also confirm the root `index.html` was regenerated (it should reference `<CATEGORY>/<SLUG>/present/index.html`). If the agent did not run `node scripts/gen-dashboard.mjs`, run it yourself.
+
 ## Final output
 
-When all four stages have completed successfully, print a single, clean summary to chat — no decoration, no celebration:
+When all five stages have completed successfully, print a single, clean summary to chat — no decoration, no celebration:
 
 ```
 ✓ <Topic Name> → <topic-folder>/
   ├── docs/01-overview.md
   ├── docs/02-deep-dive.md
   ├── docs/03-practice.md
-  └── code/mvp.<ext> + README.md
+  ├── code/mvp.<ext> + README.md
+  └── present/index.html + overview.html + detail.html + practice.html
 
-Open <topic-folder>/docs/01-overview.md to start reading.
+Open <topic-folder>/present/index.html in the site, or docs/01-overview.md to start reading.
 ```
 
 That is the whole final message. Do not include explanations of what each doc contains — the user can open them.
 
 ## Things you must NOT do
 
-- Do not write the doc content yourself. That's what the subagents are for, and they each run on Opus with their own context window. Doing it in the orchestrator wastes context.
-- Do not paste long quotes from the generated docs into chat.
+- Do not write the doc, code, or HTML content yourself. That's what the subagents are for, and they each run on Opus with their own context window. Doing it in the orchestrator wastes context.
+- Do not paste long quotes from the generated artifacts into chat.
 - Do not ask the user for clarification mid-pipeline. The agents are designed to make defensible choices and proceed. The only legitimate stop is a failed write.
-- Do not create files outside the standard layout defined by the `learning-doc-formatter` skill. No `requirement.md`, no `analyzed.md`, no `summary.md`.
+- Do not create files outside the standard layout (`docs/`, `code/`, `present/`) defined by the `learning-doc-formatter` and `present-page-conventions` skills. No `requirement.md`, no `analyzed.md`, no `summary.md`.
+- Do not hand-edit the root `index.html` dashboard — it is generated by `scripts/gen-dashboard.mjs`.
 - Do not invoke the subagents in parallel. They depend on each other's outputs in order.

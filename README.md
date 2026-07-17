@@ -39,6 +39,16 @@ Topics are grouped into **6 categories**:
 
 The `present/` pages are **re-authored from the docs** to be easy to skim: short words, bulleted lists, small *italic* explanations of jargon, and a **diagram on every page** (state machines, request flows, and hand-drawn concept art). The written `docs/` and runnable `code/` stay as the source of truth.
 
+## How topics are added
+
+Topics are produced by the `/learn` pipeline (`.claude/`), which runs five stages: overview → deep dive → practice → MVP code → **present pages**. The final stage (`present-builder`) re-authors the docs into the `present/` HTML using the shared `present-page-conventions` skill, then regenerates this dashboard with `scripts/gen-dashboard.mjs` so the new topic appears automatically. A weekly Claude Routine runs the pipeline on a fresh topic and opens a PR; merging it redeploys the site.
+
+To rebuild the dashboard by hand at any time:
+
+```bash
+node scripts/gen-dashboard.mjs
+```
+
 ## Run the site locally
 
 No build step — it's plain static HTML/CSS/JS. Serve the repo root and open the dashboard:
