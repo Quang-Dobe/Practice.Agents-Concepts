@@ -1,11 +1,11 @@
-# Connection Pooling
+# Retrieval Augmented Generation
 
-Connection pooling is the practice of keeping a small stash of already-open database connections around and lending them out to your code, instead of opening a brand new one every time the application needs to talk to the database. The pool sits inside your app (or in a separate process like PgBouncer or RDS Proxy) and hides all of the borrow-and-return bookkeeping behind the driver.
+Retrieval Augmented Generation, or RAG, is the pattern of looking things up before asking a large language model to answer. Instead of relying only on what the model memorised during training, the system first fetches the most relevant snippets from a knowledge source you control, pastes them into the prompt, and asks the model to answer using that specific context.
 
-It matters because opening a database connection is surprisingly expensive — a TCP handshake, a TLS handshake, authentication, and session setup can add up to 20–100 milliseconds before you send a single query. In a web service under real traffic, that cost quickly dominates the request budget and makes the database server work far harder than it needs to. Engineers reach for a pool anytime a service, worker, or API is going to fire many queries against the same database. They skip it only for one-shot scripts or extremely low-traffic tools where a single connection is enough.
+It matters because a plain LLM has a fixed knowledge cutoff and will confidently invent answers about anything outside it — your company's refund policy, last week's board notes, a private wiki. RAG grounds the reply in real, current, and often private documents, so the answer is traceable back to a source and far less prone to hallucination. Engineers reach for it whenever a chatbot needs to answer from private documents, whenever the facts change too often to bake into weights, and whenever a domain like medicine, law, or finance demands citations. It is chosen instead of fine-tuning when the goal is injecting new facts rather than teaching new behaviour.
 
-Think of a busy hotel that used to send one concierge up and down from the top floor for every guest. The fix is to station ten concierges permanently in the lobby and have guests take a numbered ticket, grabbing whichever one is free. If all ten are busy, guests wait briefly in line. That lobby is the pool, the concierges are the open connections, and your application code is the guest — the driver quietly hands out and collects tickets on its behalf.
+Picture an open-book exam. The LLM is the student — fluent and good at synthesising an answer. Your documents are the book. RAG is the librarian sitting between them: when a question comes in, the librarian does not hand over the whole book, they flip to the two or three most relevant pages, slide them across the desk, and say "answer using these." The student then writes the essay.
 
 ---
 
-Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/backend/connection-pooling/
+Full notes: https://github.com/Quang-Dobe/Practice.Concept/tree/main/ai/retrieval-augmented-generation/

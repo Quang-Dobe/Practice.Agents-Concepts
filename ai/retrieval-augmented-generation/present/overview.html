@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Retrieval Augmented Generation · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Retrieval Augmented Generation</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Retrieval Augmented Generation</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/retrieval-augmented-generation/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Retrieval Augmented Generation</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">An LLM on its own is a very well-read intern who has been locked in a room since their training data was frozen. Ask about your company's refund policy or last week's board notes and they either say "I don't know" or invent something that sounds right.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>RAG gives the model a research step. Before answering, the system fetches the most relevant snippets from a knowledge source you control, pastes them into the prompt, and asks the model to answer from that. The result is
+              <span class="term">grounded</span>
+              <span class="term__gloss">anchored in retrieved source material instead of the model's memory</span>,
+              up-to-date, and traceable back to a source document.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture an open-book exam. The student is the LLM: fluent, articulate, good at writing an answer. The book is your knowledge base: your product docs, your Confluence, your PDFs, your Slack export, your SQL rows dumped to text. RAG is the librarian sitting between them.</p>
+
+        <p>When a question comes in, the librarian does not hand over the whole book — they flip to the two or three most relevant pages, slide them across the desk, and say "answer using these." The student writes the essay.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    Q[User question] --> LIB[Librarian · retrieves top-k pages]
+    KB[(Knowledge base)] --> LIB
+    LIB --> PROMPT["Prompt: here are the pages · answer using them"]
+    PROMPT --> STU[Student · the LLM]
+    STU --> ANS[Grounded answer + citations]
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: the librarian narrows the book down to a few pages, the student writes an essay from those pages only.</figcaption>
+        </figure>
+
+        <h3>A concrete example</h3>
+        <p>Imagine a customer-support bot for a mattress company. A user asks, <em>"Can I return the King Serenity mattress after 120 nights?"</em> A vanilla LLM guesses. A RAG bot does this:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Retrieve.</span> It searches the company's return-policy documents, finds the paragraph "King Serenity returns are accepted within 180 nights of delivery," and grabs it.</li>
+          <li><span class="steps__title">Generate.</span> It sends the model a prompt shaped like <em>"Using the context below, answer the user. Context: &lt;that paragraph&gt;. Question: &lt;user's message&gt;."</em></li>
+        </ol>
+        <p>The model replies, "Yes — you have up to 180 nights, so 120 is fine," and can cite the exact policy page it used. No
+          <span class="term">hallucination</span>
+          <span class="term__gloss">a confident, fluent, wrong answer produced when the model has no real basis</span>,
+          no stale training data, no fine-tuning required.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not fine-tuning.</strong> Fine-tuning bakes new <em>behavior</em> into the model's weights. RAG leaves the weights alone and injects new <em>facts</em> at query time.</li>
+              <li><strong>Not just "long context".</strong> Stuffing an entire 500-page manual into the prompt is expensive, slow, and often less accurate than retrieving the right two pages.</li>
+              <li><strong>Not a search engine.</strong> A search engine returns links for a human to read. RAG uses retrieval as a hidden intermediate step so the model can write the final answer.</li>
+              <li><strong>Not a memory system for an agent.</strong> Agent memory is about remembering past turns; RAG is about grounding in a knowledge corpus.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>A chatbot must answer from your private documents — support KB, internal wiki, legal contracts.</li>
+              <li>Any assistant that needs facts newer than the model's training cutoff.</li>
+              <li>A domain expert bot (medical, legal, financial) where making things up is unacceptable and citations are required.</li>
+              <li>Search UIs that want a natural-language answer on top of results, not just a link list.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The knowledge fits in the system prompt and never changes — just paste it in.</li>
+              <li>The task is pure reasoning or code generation with no external facts (e.g., "refactor this function").</li>
+              <li>You need the model to adopt a <em>style</em> or <em>format</em> consistently — that's a fine-tuning problem.</li>
+              <li>Latency budget is under ~100 ms and you can't afford the extra retrieval hop.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Corpus</dt><dd>The collection of documents you want the model to answer from.</dd></div>
+          <div><dt>Chunk</dt><dd>A small slice of a document (a paragraph or two) that gets retrieved as a unit.</dd></div>
+          <div><dt>Embedding</dt><dd>A numeric vector that represents the meaning of a chunk, used for semantic search.</dd></div>
+          <div><dt>Vector store</dt><dd>A database optimized for finding chunks whose embeddings are closest to a query.</dd></div>
+          <div><dt>Retriever</dt><dd>The component that turns a user question into a set of relevant chunks.</dd></div>
+          <div><dt>Context window</dt><dd>The maximum amount of text the LLM can read in a single call.</dd></div>
+          <div><dt>Grounding</dt><dd>Anchoring a generated answer in retrieved source material.</dd></div>
+          <div><dt>Hallucination</dt><dd>A confident, fluent, and wrong answer produced when the model has no real basis for what it is saying.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
