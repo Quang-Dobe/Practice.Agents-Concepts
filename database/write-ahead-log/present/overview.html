@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Write-Ahead Log · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Write-Ahead Log</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Write-Ahead Log</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/write-ahead-log/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Write-Ahead Log</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">A Write-Ahead Log (WAL) is a durable, append-only journal where a database records what it is <em>about to</em> change, before it actually changes anything — so a crash can never lose committed work.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Databases hold their "live" state in memory for speed. Memory disappears when the power fails. The WAL is the safety net: every intended change is written to a sequential log file on disk <em>first</em>, and only then is the in-memory data allowed to change (and eventually get written back to the real data files, lazily). If the process dies mid-flight, restart reads the log and replays it to reconstruct exactly the state committed transactions promised. This is how "your <code>INSERT</code> returned OK" translates into "your row will still be there tomorrow."</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a bank teller with two things on the desk: a <strong>bound ledger notebook</strong> (pages numbered, entries only appended, never erased) and the <strong>actual cash drawers</strong> for each account. Whenever a customer says "move $50 from A to B," the teller does not touch the drawers first. She writes the transfer into the notebook, closes it, hands it to the vault clerk, waits for a nod that says "your line is now permanent" — <em>then</em> she moves the cash.</p>
+
+        <p>If the building burns down that night and the drawers melt, the notebook survives, and tomorrow the branch can rebuild every account balance by replaying entries in order. That notebook is the WAL. The cash drawers are the
+          <span class="term">data pages</span>
+          <span class="term__gloss">the fixed-size chunks that hold the "real" table and index data on disk</span>.
+          The vault clerk's nod is
+          <span class="term">fsync</span>
+          <span class="term__gloss">the OS call that forces buffered writes down to physical storage — the moment durability becomes real</span>.
+          The rebuild the next morning is
+          <span class="term">crash recovery</span>
+          <span class="term__gloss">the restart-time pass that replays the log to reconstruct exactly the committed state</span>.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[Customer request] --> B["Write entry into notebook (append to WAL)"]
+    B --> C["Vault clerk nods: fsync returns"]
+    C --> D["Now move the cash (update in-memory page)"]
+    D -.-> E["Later: cash-count sheet updated (data file flush)"]
+    F[["Fire that night"]] -.-> G["Morning: replay notebook to rebuild drawers (recovery)"]
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop: notebook first, nod, then cash. If the building burns, the notebook rebuilds every drawer in the morning.</figcaption>
+        </figure>
+
+        <p>The trick that makes this fast: writing to the notebook is a <strong>sequential append</strong> — the fastest thing a disk can do — while updating the drawers is random access and can be deferred, batched, and reordered. The database gets to lie about when data files hit disk, and still keep its ACID promise, because the log already tells the true story.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a backup.</strong> Backups are point-in-time snapshots you keep for weeks; a WAL is a rolling record measured in seconds-to-hours that the engine actively uses.</li>
+              <li><strong>Not the binary log / replication log.</strong> Those describe <em>logical</em> changes for other servers to consume; a WAL describes <em>physical</em> page-level changes for this server's own recovery. (Postgres uses the WAL for both — but the roles are distinct.)</li>
+              <li><strong>Not an audit log.</strong> Audit logs are for humans and compliance; the WAL is for the engine itself and is usually unreadable without engine internals.</li>
+              <li><strong>Not a transaction log in the application sense.</strong> Event sourcing, message queues, and Kafka topics borrow the idea, but a database WAL is an implementation detail of storage, not an application-level API.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You are building any storage system that must survive <code>kill -9</code> or a power cut without losing acknowledged writes.</li>
+              <li>You need atomic multi-page updates — a single logical change touches several data pages, and either all or none must apply.</li>
+              <li>You want fast commits: batching many small random writes into one sequential log flush.</li>
+              <li>You need point-in-time recovery or streaming replication — the log is the natural feed for both.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Pure in-memory caches where losing data on restart is acceptable (Redis without AOF, memcached).</li>
+              <li>Tiny embedded configs where a full rewrite of the file on every change is simpler and safe enough.</li>
+              <li>Read-only or append-only-file workloads where the data file <em>is</em> already the log.</li>
+              <li>Systems where the extra fsync latency is unacceptable and durability is explicitly traded away.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>LSN (Log Sequence Number)</dt><dd>Monotonically increasing ID stamped on every log record; the log's timeline.</dd></div>
+          <div><dt>fsync</dt><dd>The OS call that forces buffered writes down to physical storage; the moment durability becomes real.</dd></div>
+          <div><dt>Dirty page</dt><dd>A data page modified in memory but not yet written back to the data file.</dd></div>
+          <div><dt>Flush</dt><dd>Writing dirty pages from memory back to their data files (separate from log writes).</dd></div>
+          <div><dt>Checkpoint</dt><dd>A periodic marker saying "everything up to this LSN is safely in the data files"; bounds how much log recovery must replay.</dd></div>
+          <div><dt>REDO</dt><dd>Replaying log records to re-apply committed changes that never reached the data file.</dd></div>
+          <div><dt>UNDO</dt><dd>Reversing log records to roll back changes from transactions that were still in-flight at crash time.</dd></div>
+          <div><dt>Commit record</dt><dd>The log entry whose durable arrival is the exact instant a transaction is officially committed.</dd></div>
+          <div><dt>Log tail</dt><dd>The newest, still-being-written end of the log.</dd></div>
+        </dl>
+
+        <!-- WHAT'S NEXT -->
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
