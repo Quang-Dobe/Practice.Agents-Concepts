@@ -39,6 +39,20 @@
   }
   initTheme(); // synchronous, before DOMContentLoaded
 
+  /* ---- 1b. SIDEBAR COLLAPSE STATE (must also run before paint) ---- */
+  /* Applied on <html> so the CSS grid re-flows before first paint. */
+  var COLLAPSE_KEY = "present-sidebar-collapsed";
+  function readCollapsed() {
+    var v;
+    try { v = localStorage.getItem(COLLAPSE_KEY); } catch (e) { v = null; }
+    // Default = collapsed on first visit.
+    return v === null ? true : v === "1";
+  }
+  function applyCollapsed(collapsed) {
+    document.documentElement.classList.toggle("sidebar-collapsed", collapsed);
+  }
+  applyCollapsed(readCollapsed());
+
   /* ---- 2. MERMAID ------------------------------------------------- */
   var mermaidReady = false;
   function mermaidThemeVars() {
@@ -133,6 +147,56 @@
     });
   }
 
+  /* ---- 3b. SIDEBAR COLLAPSE (desktop) ------------------------------ */
+  function initCollapse() {
+    var sidebar = document.querySelector(".sidebar");
+    if (!sidebar) return;
+
+    // Add a collapse button into the sidebar header (absolute-positioned in CSS).
+    var header = sidebar.querySelector(".sidebar__header");
+    var btnCollapse = null;
+    if (header && !header.querySelector(".sidebar__collapse")) {
+      btnCollapse = document.createElement("button");
+      btnCollapse.type = "button";
+      btnCollapse.className = "sidebar__collapse";
+      btnCollapse.setAttribute("aria-label", "Collapse sidebar");
+      btnCollapse.setAttribute("aria-controls", "sidebar");
+      btnCollapse.setAttribute("title", "Collapse sidebar");
+      btnCollapse.textContent = "◀"; // ◀
+      header.appendChild(btnCollapse);
+    } else if (header) {
+      btnCollapse = header.querySelector(".sidebar__collapse");
+    }
+
+    // Floating expand button (visible only when sidebar is collapsed).
+    var btnExpand = document.querySelector(".sidebar-expand");
+    if (!btnExpand) {
+      btnExpand = document.createElement("button");
+      btnExpand.type = "button";
+      btnExpand.className = "sidebar-expand";
+      btnExpand.setAttribute("aria-label", "Expand sidebar");
+      btnExpand.setAttribute("aria-controls", "sidebar");
+      btnExpand.setAttribute("title", "Expand sidebar");
+      btnExpand.textContent = "☰"; // ☰
+      document.body.appendChild(btnExpand);
+    }
+
+    function sync() {
+      var collapsed = document.documentElement.classList.contains("sidebar-collapsed");
+      if (btnCollapse) btnCollapse.setAttribute("aria-expanded", (!collapsed).toString());
+      btnExpand.setAttribute("aria-expanded", (!collapsed).toString());
+    }
+    function set(collapsed) {
+      applyCollapsed(collapsed);
+      try { localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0"); } catch (e) {}
+      sync();
+    }
+
+    if (btnCollapse) btnCollapse.addEventListener("click", function () { set(true); });
+    btnExpand.addEventListener("click", function () { set(false); });
+    sync();
+  }
+
   /* ---- 4. ACTIVE NAV (by filename) -------------------------------- */
   function initActiveNav() {
     var here = window.location.pathname.split("/").pop() || "index.html";
@@ -223,6 +287,7 @@
   initMermaid();
   function boot() {
     initSidebar();
+    initCollapse();
     initActiveNav();
     initProgress();
     initThemeToggle();
