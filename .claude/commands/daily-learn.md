@@ -33,15 +33,15 @@ If Stage 0 of `/learn` returns `NEXT_STEP: complete`, the picker has somehow cho
 
 After Stage 1 completes successfully, read `<CATEGORY>/<SLUG>/docs/01-overview.md` and distill it into a plain-English summary at `<repo root>/TOPIC_SUMMARIZATION.md`. **Overwrite** any existing file at that path.
 
-### Resolving the GitHub URL
+### Resolving the deployed page URL
 
-Run `git remote get-url origin`. Normalize the result into an `https://github.com/<owner>/<repo>` form:
+The presentation site is deployed to GitHub Pages at `https://quang-dobe.github.io/Practice.Agents-Concepts/`. Every topic's `present/index.html` is reachable at:
 
-- If it begins with `git@github.com:`, replace with `https://github.com/` and strip the trailing `.git`.
-- If it begins with `https://github.com/`, just strip any trailing `.git`.
-- If it does not match either, abort with `Cannot resolve GitHub URL from remote.`
+```
+https://quang-dobe.github.io/Practice.Agents-Concepts/<CATEGORY>/<SLUG>/present/index.html
+```
 
-Call the result `REPO_URL`.
+Call that `PAGE_URL`. Do not derive it from `git remote get-url origin` — the remote path may drift (renames, redirects); the Pages URL above is the stable canonical link.
 
 ### File template
 
@@ -58,7 +58,7 @@ Write exactly this shape — no YAML front matter, no extra sections:
 
 ---
 
-Full notes: <REPO_URL>/tree/main/<CATEGORY>/<SLUG>/
+Full notes: <PAGE_URL>
 ```
 
 Constraints:
