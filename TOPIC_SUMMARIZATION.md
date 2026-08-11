@@ -1,11 +1,11 @@
-# CSS Grid
+# OAuth 2.0
 
-CSS Grid is a browser layout system where the parent element draws the rows and columns of a page first, and each child then claims a rectangle of cells inside that plan. It works in two dimensions at once — rows and columns together — instead of the single direction Flexbox handles. A container declares its tracks with something like `grid-template-columns: 200px 1fr 200px`, and the browser handles the leftover space, the gaps, and the stretching. It has shipped in every major browser since 2017.
+OAuth 2.0 is a protocol that lets one app use another app's API on your behalf without you ever handing over your password. Instead of giving an app your credentials, you get redirected to the service that holds your data, that service asks you directly whether the app may have a specific slice of access, and if you agree it issues the app a short-lived access token scoped to only that slice.
 
-An engineer reaches for it whenever things have to line up across both rows and columns: page scaffolding with a header, sidebar, main area and footer; dashboards; pricing tables; card galleries. It also gives responsive layouts without media queries through `repeat(auto-fit, minmax(240px, 1fr))`, and lets elements overlap without `position: absolute`. It does not replace Flexbox — a single row of buttons is less code in Flexbox — and it is not a substitute for a real `<table>` when the data is genuinely tabular.
+Engineers reach for it whenever a third-party app needs to call an API for a user, when a single-page or mobile app calls its own backend and you want short-lived revocable credentials, or for service-to-service calls with no user involved. It also gives you per-integration revocation — you can cut off one app's access without resetting anyone's password. It is worth knowing what it is not: it answers "may this app do X?", not "who is this person?" — that is OpenID Connect, a thin identity layer on top. It is also not a token format; an access token can be a JWT or an opaque random string and OAuth does not care.
 
-The useful analogy is an architect's floor plan versus seating people on a bus. Flexbox is the bus: one aisle, one direction, and rows know nothing about each other. Grid is the floor plan: you draw the walls before anyone moves in, then assign tenants — accounting takes the whole top strip, engineering takes columns one through two and rows two through four. Tenants can span several cells, sit on top of each other, or be dropped in unassigned and let the building manager find them a free room.
+Picture an apartment building with a front desk. A cleaning company wants into your gym locker. You do not give them your house key. You send them to the desk clerk, who asks you in person, then prints a keycard that opens the gym locker only and expires at 6pm. The cleaning company holds the keycard and never learns your key. You are the resource owner, the clerk is the authorization server, the keycard is the access token, and "gym locker only" is the scope.
 
 ---
 
-Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/frontend/css-grid/present/index.html
+Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/backend/oauth-2-0/present/index.html

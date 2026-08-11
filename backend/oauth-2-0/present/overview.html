@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OAuth 2.0 · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">OAuth 2.0</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">OAuth 2.0</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/oauth-2-0/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">OAuth 2.0</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">You want a payroll app to read your Google Calendar. The dumb answer is to give the payroll app your Google password — now it can also read your email, delete your Drive, and change your password.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>OAuth 2.0 replaces password sharing with a redirect dance. Google asks <em>you</em> directly whether the payroll app may read your calendar. If you say yes, it hands the payroll app a short-lived
+              <span class="term">access token</span>
+              <span class="term__gloss">a temporary key the app sends with each API call, in an <code>Authorization: Bearer</code> header</span>
+              scoped to calendar-read only. Engineers care because this is how nearly every "Sign in with…", every third-party API integration, and every mobile-app-to-your-own-backend call is authorized today.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of an apartment building with a front desk.</p>
+        <p>You live in the building. A cleaning company wants access to your unit's gym storage locker. You do <strong>not</strong> give them your house key.</p>
+        <p>Instead you send them to the front desk. The desk clerk knows you — they ask you in person, "the cleaning company wants access to your gym locker, approve?" You say yes. The clerk prints a <strong>keycard</strong> that opens the gym locker, nothing else, and expires at 6pm today. The cleaning company holds the keycard. It never learns your key.</p>
+
+        <h3>Map it</h3>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Building</th><th scope="col">OAuth</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>You</td><td>Resource owner</td></tr>
+              <tr><td>Cleaning company</td><td>Client (the app asking)</td></tr>
+              <tr><td>Front desk clerk</td><td>Authorization server</td></tr>
+              <tr><td>The locker</td><td>Resource server (the API)</td></tr>
+              <tr><td>Keycard</td><td>Access token</td></tr>
+              <tr><td>"Gym locker only"</td><td>Scope</td></tr>
+              <tr><td>Expires at 6pm</td><td>Token lifetime</td></tr>
+              <tr><td>Renew card without re-asking you</td><td>Refresh token</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    U["User — resource owner"] -->|"approves"| AS["Authorization server"]
+    AS -->|"redirect back"| CA["Client app"]
+    CA -->|"redirects the user to /authorize"| AS
+    AS -->|"issues token"| CA
+    CA -->|"calls with token"| API["Resource API"]
+          </pre>
+          <figcaption class="diagram__caption">The loop in four moves: the app sends you to the authorization server, you approve, the server issues a token, the app calls the API with it.</figcaption>
+        </figure>
+
+        <p>The core insight: <strong>the app never sees your credentials, and the token it does see is deliberately weak</strong> — narrow
+          <span class="term">scope</span>
+          <span class="term__gloss">a permission label such as <code>calendar.read</code> that limits what the token can do</span>,
+          short life, and revocable at any time. The
+          <span class="term">refresh token</span>
+          <span class="term__gloss">a longer-lived token the app trades for fresh access tokens without asking you again</span>
+          is what keeps the app working after the first token expires.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not authentication.</strong> OAuth answers "may this app do X?", not "who is this person?" For login you want OpenID Connect, a thin identity layer built on top of OAuth that adds an <code>id_token</code>.</li>
+              <li><strong>Not JWT.</strong> JWT is a <em>token format</em>; OAuth is a <em>protocol for getting tokens</em>. An access token may be a JWT or an opaque random string — OAuth does not care. See <code>backend/jwt</code> for the format side.</li>
+              <li><strong>Not SAML.</strong> Same goal, older XML-based protocol, still common in enterprise SSO.</li>
+              <li><strong>Not authorization logic.</strong> OAuth delivers scopes; deciding whether <code>calendar.read</code> lets you see a specific event is still your API's job.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>A third-party app needs to call an API on a user's behalf — the original use case.</li>
+              <li>Your React SPA or mobile app calls your own backend and you want short-lived, revocable credentials.</li>
+              <li>Service-to-service calls with no user involved — the <code>client_credentials</code> grant.</li>
+              <li>You need per-integration revocation: kill one app's access without resetting anyone's password.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>A single monolith with its own users and no third parties — a session cookie is simpler and safer.</li>
+              <li>Machine-to-machine inside one trust boundary where mTLS or a signed internal token already works.</li>
+              <li>You actually need "who is the user" — reach for OpenID Connect instead of bolting identity onto raw OAuth.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">One flow to remember</p>
+            <p><strong>Authorization Code +
+              <span class="term">PKCE</span>
+              <span class="term__gloss">Proof Key for Code Exchange — the app proves it started the flow, so a stolen authorization code is useless to anyone else</span></strong>
+              is the default for everything now: SPAs, mobile, desktop, CLIs and server-side web apps alike. PKCE is required for <em>all</em> clients in <a href="https://oauth.net/2.1/" rel="noopener">OAuth 2.1</a>.</p>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Resource owner</dt><dd>The human who owns the data.</dd></div>
+          <div><dt>Client</dt><dd>The app requesting access. <em>Confidential</em> if it can keep a secret (server), <em>public</em> if it cannot (SPA, mobile).</dd></div>
+          <div><dt>Authorization server</dt><dd>Issues tokens — Entra ID, Auth0, Cognito, Keycloak.</dd></div>
+          <div><dt>Resource server</dt><dd>The API that validates tokens.</dd></div>
+          <div><dt>Access token</dt><dd>The keycard. Short-lived, sent as <code>Authorization: Bearer &lt;token&gt;</code>.</dd></div>
+          <div><dt>Refresh token</dt><dd>Longer-lived, exchanged for new access tokens.</dd></div>
+          <div><dt>Scope</dt><dd>The permission label, e.g. <code>calendar.read</code>.</dd></div>
+          <div><dt>Grant / flow</dt><dd>The recipe for getting a token. Authorization Code + PKCE is the default for everything now.</dd></div>
+          <div><dt>PKCE</dt><dd>A proof-of-possession trick that stops an intercepted authorization code from being redeemed by an attacker. Required for all clients in OAuth 2.1.</dd></div>
+          <div><dt>Redirect URI</dt><dd>Where the authorization server sends the user back. Must match exactly.</dd></div>
+        </dl>
+
+        <h2>What's next</h2>
+        <p>Detail covers What / Where / When / How / Why: each grant type step by step, the full Authorization Code + PKCE message flow, token validation on the resource server, and why the Implicit and Password grants were removed by <a href="https://datatracker.ietf.org/doc/rfc9700/" rel="noopener">RFC 9700</a>.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

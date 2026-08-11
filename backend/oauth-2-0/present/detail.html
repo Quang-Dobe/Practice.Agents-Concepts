@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OAuth 2.0 · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">OAuth 2.0</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">OAuth 2.0</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/oauth-2-0/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">OAuth 2.0</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>OAuth 2.0 is a <strong>delegated authorization framework</strong> defined by <a href="https://datatracker.ietf.org/doc/html/rfc6749" rel="noopener">RFC 6749</a> (October 2012) and <a href="https://datatracker.ietf.org/doc/html/rfc6750" rel="noopener">RFC 6750</a> (bearer token usage). It says how a <em>client</em> gets a scoped, time-limited <em>access token</em> from an <em>authorization server</em> (AS), with the <em>resource owner's</em> consent, and presents it to a <em>resource server</em> (RS).</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">"Framework" is doing real work in that sentence</p>
+            <p>RFC 6749 leaves token format, client authentication method, scope meaning and token lifetimes to the deployment. Two conforming OAuth servers can be mutually unusable. Everything since 2012 has narrowed that space: <a href="https://datatracker.ietf.org/doc/rfc9700/" rel="noopener">RFC 9700 / BCP 240</a> (January 2025) is the security best current practice, and <a href="https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1" rel="noopener">OAuth 2.1</a> — at <code>draft-ietf-oauth-v2-1-15</code>, published 2 March 2026 — folds RFC 6749, RFC 6750, PKCE and the BCP into one document and deletes the unsafe parts.</p>
+          </div>
+        </div>
+
+        <h3>The core building blocks</h3>
+        <ul>
+          <li><strong>Four roles</strong> — resource owner, client, authorization server, resource server. The client is
+            <span class="term">confidential</span>
+            <span class="term__gloss">it can hold a secret, because it runs on a server you control</span>
+            or <em>public</em> (cannot: SPA, mobile, desktop, CLI).</li>
+          <li><strong>Two endpoints that matter</strong> — <code>/authorize</code> on the
+            <span class="term">front channel</span>
+            <span class="term__gloss">the browser-redirect path: visible to the user, to extensions, and to an attacker; no client authentication is possible there</span>,
+            and <code>/token</code> on the
+            <span class="term">back channel</span>
+            <span class="term__gloss">a direct server-to-server POST over TLS where the client can authenticate itself</span>.</li>
+          <li><strong>Grants</strong> — OAuth 2.1 defines exactly three: <code>authorization_code</code>, <code>client_credentials</code>, <code>refresh_token</code>. Everything else is an extension: device grant (<a href="https://www.rfc-editor.org/rfc/rfc8628.html" rel="noopener">RFC 8628</a>), token exchange (<a href="https://datatracker.ietf.org/doc/html/rfc8693" rel="noopener">RFC 8693</a>), CIBA (OpenID).</li>
+          <li><strong>PKCE</strong> (<a href="https://datatracker.ietf.org/doc/html/rfc7636" rel="noopener">RFC 7636</a>) — the client generates a random <code>code_verifier</code> (43–128 unreserved characters) and sends <code>code_challenge = BASE64URL(SHA-256(verifier))</code> with <code>code_challenge_method=S256</code>. The <code>plain</code> method exists and should never be used.</li>
+          <li><strong>Token formats</strong> — opaque random string validated by introspection (<a href="https://datatracker.ietf.org/doc/html/rfc7662" rel="noopener">RFC 7662</a>), or JWT with <code>typ: at+jwt</code> per <a href="https://www.rfc-editor.org/rfc/rfc9068.html" rel="noopener">RFC 9068</a>. OAuth itself is format-agnostic.</li>
+          <li><strong>Discovery metadata</strong> — <code>/.well-known/oauth-authorization-server</code> (<a href="https://datatracker.ietf.org/doc/html/rfc8414" rel="noopener">RFC 8414</a>) tells clients the endpoints and <code>jwks_uri</code>; <code>/.well-known/oauth-protected-resource</code> (<a href="https://datatracker.ietf.org/doc/html/rfc9728" rel="noopener">RFC 9728</a>) tells clients which AS guards a given API.</li>
+          <li><strong>Hardening extensions</strong> — PAR (<a href="https://datatracker.ietf.org/doc/html/rfc9126" rel="noopener">RFC 9126</a>), DPoP (<a href="https://datatracker.ietf.org/doc/html/rfc9449" rel="noopener">RFC 9449</a>), mTLS-bound tokens (<a href="https://datatracker.ietf.org/doc/html/rfc8705" rel="noopener">RFC 8705</a>), RAR (<a href="https://datatracker.ietf.org/doc/html/rfc9396" rel="noopener">RFC 9396</a>), issuer identification (<a href="https://datatracker.ietf.org/doc/html/rfc9207" rel="noopener">RFC 9207</a>).</li>
+        </ul>
+
+        <h3>How it relates to the broader landscape</h3>
+        <p>OAuth 2.0 belongs to the family of <strong>browser-redirect-based delegation protocols</strong>.</p>
+        <ul>
+          <li><strong>OAuth 1.0a</strong> (<a href="https://datatracker.ietf.org/doc/html/rfc5849" rel="noopener">RFC 5849</a>) — its predecessor; signed every request with HMAC.</li>
+          <li><strong>SAML 2.0</strong> — same job with XML assertions and browser form POSTs, and still dominates enterprise SSO.</li>
+          <li><strong>OpenID Connect</strong> — sits <em>on top</em> of OAuth 2.0 and adds an <code>id_token</code> plus a <code>/userinfo</code> endpoint. It is not an alternative, it is a profile.</li>
+          <li><strong>GNAP</strong> (<a href="https://datatracker.ietf.org/doc/html/rfc9635" rel="noopener">RFC 9635</a>) — a clean-sheet redesign with negligible deployment. OAuth 2.1 won by being an incremental cleanup instead.</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Application layer, over HTTPS, split across two channels with different threat models. Concretely you touch OAuth in four places:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">1 · The authorization server</div><p>A separate service (or SaaS), holding user credentials, sessions, consent records, client registrations and signing keys.</p></div>
+          <div class="card"><div class="card__title">2 · The client's redirect handler</div><p>A route in your app that receives <code>?code=</code> and exchanges it. In a BFF architecture this is server-side.</p></div>
+          <div class="card"><div class="card__title">3 · The resource server's middleware</div><p><code>AddJwtBearer</code> in ASP.NET Core, <code>express-oauth2-jwt-bearer</code> in Node, Spring Security's resource server. Validates signature, <code>iss</code>, <code>aud</code>, <code>exp</code>, <code>scope</code>.</p></div>
+          <div class="card"><div class="card__title">4 · The gateway</div><p>Envoy <code>ext_authz</code>, Kong, Azure APIM and AWS API Gateway commonly validate tokens before the request ever reaches your service.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph FRONT["Front channel — browser redirects, attacker-visible, no client auth"]
+      B["Browser"]
+      AZ["AS · /authorize"]
+    end
+    subgraph BACK["Back channel — server to server over TLS, client authenticates"]
+      RH["Client redirect handler or BFF"]
+      TK["AS · /token"]
+    end
+    subgraph APIS["Resource side"]
+      GW["Gateway — Envoy ext_authz, Kong, APIM, API Gateway"]
+      MW["Auth middleware — AddJwtBearer, express-oauth2-jwt-bearer, Spring Security"]
+    end
+    B --> AZ
+    AZ -->|"302 with code"| RH
+    RH -->|"code + code_verifier"| TK
+    TK -->|"access token"| RH
+    RH -->|"Bearer token"| GW
+    GW --> MW
+          </pre>
+          <figcaption class="diagram__caption">Two channels, two threat models. Anything on the front channel is assumed visible to an attacker, which is why the code is single-use and PKCE-bound; the actual token only ever crosses the back channel.</figcaption>
+        </figure>
+
+        <h3>Where you typically encounter it</h3>
+        <ul>
+          <li>Every major API: Google, Microsoft Graph, GitHub, Slack, Stripe Connect, Salesforce connected apps.</li>
+          <li>Mobile apps using AppAuth-iOS/Android or MSAL against Entra ID.</li>
+          <li>SPAs talking to your own backend — increasingly through a BFF rather than as a public client.</li>
+          <li>Kubernetes API server with <code>--oidc-issuer-url</code>, and CI systems using GitHub Actions OIDC to federate into AWS/Azure without static keys.</li>
+          <li><strong>MCP servers</strong>: the Model Context Protocol authorization spec requires the server to act as an OAuth 2.1 resource server and to publish RFC 9728 protected-resource metadata.</li>
+        </ul>
+
+        <h3>Ecosystem and tooling</h3>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Self-hosted authorization servers</div>
+            <p>Keycloak, Ory Hydra, Duende IdentityServer (commercial; IdentityServer4 is end-of-life), FusionAuth, Curity.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Managed</div>
+            <p>Entra ID, Auth0, Okta, AWS Cognito, Google Identity Platform.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Client / RS libraries</div>
+            <p><code>Microsoft.AspNetCore.Authentication.JwtBearer</code> and <code>.OpenIdConnect</code> (.NET), <code>openid-client</code> (Node), Authlib (Python), Spring Security, AppAuth (mobile).</p>
+          </div>
+          <div class="card">
+            <div class="card__title">BFF and proxying</div>
+            <p>Duende.BFF, <code>oauth2-proxy</code>, Auth.js, Envoy/Kong OIDC filters.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Profiles and conformance</div>
+            <p><a href="https://openid.net/specs/fapi-security-profile-2_0-final.html" rel="noopener">FAPI 2.0 Security Profile</a>, final since February 2025, and the OpenID Foundation conformance suite.</p>
+          </div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Before 2007, the standard way to let Site B read your Site A data was to hand Site B your Site A password and let it scrape. Flickr Auth, Google AuthSub and Yahoo BBAuth were incompatible one-off fixes. OAuth 1.0 (2007, revised to 1.0a in 2009) unified them with per-request HMAC signatures — cryptographically sound, but implementers spent their lives debugging signature base-string canonicalization.</p>
+            <p>OAuth 2.0 traded that signature for <strong>TLS plus a bearer token</strong>: any party holding the token can use it, and transport security is assumed to protect it. That trade made adoption explode and prompted lead author Eran Hammer to resign and publish <em>"OAuth 2.0 and the Road to Hell"</em> in 2012, arguing the spec had become an unopinionated framework. The following 13 years proved both sides right: adoption is universal, and the spec needed continuous patching — PKCE (2015), device grant (2019), sender-constrained tokens (2020–2023), RFC 9700 (2025), OAuth 2.1 (in progress).</p>
+          </div>
+        </div>
+
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>A party outside your trust boundary needs API access on a user's behalf.</li>
+              <li>Your client is public (SPA, mobile, desktop, CLI) and cannot hold a secret.</li>
+              <li>Multiple APIs share one identity provider and you want one login and one revocation point.</li>
+              <li>You need per-integration revocation, scoped credentials, and a consent audit trail.</li>
+              <li>Service-to-service calls need rotatable credentials — <code>client_credentials</code> with <code>private_key_jwt</code> or mTLS beats a shared static API key.</li>
+              <li>A regulator or partner requires a profile (FAPI 2.0, open banking) — those are defined on top of OAuth.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Avoid it when</p>
+            <ul>
+              <li>You have one app, one user store, no third parties. A signed HTTP-only session cookie is fewer moving parts and fewer failure modes.</li>
+              <li>Both ends are inside one trust boundary and you already run mTLS/SPIFFE.</li>
+              <li>You only need identity. Use OpenID Connect; raw OAuth access tokens carry no reliable statement about who the user is.</li>
+              <li>Your authorization is per-object ("can Alice edit document 42?"). Scope strings do not scale to that — pair OAuth with a policy engine (OpenFGA, Cedar, OPA).</li>
+              <li>The device has no browser and you cannot use the device grant. There is no safe redirect-free flow left; the password grant is gone.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Authorization Code + PKCE, end to end:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Prepare.</span> The client generates <code>code_verifier</code>, derives <code>code_challenge</code>, generates <code>state</code>, and stores both against the user's session.</li>
+          <li><span class="steps__title">Redirect to <code>/authorize</code>.</span> With <code>response_type=code</code>, <code>client_id</code>, exact <code>redirect_uri</code>, <code>scope</code>, <code>state</code>, <code>code_challenge</code>, <code>code_challenge_method=S256</code>. With PAR, these parameters are POSTed to <code>/par</code> first and the redirect carries only a short-lived <code>request_uri</code>, keeping them off the front channel.</li>
+          <li><span class="steps__title">The AS authenticates the human.</span> Session cookie, password + MFA, or passkey. It renders consent and binds the challenge to the issued code.</li>
+          <li><span class="steps__title">Redirect back.</span> With <code>code</code>, <code>state</code>, and <code>iss</code>. The code is single-use and short-lived — RFC 6749 caps the recommendation at <strong>10 minutes</strong>, and real servers issue <strong>30–60 seconds</strong>.</li>
+          <li><span class="steps__title">Exchange at <code>/token</code>.</span> The client POSTs <code>grant_type=authorization_code</code>, <code>code</code>, <code>redirect_uri</code>, <code>client_id</code>, <code>code_verifier</code>, plus client authentication if confidential (<code>client_secret_basic</code>, <code>private_key_jwt</code>, or mTLS).</li>
+          <li><span class="steps__title">The AS verifies three things.</span> That <code>SHA-256(code_verifier)</code> equals the stored challenge, that <code>redirect_uri</code> matches as an exact string, and that the code has not been used. A second redemption of the same code must revoke the tokens already issued from it.</li>
+          <li><span class="steps__title">Call the API.</span> The client sends <code>Authorization: Bearer …</code>. The RS validates a JWT locally against the AS's
+            <span class="term">JWKS</span>
+            <span class="term__gloss">the authorization server's published set of public signing keys, cached by key id (<code>kid</code>)</span>,
+            checking <code>iss</code>, <code>aud</code>, <code>exp</code>, <code>nbf</code> and <code>scope</code> — or calls <code>/introspect</code> for opaque tokens.</li>
+          <li><span class="steps__title">Refresh on expiry.</span> For public clients OAuth 2.1 requires refresh tokens to be either
+            <span class="term">sender-constrained</span>
+            <span class="term__gloss">cryptographically tied to a key the client holds, so a stolen copy is useless</span>
+            or <strong>rotated</strong> on each use. Presenting a superseded refresh token is treated as theft: the AS revokes the entire token family.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant U as User + browser
+    participant C as Client backend
+    participant AS as Authorization server
+    participant RS as Resource server
+    C->>C: 1 make code_verifier, derive S256 challenge, make state
+    C-->>U: 2 redirect to /authorize (front channel)
+    U->>AS: client_id, exact redirect_uri, scope, state, code_challenge
+    AS->>U: 3 login — cookie, password + MFA or passkey — then consent
+    AS-->>U: 4 302 back with code, state, iss (code lives 30–60s, single use)
+    U->>C: redirect handler receives the code
+    C->>AS: 5 POST /token — code, code_verifier, client auth (back channel)
+    AS->>AS: 6 check SHA-256(verifier) equals challenge, exact redirect_uri, code unused
+    AS-->>C: access_token, refresh_token, optional id_token
+    C->>RS: 7 GET /api with Authorization Bearer token
+    RS->>RS: validate iss, aud, exp, nbf, scope against cached JWKS
+    RS-->>C: 200 with only the scoped data
+    C->>AS: 8 on expiry, refresh_token grant — rotated or sender-constrained
+          </pre>
+          <figcaption class="diagram__caption">One full Authorization Code + PKCE exchange. Steps 1–4 ride the untrusted front channel and carry no token; step 5 onward is server-to-server.</figcaption>
+        </figure>
+
+        <p>The runnable version of this exact flow — including the PKCE-mismatch and code-replay rejections — lives in <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/oauth-2-0/code" target="_blank" rel="noopener">the code folder</a>. One .NET process plays all four roles, so the whole dance is visible without a browser.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Bearer tokens</td><td>Trivial to issue and verify; works everywhere</td><td>Anyone who steals the token is you — no proof of possession</td></tr>
+              <tr><td>DPoP (RFC 9449)</td><td>Token bound to a client key; theft alone is useless</td><td>Per-request signing, key management, nonce/replay handling</td></tr>
+              <tr><td>mTLS-bound tokens (RFC 8705)</td><td>Strongest binding, transport layer</td><td>X.509 lifecycle, TLS termination you control; unusable in browsers</td></tr>
+              <tr><td>JWT access tokens</td><td>Stateless validation, no network hop per request</td><td>Cannot revoke before <code>exp</code>; claims go stale; larger headers</td></tr>
+              <tr><td>Opaque + introspection</td><td>Instant revocation, small tokens</td><td>One extra round trip per call unless you cache</td></tr>
+              <tr><td>Short access tokens (5–15 min)</td><td>Small blast radius</td><td>More refresh traffic and more load on the AS</td></tr>
+              <tr><td>Scopes</td><td>Simple, interoperable, cacheable in a JWT</td><td>Coarse; explodes combinatorially for per-object rules (RAR helps)</td></tr>
+              <tr><td>BFF for SPAs</td><td>Tokens never enter JavaScript</td><td>A stateful server component and a session store</td></tr>
+              <tr><td>Managed AS</td><td>Conformance, MFA, threat detection for free</td><td>Vendor lock-in on claims, extensibility limits, per-MAU cost</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Wildcard or loosely matched <code>redirect_uri</code></p>
+            <p>An open redirect on any allowed host exfiltrates the code. OAuth 2.1 mandates exact string matching for this reason.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Missing <code>state</code></p>
+            <p>CSRF: an attacker's code gets injected into the victim's session, linking the victim's client session to the attacker's account.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">PKCE omitted on a public client</p>
+            <p>An intercepted code — custom URL scheme hijack, referrer leak — is redeemable by anyone.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Mix-up attack with more than one configured AS</p>
+            <p>The client sends the code to the wrong token endpoint. Fixed by validating the <code>iss</code> response parameter (RFC 9207).</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Tokens in <code>localStorage</code></p>
+            <p>One XSS and every token leaves the browser. The browser-based apps BCP is blunt: no browser storage mechanism is safe from malicious JavaScript.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">RS ignores <code>aud</code></p>
+            <p>A token minted for service A is accepted by service B. Classic confused deputy.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">JWKS handling bugs</p>
+            <p>No <code>kid</code>-based cache invalidation causes mass 401s on key rotation. Worse: fetching keys from an issuer-controlled URL taken out of the token itself lets an attacker sign their own tokens.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Over-broad consented scopes on a machine integration</p>
+            <p>The Salesloft–Drift compromise (August 2025) turned stolen OAuth tokens into data theft across <strong>700+ Salesforce tenants</strong>; refresh tokens survived password resets and never triggered an MFA prompt.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Because credential sharing does not compose. A password is an <strong>unscoped, non-expiring, non-revocable, non-auditable</strong> capability over an entire account. OAuth replaces it with capabilities that are <strong>scoped, expiring, revocable and attributable</strong> — and it moves the authentication event to the only party that should ever see the credential, the authorization server. Everything else in the spec is machinery to move a capability across a browser redirect without letting an attacker steal it in transit.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 580 268" role="img" aria-labelledby="capTitle capDesc" width="580" style="max-width:100%">
+            <title id="capTitle">Password versus access token as a capability</title>
+            <desc id="capDesc">A shared password is unscoped, non-expiring, non-revocable and non-auditable. An OAuth access token is scoped, expiring, revocable and attributable.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="10" y="10" width="264" height="220" rx="10" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="142" y="38" fill="var(--danger)" text-anchor="middle" font-size="15">Sharing your password</text>
+              <text x="142" y="58" fill="var(--text-faint)" text-anchor="middle" font-size="12">one capability over the whole account</text>
+              <text x="34" y="92"  fill="var(--text)">✕ unscoped — everything you can do</text>
+              <text x="34" y="122" fill="var(--text)">✕ non-expiring — valid until changed</text>
+              <text x="34" y="152" fill="var(--text)">✕ non-revocable per app</text>
+              <text x="34" y="182" fill="var(--text)">✕ non-auditable — it is just "you"</text>
+              <text x="34" y="212" fill="var(--danger)" font-size="12">and it cannot support MFA or passkeys</text>
+
+              <rect x="306" y="10" width="264" height="220" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="438" y="38" fill="var(--accent)" text-anchor="middle" font-size="15">OAuth access token</text>
+              <text x="438" y="58" fill="var(--text-faint)" text-anchor="middle" font-size="12">a deliberately weak capability</text>
+              <text x="330" y="92"  fill="var(--text)">✓ scoped — e.g. calendar.read only</text>
+              <text x="330" y="122" fill="var(--text)">✓ expiring — 5 to 15 minutes</text>
+              <text x="330" y="152" fill="var(--text)">✓ revocable — kill one grant alone</text>
+              <text x="330" y="182" fill="var(--text)">✓ attributable — to one client_id</text>
+              <text x="330" y="212" fill="var(--accent)" font-size="12">the password never leaves the AS</text>
+
+              <line x1="290" y1="24" x2="290" y2="216" stroke="var(--border)" stroke-dasharray="4 4"/>
+              <text x="290" y="254" fill="var(--text-faint)" text-anchor="middle" font-size="12">The whole protocol exists to move the right-hand box across a browser redirect safely.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The failure OAuth prevents: one unlimited, permanent credential replaced by a narrow, short, revocable, traceable one.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The redirect dance looks baroque until you name the alternative: the client collects the user's password and forwards it — the <code>password</code> grant. That is simpler and needs no browser, and it reintroduces exactly the problem OAuth exists to solve, plus it cannot support MFA, passkeys, or step-up. RFC 9700 removed it, and OAuth 2.1 does not define it.</p>
+        <p>The deeper design call was OAuth 1.0's per-request signatures versus OAuth 2.0's bearer tokens:</p>
+        <ul>
+          <li>Signatures give proof of possession for free, but made every client implementation a canonicalization exercise.</li>
+          <li>OAuth 2.0 pushed that responsibility down to TLS and bought a decade of adoption with it.</li>
+          <li>The bill arrived as token theft. The answer — DPoP and mTLS binding — is proof of possession reintroduced as an <em>opt-in layer</em> rather than a mandatory tax.</li>
+        </ul>
+        <p>That is the pattern to internalise: OAuth 2.x optimises for a working baseline any team can ship, then layers rigour for those who need it.</p>
+
+        <h3>Why it matters now</h3>
+        <ol class="steps">
+          <li><span class="steps__title">Token theft is the dominant identity attack vector.</span> Adversary-in-the-middle proxies harvest post-MFA session and refresh tokens, which is why FAPI 2.0 (final February 2025) mandates sender-constrained tokens and PAR, and why DPoP is moving from exotic to expected.</li>
+          <li><span class="steps__title">OAuth 2.1 is close enough to done.</span> New systems should be built to it now; the removed flows are already gone from every serious provider.</li>
+          <li><span class="steps__title">AI agents made OAuth a front-line concern again.</span> The MCP authorization spec puts every MCP server in the resource-server role with RFC 9728 discovery, and "which scopes did the user actually grant this agent" is now a design question, not a compliance checkbox.</li>
+        </ol>
+
+        <!-- OPEN QUESTIONS -->
+        <h2>Open questions to verify in practice</h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Things you cannot answer from the spec — only from your own stack</p>
+            <ul>
+              <li>What are the actual default access-token and refresh-token lifetimes on the AS you use, and can you shorten them without breaking clients? Vendor defaults vary by an order of magnitude.</li>
+              <li>Does your resource server really reject a token with the wrong <code>aud</code>? Mint one for a sibling API and try it.</li>
+              <li>Does refresh-token rotation on your AS include <strong>reuse detection</strong> that revokes the whole family, or does it just issue a new token silently?</li>
+              <li>How does your JWKS cache behave during a signing-key rotation — a thundering herd on <code>jwks_uri</code>, or a wave of 401s?</li>
+              <li>For your SPA: measure the cost of moving to a BFF versus staying a public client with in-memory tokens. What breaks — CORS, cookie <code>SameSite</code>, multi-tab, WebSockets?</li>
+              <li>Can your AS issue DPoP-bound tokens today, and what does the per-request signing cost look like on mobile?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OAuth 2.0 · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">OAuth 2.0</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">OAuth 2.0</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/oauth-2-0/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">OAuth 2.0</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Most of the OAuth code in a healthy codebase is <strong>configuration, not logic</strong>. When you find hand-written token parsing, that is usually where the bug is. Three settings dominate:</p>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">A typical SaaS backend</div>
+            <p>OAuth sits between your users' browsers and every API you own: an authorization server (usually Entra ID, Auth0, Okta, Cognito or Keycloak), a redirect-handling route in your web app, and one line of middleware per service — <code>AddJwtBearer</code> in ASP.NET Core, <code>express-oauth2-jwt-bearer</code> in Node.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">An integrations marketplace</div>
+            <p>Every "Connect to Slack / Salesforce / Google Drive" button is an authorization-code flow, and every grant leaves a long-lived refresh token in someone's database. The Salesloft–Drift compromise of August 2025 was exactly this: stolen integration tokens gave attackers read access across <a href="https://cloudsecurityalliance.org/blog/2025/09/25/the-salesloft-drift-oauth-supply-chain-attack-cross-industry-lessons-in-third-party-access-visibility" rel="noopener">700+ downstream tenants</a>, survived password resets, and never triggered an MFA prompt.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Platform / machine identity</div>
+            <p><code>client_credentials</code> between services, GitHub Actions OIDC federating into AWS without static keys, and — new since 2025 — MCP servers acting as OAuth 2.1 resource servers for AI agents. Here the resource owner is absent, consent is a config file, and the failure mode is scope sprawl rather than phishing.</p>
+          </div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Use Authorization Code + PKCE for every interactive client</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>One flow for SPAs, mobile, desktop, CLIs and confidential web apps. <code>code_challenge_method=S256</code>, never <code>plain</code>. Confidential clients still authenticate at <code>/token</code> — PKCE is additive, not a substitute.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An intercepted code — custom URL-scheme hijack, referrer leak, browser history, proxy log — is worthless without the verifier. Without PKCE, the same leak is a full account takeover.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Keeping an implicit-flow or <code>password</code>-grant code path alive "for the legacy mobile app" — both are removed in <a href="https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1" rel="noopener">OAuth 2.1</a>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Register exact redirect URIs, and treat every open redirect on those hosts as a P1</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Full absolute strings, no wildcards, no path prefixes. Separate client registrations per environment instead of <code>https://*.dev.example.com/**</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An <a href="https://dl.acm.org/doi/fullHtml/10.1145/3627106.3627140" rel="noopener">academic study of 16 major IdPs</a> found <strong>6 vulnerable to path confusion</strong> and <strong>10 to parameter pollution</strong> in redirect matching. An open redirect anywhere on an allowed host converts into code exfiltration.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Adding <code>http://localhost:3000</code> to the production client so developers can debug against prod.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Keep tokens out of the browser: use a BFF for SPAs</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Terminate the flow server-side; the browser gets an <code>HttpOnly; Secure; SameSite=Lax</code> session cookie, and the
+              <span class="term">BFF</span>
+              <span class="term__gloss">backend-for-frontend — a small server owned by the same team as the UI, which holds the tokens and proxies API calls</span>
+              holds the tokens. <code>oauth2-proxy</code>, Duende.BFF and Auth.js all implement this.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The browser-based apps BCP is blunt: no browser storage survives malicious JavaScript. <code>localStorage</code> means one XSS in one npm dependency exfiltrates every token, including refresh tokens.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"We store tokens in memory only, so we're fine" — in-memory tokens are still readable by any script in the page.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph PUB["Public client SPA — tokens live in the browser"]
+      P1["Browser JS holds access + refresh tokens"]
+      P1 --> P2["API"]
+      P3["One XSS in one npm dependency"] -.->|"reads both tokens"| P1
+    end
+    subgraph BFFG["BFF — tokens never enter JavaScript"]
+      B1["Browser holds only an HttpOnly Secure SameSite=Lax cookie"]
+      B1 --> B2["BFF server holds access + refresh tokens"]
+      B2 --> B3["API"]
+      B4["One XSS in one npm dependency"] -.->|"can only replay the session, cannot read tokens"| B1
+    end
+          </pre>
+          <figcaption class="diagram__caption">The SPA token-storage choice. The BFF costs you a stateful server component and a session store; it buys you a browser that has nothing worth stealing.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Rotate refresh tokens and detect reuse</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For public clients, rotate on every use and revoke the entire token family when a superseded token is presented. Verify your AS actually does the revocation, not just the reissue.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Refresh tokens outlive sessions by days-to-months and bypass MFA.
+              <span class="term">Reuse detection</span>
+              <span class="term__gloss">noticing that an already-superseded refresh token was presented, which means two parties hold copies</span>
+              is the only signal that turns a silent theft into an alert.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Non-expiring refresh tokens on integrations, then discovering during incident response that resetting passwords did nothing.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Validate <code>aud</code>, <code>iss</code> and <code>exp</code> on every resource server — separately per API</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Give each API its own audience identifier and reject anything else. Cache JWKS keyed by <code>kid</code> with a bounded negative-cache on miss.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An RS that ignores <code>aud</code> accepts a token minted for a lower-trust sibling service. That is the
+              <span class="term">confused deputy</span>
+              <span class="term__gloss">a trusted component tricked into using its own authority on behalf of an attacker</span>,
+              and it converts one compromised low-value integration into access to your billing API.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A single audience such as <code>api.example.com</code> shared by twelve services — you have no blast-radius boundary left.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Design scopes around business capabilities, not endpoints</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Roughly <strong>5–20 stable scopes</strong> grouped by resource and action (<code>invoices.read</code>, <code>invoices.write</code>). Push per-object decisions ("can Alice edit document 42?") into a policy engine — OpenFGA, Cedar, OPA.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Endpoint-shaped scopes make every new route a client-visible breaking change and blow past header size limits. Curity's <a href="https://curity.io/resources/learn/scope-best-practices/" rel="noopener">scope guidance</a> makes stability the primary criterion.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Requesting the union of all scopes at first login "so we never have to re-prompt" — you have just made every stolen token maximally valuable.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Set access-token lifetimes deliberately and know your revocation story</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><strong>5–15 minutes</strong> for JWT access tokens. If you need instant revocation, use opaque tokens plus introspection with a short cache, or accept a bounded revocation delay and document it.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A JWT is valid until <code>exp</code> no matter what your admin console says. Teams routinely discover this during an incident, when "disable the user" does not stop the traffic.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>24-hour access tokens because refresh handling was annoying to implement.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Authenticate confidential clients with keys, not shared secrets</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>private_key_jwt</code> (<a href="https://datatracker.ietf.org/doc/html/rfc7523" rel="noopener">RFC 7523</a>) or mTLS (<a href="https://datatracker.ietf.org/doc/html/rfc8705" rel="noopener">RFC 8705</a>) for server-side clients and <code>client_credentials</code>. Secrets that must exist go in a vault with a rotation runbook that has actually been rehearsed.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A <code>client_secret</code> is a bearer credential in CI logs, container env vars and Slack threads. Asymmetric auth means nothing worth stealing ever leaves your service.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>One shared <code>client_id</code>/<code>client_secret</code> pair reused across all environments and services.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Send <code>state</code>, and check <code>iss</code> on the response</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>state</code> bound to the user's session (not a global nonce), single-use, validated before the code is redeemed. Validate the <code>iss</code> response parameter (<a href="https://datatracker.ietf.org/doc/html/rfc9207" rel="noopener">RFC 9207</a>) if you support more than one authorization server.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Missing <code>state</code> is CSRF — an attacker's code lands in the victim's session, silently linking accounts. Missing <code>iss</code> with multiple ASes is the mix-up attack: your client posts a code to the wrong token endpoint and hands it to the attacker.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using <code>state</code> to carry the post-login return URL without also carrying CSRF entropy.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Treat third-party grants as inventory, with an expiry policy</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Store every grant with client, scopes, issue time, last use, and source IP range. Expire unused grants after a set window and alert on scope escalation at re-consent.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>This is the Salesloft–Drift lesson. Nobody knew which tokens existed or which had gone quiet, so <strong>ten days of exfiltration</strong> looked like normal integration traffic.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Treating "user approved it once in 2023" as a permanent authorization.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Tokens in <code>localStorage</code> with a CSP as the mitigation</p>
+            <p>The SPA stores access and refresh tokens in web storage and the team points at a strict CSP. CSPs get relaxed for analytics, and a compromised dependency runs inside the origin regardless — move to a BFF or accept that XSS equals full account compromise.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The homegrown JWT validator</p>
+            <p>Someone decodes the token, reads <code>iss</code> from inside it, fetches that issuer's JWKS, and verifies. An attacker signs their own token and points <code>iss</code> at their own JWKS — pin the issuer and audience from configuration, never from the token.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">OAuth-as-login</p>
+            <p>The client calls <code>/userinfo</code> (or worse, <code>/api/me</code>) with an access token and treats the response as proof of identity. An access token minted for a different client is accepted, which is the <a href="https://oauth.net/articles/authentication/" rel="noopener">original confused-deputy login bug</a> — use OpenID Connect and validate the <code>id_token</code>'s <code>aud</code> and <code>nonce</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Scope creep by re-consent</p>
+            <p>Each feature adds a scope to the login request, so version 12 asks for the union of everything. Users click through it, and the value of a stolen token grows monotonically — request scopes incrementally, in context.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The shared service identity</p>
+            <p>One <code>client_credentials</code> client for the whole platform because per-service registration was tedious. Any compromised service can call any API as any other, and audit logs cannot attribute anything — one client per service, per environment.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Refresh-token rotation without reuse detection</p>
+            <p>The AS issues a new refresh token each time but silently accepts the old one too. You get the operational cost of rotation with none of the theft detection — verify reuse triggers family revocation by testing it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Revoking sessions but not tokens during incident response</p>
+            <p>The runbook says "reset password, kill sessions." Refresh tokens and OAuth grants survive both, so the attacker keeps access — the runbook needs an explicit grant-revocation step.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Multi-tenant B2B SaaS with an integrations directory</div>
+            <p>A mid-size product exposes <strong>40+ inbound integrations</strong>, each holding a refresh token per tenant. What works: one client registration per integration partner, tenant-scoped tokens, and a per-partner kill switch that revokes every grant for that <code>client_id</code> in one call. <em>Lesson:</em> test the kill switch during a quiet week — the first run should not be during an incident, because the revocation endpoint usually turns out to be rate-limited.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Mobile app plus API, 10k+ RPS</div>
+            <p>AppAuth or MSAL performs Authorization Code + PKCE in the system browser (never a <code>WebView</code>), tokens live in Keychain / Keystore, the API gateway validates JWTs and forwards claims. <em>Lesson:</em> JWKS caching at the gateway is what keeps signing-key rotation from becoming an outage. Give the cache a stale-while-revalidate window; a hard TTL plus a rotated key produces a synchronized wave of 401s across every pod.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Regulated fintech under FAPI 2.0</div>
+            <p>PAR keeps request parameters off the front channel, sender-constrained tokens (DPoP or mTLS) make stolen tokens useless, and every client is registered with a public key. <em>Lesson:</em> DPoP's real cost is not signing, it is nonce handling and clock skew — budget for the retry loop when the AS issues <code>use_dpop_nonce</code>.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Internal platform with service-to-service auth</div>
+            <p><code>client_credentials</code> with <code>private_key_jwt</code>, one client per service, audience-scoped tokens, and short lifetimes. <em>Lesson:</em> the hard part is not the OAuth, it is that services cache tokens badly — without a shared token cache with jittered pre-expiry refresh, you get a thundering herd on the token endpoint every 15 minutes, on the minute.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> are you alerting on token-endpoint error rate by <code>error</code> code, refresh-token reuse detections, consent grants with new scopes, and JWKS fetch failures?</li>
+              <li><strong>Failure handling:</strong> when the authorization server is down or its JWKS is unreachable, does the resource server fail closed, and has that been tested with a chaos run?</li>
+              <li><strong>Failure handling:</strong> does a second redemption of the same authorization code revoke the tokens already issued from it? Try it.</li>
+              <li><strong>Security:</strong> are redirect URIs exact-match, wildcard-free, and reviewed whenever a new one is added?</li>
+              <li><strong>Security:</strong> does each API reject a token minted for a sibling API? Mint one and confirm the 401/403.</li>
+              <li><strong>Security:</strong> is there a documented, rehearsed path to revoke a single integration's grants across all tenants?</li>
+              <li><strong>Cost:</strong> managed authorization servers price per monthly active user or per token — do short access-token lifetimes push you into a higher tier, and is <code>/introspect</code> cached?</li>
+              <li><strong>Cost:</strong> does the client cache access tokens with jittered refresh, or does every request hit <code>/token</code>?</li>
+              <li><strong>Onboarding:</strong> can a new engineer name your authorization server, the client registration for their service, the audience value, and where secrets live — on day one, from the README?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Managed SDK, one client registration.</span> Login works in an afternoon, scopes are <code>openid profile email</code>, and the access token is treated as a session. This is fine, and it stays fine until the second API appears.</li>
+          <li><span class="steps__title">First painful migration — audience separation.</span> Once two services exist, that shared token is a confused deputy waiting to happen. Splitting audiences means touching every client, every gateway rule and every integration test at once.</li>
+          <li><span class="steps__title">Second painful migration — SPA token storage.</span> Moving from <code>localStorage</code> to a BFF changes your deployment topology (you now need a stateful session store), your CORS and cookie configuration, and your multi-tab and WebSocket behaviour. Teams postpone it until a pen test forces the issue, which is the most expensive possible time.</li>
+          <li><span class="steps__title">The mature end state.</span> One authorization server; one client registration per application per environment; audience-scoped short-lived access tokens; rotated refresh tokens held server-side; scopes as coarse capabilities with a policy engine underneath for per-object rules; and a
+            <span class="term">grant inventory</span>
+            <span class="term__gloss">a record of every issued third-party grant — client, scopes, issue time, last use — with an expiry policy</span>.
+            Getting there incrementally is possible — audience separation first, then token storage, then sender-constrained tokens if your threat model needs them.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://datatracker.ietf.org/doc/rfc9700/" rel="noopener">RFC 9700 — OAuth 2.0 Security Best Current Practice</a> — the single highest-value document here. Read the attack sections; they are the source of half this page.</li>
+          <li><a href="https://datatracker.ietf.org/doc/draft-ietf-oauth-browser-based-apps/" rel="noopener">OAuth 2.0 for Browser-Based Applications</a> — the working group's reasoning on why SPAs should not hold tokens, with the BFF pattern spelled out.</li>
+          <li><a href="https://duendesoftware.com/blog/20210326-bff" rel="noopener">Securing SPAs using the BFF Pattern</a> — Duende's practical walkthrough of the same idea with the trade-offs stated honestly.</li>
+          <li><a href="https://curity.io/resources/learn/scope-best-practices/" rel="noopener">OAuth 2.0 Scope Best Practices</a> — Curity on granularity, naming, and where scopes stop scaling.</li>
+          <li><a href="https://cloudsecurityalliance.org/blog/2025/09/25/the-salesloft-drift-oauth-supply-chain-attack-cross-industry-lessons-in-third-party-access-visibility" rel="noopener">The Salesloft–Drift OAuth supply-chain attack</a> — the current canonical case study in third-party grant risk.</li>
+          <li><a href="https://openid.net/specs/fapi-security-profile-2_0-final.html" rel="noopener">FAPI 2.0 Security Profile</a> — worth reading even outside finance; it shows what "OAuth with the safeties on" looks like.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/oauth-2-0/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
