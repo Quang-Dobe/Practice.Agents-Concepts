@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infrastructure as Code · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Infrastructure as Code</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Infrastructure as Code</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/infrastructure-as-code/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Infrastructure as Code</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Clicking through the AWS or Azure portal to create a VM, a load balancer and a firewall rule works once. It does not work the fifth time, in the third region, for the second engineer, at 3 a.m.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>You write a file that says "these things should exist, configured this way." A tool reads that file, compares it to what actually exists in your cloud account, and makes reality match. The file goes through pull requests, code review and CI like any other code. The payoff: spinning up an identical staging environment stops being a two-day archaeology project and becomes one command.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of the difference between <strong>a recipe and a food order</strong>.</p>
+        <ul>
+          <li><strong>A recipe is imperative.</strong> "Create the VPC, then the subnet, then attach the gateway, then launch the instance." Perfect the first time. Run it a second time and you get two VPCs, or an error — a recipe assumes you start with an empty kitchen.</li>
+          <li><strong>A food order is declarative.</strong> "A table set for six, with three plates of pasta." The kitchen walks over, sees four plates already on the table, removes one, adds two chairs. Give the same order again and nothing happens, because the table already matches.</li>
+        </ul>
+        <p>That "nothing happens the second time" property is
+          <span class="term">idempotency</span>
+          <span class="term__gloss">running it twice produces the same result as running it once</span>,
+          and it is the whole reason IaC scales.</p>
+
+        <p>To pull this off, the tool needs a memory of what it put there — a
+          <span class="term">state file</span>
+          <span class="term__gloss">the tool's record mapping each config address to the real cloud resource it created</span>.
+          State is how Terraform knows the <code>web-01</code> instance in your config is the same instance as <code>i-0abc123</code> in AWS. When someone changes that instance by hand in the console, config and reality diverge; that gap is
+          <span class="term">drift</span>
+          <span class="term__gloss">real infrastructure no longer matching the config, usually from manual edits</span>,
+          and the tool's <code>plan</code> step is what surfaces it.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    W["config — what you want"] --> P{"plan — the diff"}
+    M["state — the mapping"] --> P
+    E["cloud — what exists"] --> P
+    P -->|"no difference"| N["nothing happens (idempotent)"]
+    P -->|"difference found"| A["apply — close the gap"]
+    A --> E
+    H["hand edit in the console"] --> E
+    H -.->|"creates drift"| P
+          </pre>
+          <figcaption class="diagram__caption">The everyday loop. Three inputs, one diff. Config = what you want, cloud = what exists, state = the mapping between them, plan = the diff.</figcaption>
+        </figure>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">The model in one line</p>
+            <p><strong>config = what you want · cloud = what exists · state = the mapping between them · plan = the diff.</strong></p>
+          </div>
+        </div>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not configuration management.</strong> Ansible, Chef and Puppet configure software <em>inside</em> machines. IaC provisions the machines themselves. They overlap but solve different halves.</li>
+              <li><strong>Not a deployment pipeline.</strong> CI/CD ships your application code. IaC ships the platform it runs on. They usually run in the same pipeline, in that order.</li>
+              <li><strong>Not containers.</strong> A Dockerfile describes one image. IaC describes the cluster, network and IAM that image needs.</li>
+              <li><strong>Not just "scripts in Git."</strong> A bash script full of <code>az cli</code> calls is automation, not IaC — it has no state, no plan, no idempotency.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TOOL LANDSCAPE -->
+        <h2>The tool landscape (as of 2026)</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Tool</th><th scope="col">Language</th><th scope="col">Scope</th><th scope="col">Reach for it when</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Terraform</td><td>HCL</td><td>Multi-cloud</td><td>Default choice; largest provider ecosystem</td></tr>
+              <tr><td>OpenTofu</td><td>HCL</td><td>Multi-cloud</td><td>You want Terraform without the BSL license (Linux Foundation fork)</td></tr>
+              <tr><td>Pulumi</td><td>C#, TS, Python, Go</td><td>Multi-cloud</td><td>Your team wants loops, types and real tests</td></tr>
+              <tr><td>Bicep / ARM</td><td>Bicep DSL</td><td>Azure only</td><td>Pure Azure shop, want day-one feature parity</td></tr>
+              <tr><td>CloudFormation / CDK</td><td>YAML / TS, C#</td><td>AWS only</td><td>Pure AWS shop, want native drift detection</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You need staging to actually match production, not approximately match it.</li>
+              <li>More than one person changes infrastructure, and you want review and an audit trail.</li>
+              <li>You build the same stack per customer, per region, or per environment.</li>
+              <li>Disaster recovery must be a rebuild, not a restore-from-memory.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It's a one-off experiment you'll delete this afternoon — the console is faster.</li>
+              <li>You're in a genuine production outage — fix it by hand, then reconcile the config afterward.</li>
+              <li>You're on a fully managed platform (Vercel, Heroku) where there's barely any infrastructure to describe.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Declarative</dt><dd>You describe the end state, not the steps.</dd></div>
+          <div><dt>Idempotent</dt><dd>Running it twice produces the same result as running it once.</dd></div>
+          <div><dt>State</dt><dd>The tool's record mapping your config to real cloud resources.</dd></div>
+          <div><dt>Plan / diff</dt><dd>A dry run showing what would change before it changes.</dd></div>
+          <div><dt>Apply</dt><dd>Executing the plan.</dd></div>
+          <div><dt>Drift</dt><dd>Real infrastructure no longer matching the config, usually from manual edits.</dd></div>
+          <div><dt>Provider</dt><dd>The plugin that translates config into AWS/Azure/GCP API calls.</dd></div>
+          <div><dt>Module</dt><dd>A reusable, parameterised bundle of resources.</dd></div>
+          <div><dt>Immutable infrastructure</dt><dd>Replace resources instead of mutating them in place.</dd></div>
+        </dl>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">What's next</p>
+            <p>Detail answers What / Where / When / How / Why: the plan/apply lifecycle, state locking and remote backends, module design, secret handling, and where IaC sits next to GitOps and policy-as-code.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

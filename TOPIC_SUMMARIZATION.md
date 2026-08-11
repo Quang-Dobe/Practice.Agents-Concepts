@@ -1,11 +1,11 @@
-# OAuth 2.0
+# Infrastructure as Code
 
-OAuth 2.0 is a protocol that lets one app use another app's API on your behalf without you ever handing over your password. Instead of giving an app your credentials, you get redirected to the service that holds your data, that service asks you directly whether the app may have a specific slice of access, and if you agree it issues the app a short-lived access token scoped to only that slice.
+Infrastructure as Code means your servers, networks, databases, and permissions are defined in text files that live in Git and get applied by a tool. Instead of clicking through the AWS or Azure portal to create a VM, a load balancer, and a firewall rule, you write a file that says these things should exist, configured this way. A tool reads that file, compares it to what actually exists in your cloud account, and makes reality match. The cloud console stops being the source of truth.
 
-Engineers reach for it whenever a third-party app needs to call an API for a user, when a single-page or mobile app calls its own backend and you want short-lived revocable credentials, or for service-to-service calls with no user involved. It also gives you per-integration revocation — you can cut off one app's access without resetting anyone's password. It is worth knowing what it is not: it answers "may this app do X?", not "who is this person?" — that is OpenID Connect, a thin identity layer on top. It is also not a token format; an access token can be a JWT or an opaque random string and OAuth does not care.
+You reach for it when staging needs to actually match production rather than approximately match it, when more than one person changes infrastructure and you want review and an audit trail, when you build the same stack per customer or per region, or when disaster recovery has to be a rebuild instead of a restore-from-memory. You skip it for a one-off experiment you will delete this afternoon, during a real outage where you fix by hand first and reconcile after, and on fully managed platforms where there is barely any infrastructure to describe.
 
-Picture an apartment building with a front desk. A cleaning company wants into your gym locker. You do not give them your house key. You send them to the desk clerk, who asks you in person, then prints a keycard that opens the gym locker only and expires at 6pm. The cleaning company holds the keycard and never learns your key. You are the resource owner, the clerk is the authorization server, the keycard is the access token, and "gym locker only" is the scope.
+The useful mental model is a recipe versus a food order. An imperative script is a recipe: create the VPC, then the subnet, then the gateway. It works the first time; run it again and you get two VPCs. Declarative IaC is a food order: a table set for six with three plates of pasta. The kitchen looks at what is already on the table and adjusts. Run the same order twice and nothing happens, because the table already matches. That property is idempotency, and it is the whole reason IaC scales.
 
 ---
 
-Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/backend/oauth-2-0/present/index.html
+Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/cloud/infrastructure-as-code/present/index.html

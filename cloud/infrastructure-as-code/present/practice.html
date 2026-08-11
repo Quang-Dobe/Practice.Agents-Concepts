@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infrastructure as Code · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Infrastructure as Code</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Infrastructure as Code</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/infrastructure-as-code/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Infrastructure as Code</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~12 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical SaaS backend, IaC owns everything your application assumes already exists: the VPC/VNet, the managed Postgres, the container platform, the queue, the secret store, the DNS record, and the IAM roles that let all of it talk. Your app pipeline ships a container image; the IaC pipeline shipped the cluster that image lands on. The two are usually separate repos with separate approval rules — and the seam between them ("who creates the DB, who runs the migration") is where most of the arguments happen.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">The app's substrate</div><p>Network, database, container platform, queue, secret store, DNS, IAM. Everything the deploy pipeline assumes is already there.</p></div>
+          <div class="card"><div class="card__title">The landing zone</div><p>Multi-account AWS Organizations or Azure management groups, with baseline guardrails — logging, CloudTrail/Activity Log, tag policy, SCPs, network hub — applied to every account by the same code. Here IaC is the compliance story, not a productivity tool.</p></div>
+          <div class="card"><div class="card__title">Environment multiplication</div><p>"A staging that actually matches prod", "a preview environment per pull request", "one isolated stack per enterprise customer". Your module boundaries decide whether that takes a day or a quarter.</p></div>
+          <div class="card"><div class="card__title">The half-adopted repo</div><p>60% of prod in Terraform, 40% clicked in the console, nobody knows which is which. This is the most common real-world state of IaC, and most practices below exist to prevent it.</p></div>
+        </div>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">"Prove nobody can create a public S3 bucket"</p>
+            <p>In a landing zone that question is answered by a
+              <span class="term">policy-as-code</span>
+              <span class="term__gloss">machine-checkable rules that run against the plan and fail the build</span>
+              check on the plan plus a service control policy — both in Git.</p>
+          </div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Remote, versioned, locked state before your second commit</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>S3 with <code>use_lockfile = true</code>, bucket versioning and SSE-KMS on; or Azure Blob with lease locking and soft delete. Keep the state account/subscription separate from the workload it describes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Local state means one laptop is your source of truth, and the first concurrent apply silently orphans resources. Versioning is your only rollback when a bad <code>state mv</code> corrupts the file.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>terraform.tfstate</code> committed to Git — it leaks secrets and merge-conflicts unrecoverably.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Split state by blast radius and change frequency</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Layer it — network/identity (changes monthly), data stores (quarterly), app platform (weekly), app-adjacent resources (daily) — each with its own state and its own CI job. Cross-layer values pass through remote-state reads or SSM/Key Vault.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>One state means one lock: a 6-minute plan on the network layer blocks the team that just wanted to add a queue. It also means anyone with apply rights can destroy the database. That reach is the
+              <span class="term">blast radius</span>
+              <span class="term__gloss">how much a single apply is able to change or destroy</span>.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>The single root module holding 2,000 resources "so everything is in one plan."</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph L1["Layer 1 — network & identity · monthly · own state"]
+        N["VPC, subnets, DNS zones, IAM baseline"]
+    end
+    subgraph L2["Layer 2 — data stores · quarterly · own state"]
+        D["Postgres, object storage, Key Vault"]
+    end
+    subgraph L3["Layer 3 — app platform · weekly · own state"]
+        K["Cluster, node pools, ingress"]
+    end
+    subgraph L4["Layer 4 — app-adjacent · daily · own state"]
+        Q["Queues, topics, per-service roles"]
+    end
+    N -->|"remote-state read or SSM / Key Vault"| D
+    D -->|"remote-state read or SSM / Key Vault"| K
+    K -->|"remote-state read or SSM / Key Vault"| Q
+          </pre>
+          <figcaption class="diagram__caption">Split by how often a layer changes and how much damage it can do. Each layer owns one state, one lock, one CI job — so a slow network plan never blocks someone adding a queue.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Directories per environment, not workspaces</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>envs/prod/</code>, <code>envs/staging/</code>, each a thin root module calling shared versioned modules with its own backend config and its own <code>.tfvars</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Workspaces share one config and one backend key prefix, so the only thing separating prod from dev is a CLI flag someone will forget. Directories let prod pin an older module version and get a stricter CI job.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>terraform workspace select prod &amp;&amp; apply</code> as your production deployment procedure.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Pin provider and module versions, commit the lock file</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>~&gt; 5.40</code>-style constraints on providers, exact tags (<code>ref=v2.3.1</code>) or registry version pins on modules, and <code>.terraform.lock.hcl</code> in Git with hashes for every platform your CI and laptops use.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An unpinned provider minor bump changes computed defaults, and your next plan proposes 40 changes you didn't write — usually discovered at 5pm on a Friday.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>source = "git::...//modules/vpc"</code> with no ref, then wondering why staging and prod diverged.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Make the saved plan the review artifact</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>CI runs <code>plan -out=plan.bin</code>, posts the human-readable diff on the PR, gates on approval, then applies <strong>that exact file</strong>. Never re-plan at apply time.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Between plan and apply, someone else's merge or a console change can alter reality; re-planning means you applied something nobody reviewed.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>apply -auto-approve</code> on merge to main with a fresh plan.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant Dev as Engineer
+    participant CI as CI pipeline
+    participant Pol as Policy + cost gate
+    participant Rev as Reviewer
+    participant Cloud as Cloud API
+    Dev->>CI: open pull request
+    CI->>CI: terraform plan -out=plan.bin
+    CI->>Pol: plan as JSON — OPA / Conftest / Checkov + Infracost
+    Pol-->>CI: hard-fail on public ingress or unencrypted storage
+    CI-->>Rev: readable diff posted on the PR
+    Rev->>CI: approve
+    CI->>Cloud: terraform apply plan.bin — the exact reviewed file
+    Note over CI,Cloud: no re-plan, so nothing unreviewed can slip in
+          </pre>
+          <figcaption class="diagram__caption">The saved plan file is the contract between review and apply. The machine gate reads every line of the diff; the human gate reads the summary.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Keep secrets out of the IaC data path</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Have IaC create the <em>container</em> — Key Vault, a Secrets Manager entry, an IAM binding — and let the app read the value at runtime. Where a password argument is unavoidable, use ephemeral/write-only attributes or a provider-generated random value the app never sees in config.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Any secret passed as a resource argument lands in plaintext in state, and often in plan output posted to a PR comment. State then becomes a credential store with Git-level access control.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>db_password = var.db_password</code> fed from a CI secret — that value is now permanently in state history.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">OIDC-federated, short-lived, scoped credentials for CI</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>GitHub Actions / Azure DevOps
+              <span class="term">federated identity</span>
+              <span class="term__gloss">CI trades a short-lived OIDC token for cloud credentials — no long-lived key is ever stored</span>
+              assuming a per-environment role. The prod role is assumable only from the protected branch, with a permission boundary that excludes IAM-write unless that layer needs it.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Long-lived access keys in CI variables are the single most common cloud breach vector, and a leaked one carries your full deploy blast radius.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>One <code>AWS_ACCESS_KEY_ID</code> with AdministratorAccess shared by every pipeline.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Gate plans with policy-as-code and cost preview</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run OPA/Conftest or Checkov against the JSON plan, plus Infracost for the delta. Hard-fail on public ingress, unencrypted storage and a missing owner tag; soft-warn on cost above a threshold.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Human reviewers approve <code>~ 180 changes</code> diffs without reading them. A machine check on the plan is the only reviewer that reads every line — and it is the control that makes LLM-generated config safe to apply.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Scanning only the source files. The plan is where computed values and module expansion become visible.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Protect stateful resources from the tool itself</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>lifecycle { prevent_destroy = true }</code> on databases and stateful stores, provider-level deletion protection on, Azure deployment stacks with <code>denySettings</code>, CloudFormation stack policies. Add <code>ignore_changes</code> for fields a platform mutates.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A tag rename on an RDS instance can plan as <code>-/+ replace</code>. <code>prevent_destroy</code> turns that from a data-loss incident into a failed plan.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting reviewers to always spot <code>-/+</code> in a long diff.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Schedule drift detection and give drift an owner</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Nightly <code>plan -detailed-exitcode</code> per state; exit code 2 opens a ticket routed to the owning team. Treat "console fix during an incident" as a required follow-up reconcile task in the incident template.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Undetected drift means your DR rebuild produces something that has never worked. Drift found six months late is archaeology; found overnight it is a two-line PR.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Discovering drift only when an unrelated change proposes to undo someone's emergency fix.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Own the import path deliberately</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use config-driven <code>import</code> blocks (reviewable in a PR) for
+              <span class="term">brownfield</span>
+              <span class="term__gloss">adopting IaC over infrastructure that already exists, rather than starting from an empty account</span>
+              adoption, and keep a documented runbook for "resource exists in cloud, not in state."</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every real adoption is brownfield. Without an import practice, teams write parallel resources instead and end up with two VPCs.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>state rm</code> as a routine debugging move — it silently converts managed resources into unmanaged ones nobody bills or patches.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Keep modules thin, opinionated and few</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Modules should encode a decision ("our standard private-subnet Postgres"), not wrap a single resource. Version them, publish to a private registry, document the inputs.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A module per resource adds a release cycle to every provider feature, and your team ends up patching passthrough variables instead of building.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>The 90-input mega-module that configures anything and is understood by one person.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The god state</p>
+            <p>One root module for the whole estate. Plan times cross the refresh cliff (one API call per resource) and a single lock serialises the org. One documented case: a 180k-line monorepo with 68-minute plans, refactored into isolated states with sub-2-minute plans. Split by layer and environment instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Workspaces as environments</p>
+            <p><code>prod</code> and <code>dev</code> differ only by workspace selector. Identical config means you cannot roll out risky changes to staging first, and a mis-selected workspace is a prod incident. Use separate directories and backends.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Console-first, IaC-later</p>
+            <p>Emergency fixes made in the portal and never reconciled. The config becomes fiction, so <code>plan</code> output stops being trusted and people stop reading it. Make reconcile a mandatory incident follow-up.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>-target</code> as normal workflow</p>
+            <p>Using <code>-target</code> to skip the slow bits applies a partial graph, so dependent resources hold stale values and the next full plan is a surprise. Fix the state split instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Copy-pasted environments</p>
+            <p>Staging was copied from prod once and has drifted for two years. Every "works in staging" claim becomes worthless. Force sharing through versioned modules so differences are explicit variables.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Wrapper sprawl before it's needed</p>
+            <p>Layers of generated backend blocks and Terragrunt <code>include</code>s for a three-environment estate. New engineers cannot answer "what does this actually deploy". Adopt orchestration when you have more than 10 root modules, not on day one.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Plan output in a public PR</p>
+            <p>Convenient, until a plan prints a connection string or the private IP plan for an unreleased product. Redact, or keep plan output in the CI job log with restricted access.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Provisioners as glue</p>
+            <p><code>local-exec</code> running an <code>aws cli</code> command to finish a resource. The engine cannot diff it, so it is neither idempotent nor visible in the plan. Use a real provider resource, or move the step into the app boot path.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Multi-account SaaS landing zone — AWS, ~40 accounts</div>
+            <p>A platform team owns an <code>account-baseline</code> module: logging, GuardDuty, tag policy, network hub attachment, break-glass role. New accounts are vended by adding a row to a registry and running one pipeline. Product teams get their own state files inside their own accounts and cannot touch the baseline. <em>Non-obvious lesson:</em> the baseline module's version bump is the riskiest change in the company — roll it out account-by-account with a canary account first, never <code>for_each</code> over all 40 in a single apply.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Azure enterprise — Bicep + deployment stacks</div>
+            <p>A regulated financial platform uses Azure Verified Modules with deployment stacks per resource group and <code>denySettings</code>, so even a subscription Owner cannot delete stack-managed resources from the portal. <em>Non-obvious lesson:</em> <code>what-if</code> returns <code>Ignore</code> for nested templates that use runtime functions — and every Bicep module compiles to a nested template — so the preview can quietly under-report. The team's real safety net is <code>denySettings</code>, not the preview.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Per-PR ephemeral environments — B2B product, ~30 engineers</div>
+            <p>Opening a PR provisions a namespace, a database schema and a DNS name; merging destroys them. <em>Non-obvious lesson:</em> the destroy path is what breaks, not the create path — orphaned load balancers and unreleased public IPs became the biggest line item on the bill. A nightly reaper that deletes anything tagged <code>ephemeral</code> older than 48 hours is mandatory, because failed destroys are normal.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Per-tenant provisioning — vertical SaaS, ~600 tenants</div>
+            <p>One module instantiated per customer, driven by a tenant table. It started as <code>for_each</code> over all tenants in one state; a single tenant's provider error blocked onboarding for everyone. <em>Non-obvious lesson:</em> past a few dozen instances, move to one state per tenant (or per shard of tenants) — the operational win is that failures are isolated, not that plans get faster.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>State:</strong> is the backend versioned, encrypted, locked, and in a different blast-radius boundary than the resources it manages? Has restore-from-previous-version been tested?</li>
+              <li><strong>Concurrency:</strong> have you triggered two applies at once and confirmed the second fails loudly (HTTP 412 / lease conflict) rather than overwriting?</li>
+              <li><strong>Recovery:</strong> is there a written runbook for "state object deleted", and has someone timed the import-based recovery?</li>
+              <li><strong>Monitoring:</strong> do you alert on drift (nightly <code>-detailed-exitcode</code>), apply failures, apply-duration trend, and plan-time cost delta? Who is paged?</li>
+              <li><strong>Blast radius:</strong> can a single apply destroy your production database? If yes, why is there no <code>prevent_destroy</code> plus provider deletion protection?</li>
+              <li><strong>Security:</strong> are CI credentials OIDC-federated and scoped per environment? Grep your state for secrets — is anything in there you would rotate if leaked?</li>
+              <li><strong>Cost:</strong> are <code>for_each</code> counts bounded, is Infracost gating large deltas, and does a nightly reaper clean up ephemeral resources whose destroy failed?</li>
+              <li><strong>Review integrity:</strong> does apply consume the saved plan file, and is <code>-auto-approve</code> on a fresh plan impossible in the prod pipeline?</li>
+              <li><strong>Onboarding:</strong> can a new engineer answer, on day one, which directory owns which environment, where state lives, and how to make a change without console access?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">One root module, local state.</span> It works, and the whole estate is 30 resources.</li>
+          <li><span class="steps__title">First forced migration — remote state with locking.</span> Triggered by the second engineer, or by the first orphaned resource.</li>
+          <li><span class="steps__title">Second — splitting environments.</span> Usually triggered by an incident where a dev change hit prod.</li>
+          <li><span class="steps__title">Third and most painful — breaking the god state apart.</span> That means <code>state mv</code> surgery or import-based re-adoption. It happens when plan times cross roughly <strong>3–5 minutes</strong> and people start reaching for <code>-target</code>. Plan the split before you need it: the cost of moving 300 resources across state boundaries scales with how long you waited.</li>
+          <li><span class="steps__title">Then it turns organisational.</span> Copy-pasted directories become versioned modules; versioned modules become an internal registry; the registry becomes a platform team with a release process and a deprecation policy. The interesting problems become governance — policy coverage, cost attribution by tag, who may bump the baseline module — not HCL syntax.</li>
+        </ol>
+
+        <h3>Two live debates worth knowing</h3>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Debate</th><th scope="col">One side</th><th scope="col">Other side</th><th scope="col">Tie-breaker</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Monorepo vs polyrepo</td><td>Monorepo wins for 2–15 engineers: atomic cross-layer changes, one CI config</td><td>Polyrepo wins past ~50: ownership, independent velocity</td><td>Whether you have a platform team to maintain shared CI</td></tr>
+              <tr><td>DSL vs general-purpose language</td><td>HCL/Bicep: the diff <em>is</em> the review</td><td>Pulumi/CDK: types and tests catch more</td><td>Who reviews changes — if a non-author must approve, the weaker language wins. HashiCorp archiving CDK for Terraform in Dec 2025 is evidence in that direction.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.terraformupandrunning.com/" target="_blank" rel="noopener">Terraform: Up &amp; Running</a> (Brikman) — the only book that treats state layout, module versioning and team workflow as first-class problems rather than syntax appendices.</li>
+          <li><a href="https://cloud.google.com/docs/terraform/best-practices-for-terraform" target="_blank" rel="noopener">Google Cloud: Best practices for using Terraform</a> — the most opinionated vendor-neutral-in-practice guide on repo layout, module boundaries and root-module sizing.</li>
+          <li><a href="https://www.hashicorp.com/en/blog/terraform-mono-repo-vs-multi-repo-the-great-debate" target="_blank" rel="noopener">HashiCorp: Terraform mono-repo vs multi-repo</a> — both sides laid out honestly, including the monolithic-configuration anti-pattern.</li>
+          <li><a href="https://azure.github.io/Azure-Verified-Modules/" target="_blank" rel="noopener">Azure Verified Modules</a> — worth reading even on AWS as a reference for what a governed internal module registry looks like: contracts, versioning, telemetry, deprecation.</li>
+          <li><a href="https://www.openpolicyagent.org/docs/terraform" target="_blank" rel="noopener">Open Policy Agent + Conftest for Terraform plans</a> — the portable way to gate plans; read it before buying a commercial policy engine.</li>
+          <li><a href="https://docs.aws.amazon.com/prescriptive-guidance/latest/terraform-aws-provider-best-practices/introduction.html" target="_blank" rel="noopener">AWS Prescriptive Guidance: Terraform on AWS</a> — concrete multi-account state, OIDC and provider-configuration patterns.</li>
+        </ul>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Try the lifecycle with no cloud account</p>
+            <p>The MVP is <code>mvp.tf</code>: about 25 lines using the <code>local</code> and <code>random</code> providers. Run <code>terraform apply</code> twice to see idempotency ("No changes."), hand-edit the generated file and run <code>terraform plan -detailed-exitcode</code> to see drift as exit code 2, then open <code>terraform.tfstate</code> and find the file content in plaintext — that is why real state never goes in Git.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/infrastructure-as-code/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

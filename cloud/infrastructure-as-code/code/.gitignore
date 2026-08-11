@@ -1,0 +1,5 @@
+# State is never committed: it holds every attribute value in plaintext.
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+out/

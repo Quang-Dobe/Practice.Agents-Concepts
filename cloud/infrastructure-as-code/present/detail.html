@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infrastructure as Code · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Infrastructure as Code</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Infrastructure as Code</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/infrastructure-as-code/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Infrastructure as Code</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Infrastructure as Code is the practice of writing cloud resources as machine-readable <strong>declarative</strong> configuration that a
+          <span class="term">reconciliation engine</span>
+          <span class="term__gloss">the part of the tool that compares wanted vs. real and emits the API calls that close the gap</span>
+          turns into API calls. The engine diffs three things:</p>
+        <ul>
+          <li><strong>Desired state</strong> — your config.</li>
+          <li><strong>Prior state</strong> — a recorded snapshot of what the tool created.</li>
+          <li><strong>Actual state</strong> — what the provider API reports right now.</li>
+        </ul>
+        <p>From that it emits a plan of create / update / replace / delete operations. Apply the same config to the same infrastructure twice and you get zero operations. That is idempotency — and it is a property of the <em>diff engine</em>, not of your files.</p>
+
+        <p>The formal model most tools implement is a
+          <span class="term">directed acyclic graph</span>
+          <span class="term__gloss">a set of nodes with one-way edges and no cycles — here, resources plus their dependencies</span>
+          (DAG) of resource nodes. Edges are data dependencies inferred from expression references, e.g. <code>subnet_id = aws_subnet.a.id</code>. The engine sorts the graph topologically and walks it with bounded parallelism — <strong>Terraform's default is 10 concurrent node operations</strong>, tunable with <code>-parallelism=N</code>.</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Resource</dt><dd>One addressable object in a provider's API: a type, a local name, and schema-validated arguments. Address form <code>aws_s3_bucket.logs</code> in Terraform, <code>Microsoft.Storage/storageAccounts@2023-05-01</code> in Bicep/ARM.</dd></div>
+          <div><dt>Provider / plugin</dt><dd>The adapter mapping schema to REST/gRPC calls. In Terraform a provider is a <strong>separate OS process</strong> speaking gRPC over HashiCorp's <code>go-plugin</code> framework. Protocol version 6 is current and works with CLI 1.0+; protocol 5 covers 0.12+. Process isolation means a crashing provider does not crash the CLI, and providers can be written in any gRPC-capable language.</dd></div>
+          <div><dt>State</dt><dd>The stored mapping from config address → real resource ID, plus last-known attribute values. Terraform, OpenTofu and Pulumi keep it as an explicit artifact you own; CloudFormation and ARM/Bicep keep it <strong>server-side</strong> inside the stack or deployment record.</dd></div>
+          <div><dt>Backend / state store</dt><dd>Where state lives and how it is locked: S3, Azure Blob, GCS, HCP Terraform, Pulumi Cloud.</dd></div>
+          <div><dt>Module</dt><dd>A parameterised folder of resources with typed inputs and outputs. The unit of reuse and the unit of naming-convention enforcement.</dd></div>
+          <div><dt>Plan / change set / what-if</dt><dd>The dry-run artifact. Terraform <code>plan</code> (savable as a binary plan file), CloudFormation <strong>change sets</strong>, ARM/Bicep <strong>what-if</strong>, Pulumi <code>preview</code>.</dd></div>
+          <div><dt>Expressions and functions</dt><dd>The config language's compute layer: <code>for_each</code>, <code>count</code>, <code>dynamic</code> blocks, <code>for</code> comprehensions, string templates.</dd></div>
+          <div><dt>Provisioners / escape hatches</dt><dd><code>local-exec</code>, <code>remote-exec</code>, <code>null_resource</code>, CloudFormation custom resources, Bicep deployment scripts. All are last resorts: they break idempotency because the engine cannot diff their effects.</dd></div>
+        </dl>
+
+        <h3>How it relates to the broader landscape</h3>
+        <p>IaC sits in the <strong>provisioning</strong> half of infrastructure automation. Its neighbours:</p>
+        <ul>
+          <li><strong>Configuration management</strong> (Ansible, Chef, Puppet, DSC) — mutates the inside of a machine that already exists.</li>
+          <li><strong>Continuous reconciliation</strong> — GitOps controllers like Argo CD and Flux, plus Crossplane, run the diff loop <em>continuously inside the cluster</em> instead of once per CI job.</li>
+          <li><strong>Image builds</strong> (Docker, Packer) — produce the artifact that IaC then places.</li>
+        </ul>
+        <p>A mature platform uses all four, in this order: build image → provision infrastructure → configure OS/app → reconcile continuously.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>IaC is a
+          <span class="term">control-plane</span>
+          <span class="term__gloss">the management layer that creates and changes resources — as opposed to the data plane that serves user traffic</span>
+          tool, not a data-plane one. It runs as a CLI process — on a laptop, in a CI runner, or in a managed run environment (HCP Terraform, Pulumi Deployments, Azure DevOps, GitHub Actions) — and talks to cloud management APIs (<code>management.azure.com</code>, <code>*.amazonaws.com</code>) over HTTPS. It is never in your request path. Its dependencies are three: credentials, network egress to the API endpoints, and write access to the state backend.</p>
+        <p>Nothing IaC does at 3 a.m. affects a user request unless it changes a resource that request touches.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph CP["Control plane — where IaC runs"]
+        L["Laptop CLI"]
+        CI["CI runner — GitHub Actions, Azure DevOps"]
+        MR["Managed runs — HCP Terraform, Pulumi Deployments"]
+        KC["In-cluster controllers — Crossplane, Argo CD, Flux"]
+    end
+    API["Cloud management APIs over HTTPS"]
+    subgraph DP["Data plane — what users actually touch"]
+        VM["VMs and clusters"]
+        DB["Managed databases"]
+        NET["Load balancers, DNS, queues"]
+    end
+    L --> API
+    CI --> API
+    MR --> API
+    KC --> API
+    API --> VM
+    API --> DB
+    API --> NET
+    USER["User request"] --> VM
+          </pre>
+          <figcaption class="diagram__caption">IaC sits above the line, not in it. The Crossplane/GitOps variant moves the loop into the cluster, so reconciliation is continuous rather than triggered — drift gets corrected automatically instead of merely reported.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">AWS platform teams</div><p>Terraform or CDK for VPC/EKS/RDS; CloudFormation StackSets for multi-account landing zones under AWS Control Tower.</p></div>
+          <div class="card"><div class="card__title">Azure platform teams</div><p>Bicep plus <strong>Azure Verified Modules</strong> (the single Microsoft-standard module set in the public Bicep registry) and <strong>deployment stacks</strong> for lifecycle-managed resource groups.</p></div>
+          <div class="card"><div class="card__title">Kubernetes platforms</div><p>Terraform provisions the cluster; Argo CD or Flux then reconciles workloads; Crossplane sometimes provisions cloud resources from inside the cluster.</p></div>
+          <div class="card"><div class="card__title">SaaS per-tenant provisioning</div><p>One module instantiated per customer, driven by a tenant registry.</p></div>
+          <div class="card"><div class="card__title">Developer environment tooling</div><p>Ephemeral preview environments spun up per pull request and destroyed on merge.</p></div>
+          <div class="card"><div class="card__title">Compliance-heavy estates</div><p>Where the audit story is "every change is a reviewed commit," and policy-as-code gates the plan.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Engines:</strong> Terraform (BUSL 1.1 since Aug 2023; 1.5.7 and earlier remain MPL 2.0; latest stable in the 1.15.x line as of mid-2026), OpenTofu (Linux Foundation, MPL 2.0, 1.11.x line), Pulumi, AWS CDK, CloudFormation, Bicep/ARM, Crossplane.</li>
+          <li><strong>State and orchestration:</strong> S3 + native lockfile, Azure Blob with lease-based locking, HCP Terraform (Stacks went GA at HashiConf 2025), Spacelift, env0, Scalr, Atlantis, Terragrunt / Terramate for multi-root orchestration.</li>
+          <li><strong>Policy and security scanning:</strong> Open Policy Agent + Conftest (Rego, portable across Terraform/OpenTofu/Kubernetes), HashiCorp Sentinel (HCP Terraform/TFE only — it does not run on OpenTofu), Checkov, Trivy (which absorbed tfsec), CloudFormation Guard, CloudFormation Hooks.</li>
+          <li><strong>Testing:</strong> <code>terraform test</code> (HCL-native test framework, since 1.6), Terratest, Pulumi's unit-test mocks, <code>Pester</code> for Bicep.</li>
+          <li><strong>Cost and drift:</strong> Infracost for plan-time cost deltas, driftctl-style scanners, CloudFormation native drift detection plus <strong>drift-aware change sets</strong> (launched Nov 2025).</li>
+          <li><strong>Discovery / brownfield import:</strong> Terraform <code>import</code> blocks (config-driven import, since 1.5), CloudFormation <strong>IaC generator</strong> (limited to resource types supported by Cloud Control API in the region), <code>az bicep decompile</code>.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When it emerged, and when to use it</h2>
+        <p>The chain of pressure runs: hand-built "pet" servers → shell scripts → configuration management (CFEngine 1993, Puppet 2005, Chef 2009) → cloud APIs making infrastructure itself programmable.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Feb 2011 — CloudFormation.</span> Established the declarative-template model with server-side state.</li>
+          <li><span class="steps__title">July 2014 — Terraform.</span> The differentiating bet: keep state <strong>client-side</strong> so the tool is not coupled to any one cloud's stack service, and model everything as a provider plugin.</li>
+          <li><span class="steps__title">2014 — Azure ARM templates.</span> JSON and painful to author, which is why Microsoft shipped <strong>Bicep</strong> in <strong>2020</strong> as a transpiler to ARM.</li>
+          <li><span class="steps__title">2018 — Pulumi.</span> Attacked the other axis: use a real programming language and get types, loops and unit tests. <strong>AWS CDK (2019)</strong> applied the same idea on top of CloudFormation.</li>
+          <li><span class="steps__title">Aug 2023 — the license fork.</span> HashiCorp relicensed Terraform to BUSL 1.1, which produced <strong>OpenTofu</strong> within a month. <strong>IBM completed its acquisition of HashiCorp on 27 February 2025.</strong></li>
+          <li><span class="steps__title">10 Dec 2025 — CDK for Terraform archived.</span> HashiCorp cited lack of product-market fit. Worth weighing before adopting a general-purpose-language wrapper over a declarative engine.</li>
+        </ol>
+
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>More than one person changes infrastructure, and you need review, blame and rollback.</li>
+              <li>The same topology is deployed more than once — per environment, per region, per tenant.</li>
+              <li>Disaster recovery must be a <strong>rebuild</strong> with a bounded RTO, not archaeology.</li>
+              <li>Compliance requires infrastructure change to be auditable and pre-approved.</li>
+              <li>The resource count is beyond what one person can hold in their head — roughly, past a few dozen resources.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Avoid it when</p>
+            <ul>
+              <li>The infrastructure is a single managed platform with nothing to describe (Vercel, Heroku, Render).</li>
+              <li>You are in an active incident. Fix by hand, then reconcile the config and record the drift.</li>
+              <li>The resource is genuinely stateful and hand-tended — a production database you would never let a tool replace. Manage its <em>surroundings</em> in IaC and mark it <code>prevent_destroy</code> / lifecycle-protected, or leave it out.</li>
+              <li>Nobody on the team will own the state backend and the CI apply path.</li>
+              <li>You need a change applied in seconds and the plan cycle takes minutes on a large state.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Half-adopted is worse than none</p>
+            <p>If the console is still authoritative, the config lies. That is strictly worse than having no IaC at all, because people trust a file that is wrong.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works under the hood</h2>
+        <p>Terraform's <code>plan</code> is the clearest example. Per resource instance, the CLI drives the provider through a fixed RPC sequence:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Init.</span> Download provider binaries matching the version constraints, write the dependency lock file <code>.terraform.lock.hcl</code> (with per-platform hashes), configure the backend.</li>
+          <li><span class="steps__title">Load and parse.</span> Read <code>.tf</code> files, build the resource graph from expression references, resolve variables and locals.</li>
+          <li><span class="steps__title">Lock state.</span> Acquire an exclusive lock. On S3 this is now <code>use_lockfile = true</code>, which uses an S3 <strong>conditional write</strong> to create a <code>.tflock</code> object; a conflict surfaces as HTTP <strong>412 PreconditionFailed</strong>. This replaced the DynamoDB table approach — native locking arrived experimentally in <strong>1.10</strong>, was promoted in <strong>1.11</strong>, and <code>dynamodb_table</code> is deprecated.</li>
+          <li><span class="steps__title"><code>UpgradeResourceState</code>.</span> If the provider's schema version advanced, migrate the stored state shape forward.</li>
+          <li><span class="steps__title"><code>ReadResource</code> (refresh).</span> Ask the provider for the current remote object. This is the drift-detection step, and it is <strong>one API call per resource instance</strong> — which is why plans on a 3000-resource state take minutes.</li>
+          <li><span class="steps__title"><code>ValidateResourceConfig</code>.</span> Provider-side validation beyond what the schema can express.</li>
+          <li><span class="steps__title"><code>PlanResourceChange</code>.</span> The provider predicts the effect of an apply, marking values it cannot know yet as <em>unknown</em>. Called <strong>twice</strong>: once at plan time with unknowns, once during apply when upstream outputs are concrete.</li>
+          <li><span class="steps__title">Present the diff.</span> <code>+ create</code>, <code>~ update in-place</code>, <code>-/+ replace</code> (a schema attribute marked
+            <span class="term">ForceNew</span>
+            <span class="term__gloss">an attribute the provider cannot change in place, so any change destroys and recreates the resource</span>), <code>- destroy</code>. Save with <code>-out=plan.bin</code> so the apply executes exactly what was reviewed.</li>
+          <li><span class="steps__title"><code>ApplyResourceChange</code>.</span> Mutate the remote system, return the final state object. State is written back <strong>incrementally</strong> as nodes complete, so a mid-apply crash still records what succeeded.</li>
+          <li><span class="steps__title">Release lock.</span> Write the new state version — S3 bucket versioning gives you the rollback path.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant U as You / CI
+    participant CLI as Terraform CLI
+    participant B as State backend
+    participant P as Provider process
+    participant API as Cloud API
+    U->>CLI: terraform init
+    CLI->>P: download binary, write .terraform.lock.hcl
+    U->>CLI: terraform plan -out=plan.bin
+    CLI->>CLI: parse config, build the DAG
+    CLI->>B: acquire lock — S3 conditional write, .tflock
+    B-->>CLI: HTTP 412 if someone else holds it
+    CLI->>P: UpgradeResourceState if schema moved
+    CLI->>P: ReadResource — one call per instance
+    P->>API: read current object
+    API-->>P: actual attributes
+    CLI->>P: ValidateResourceConfig
+    CLI->>P: PlanResourceChange with unknowns
+    CLI-->>U: diff — create, update in place, replace, destroy
+    U->>CLI: terraform apply plan.bin
+    CLI->>P: PlanResourceChange again, values now concrete
+    CLI->>P: ApplyResourceChange
+    P->>API: create / update / delete
+    CLI->>B: write state incrementally, release lock
+          </pre>
+          <figcaption class="diagram__caption">One plan and apply, end to end. The refresh step is the expensive one — one read per resource instance is the whole cost model.</figcaption>
+        </figure>
+
+        <h3>How the other engines differ</h3>
+        <ul>
+          <li><strong>CloudFormation</strong> inverts the ownership: you <code>PUT</code> a template, the service builds the change set server-side, executes it with automatic rollback on failure, and keeps state in the stack record.</li>
+          <li><strong>ARM / Bicep</strong> is closest to CloudFormation — Bicep compiles to an ARM JSON template, and Azure Resource Manager does the diffing.</li>
+          <li><strong>Pulumi and CDK</strong> differ at a different layer: both <em>generate</em> the desired state by executing a program, then hand it to an engine — Pulumi's own, or CloudFormation for CDK.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Client-side state (Terraform, Pulumi)</td><td>Cloud-agnostic; one plan spans AWS + Azure + Datadog</td><td>You must secure, back up, lock and split state yourself; state can contain secrets</td></tr>
+              <tr><td>Server-side state (CloudFormation, ARM)</td><td>No state file to lose, native drift API, automatic rollback</td><td>Single-cloud only; hard quotas (500 resources/template, 51,200-byte inline template body, 2500 resources per nested-stack operation)</td></tr>
+              <tr><td>DSL (HCL, Bicep)</td><td>Diffable, statically analysable, one obvious way to write it</td><td>Awkward conditional/loop logic; no real unit tests</td></tr>
+              <tr><td>General-purpose language (Pulumi, CDK)</td><td>Types, IDE support, loops, real tests, package managers</td><td>Turing-complete configs are hard to review; arbitrary code between "commit" and "desired state"</td></tr>
+              <tr><td>Small many-state layout</td><td>Fast plans, tight blast radius, per-team IAM</td><td>Cross-state data passing via remote-state lookups or SSM/Key Vault; ordering becomes your problem</td></tr>
+              <tr><td>One big state</td><td>Simple; one plan sees everything</td><td>Slow refresh, wide blast radius, one lock serialises the whole org</td></tr>
+              <tr><td>Immutable replace</td><td>Predictable; matches golden-image workflows</td><td>Downtime windows and data-migration work per replace</td></tr>
+              <tr><td>In-place update</td><td>Cheaper, no data movement</td><td>Providers' update paths are less tested than create paths</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">State/reality divergence after a console fix</p>
+            <p>Someone edits in the portal; the next apply proposes to undo it, or errors because the resource shape changed underneath.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Lost or corrupted state</p>
+            <p>The backend was not versioned. Recovery is <code>import</code> for every resource, by hand.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Concurrent apply without locking</p>
+            <p>Two CI runs write state; the loser's resources become orphans nobody manages.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Refresh-time cliff</p>
+            <p>Plans go from 10 seconds to 4+ minutes as state grows past a few thousand resources, because refresh is one API call per instance.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Accidental replace from a ForceNew attribute</p>
+            <p>A tag or name change on an RDS instance or storage account silently plans a destroy/create. Always read the <code>-/+</code> lines.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>for_each</code> keyed by index</p>
+            <p>Reordering a list re-indexes and destroys/recreates unrelated resources. Key by a stable string.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Secrets in state</p>
+            <p>Passwords passed as resource arguments are stored in plaintext state unless the provider marks them write-only, or you use ephemeral values (OpenTofu 1.11; Terraform's <code>terraform_data</code> <code>store</code> block is arriving in the 1.16 line).</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Provider version drift</p>
+            <p>An unpinned provider upgrade changes defaults and proposes changes you never wrote. Commit the lock file.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">What-if / plan short-circuiting</p>
+            <p>ARM what-if gives up analysing nested templates that use runtime functions — and since every Bicep module becomes a nested template, the preview can silently report <code>Ignore</code> instead of the real change.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Provider bug on a partially-created resource</p>
+            <p>Apply fails halfway, state records a tainted object, and the only clean path is manual deletion plus <code>state rm</code>.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Three first-principles pressures:</p>
+        <ul>
+          <li><strong>Reproducibility.</strong> A manually built environment cannot be recreated, so staging never matches production and every incident has an untestable hypothesis.</li>
+          <li><strong>Auditability.</strong> Cloud APIs let anyone with a role change anything. Text in Git plus a review gate is the cheapest way to make change intentional.</li>
+          <li><strong>Scale of cardinality.</strong> Past hundreds of resources across accounts and regions, human memory stops being a viable storage medium for configuration.</li>
+        </ul>
+        <p>IaC replaces institutional memory with a data structure a machine can diff.</p>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The non-obvious design decision is <strong>why a state file exists at all</strong>. The obvious alternative — pure discovery, where the tool reads the cloud on every run and needs no memory — was tried and does not work, for two reasons:</p>
+        <ul>
+          <li><strong>Cloud APIs are not lossless mirrors of your config.</strong> A resource you created with three arguments comes back with forty server-computed fields. Without prior state the tool cannot tell "you never set this" from "someone changed this."</li>
+          <li><strong>Deletion is undetectable without memory.</strong> Remove a resource block from your config and a stateless tool sees only an object in the cloud it does not recognise. It cannot tell "delete this" from "not mine."</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 300" role="img" aria-labelledby="stateTitle stateDesc" width="560" style="max-width:100%">
+            <title id="stateTitle">Why state exists: deletion needs memory</title>
+            <desc id="stateDesc">The config lists resources A and B while the cloud holds A, B and C. A stateless tool cannot decide whether C should be destroyed or belongs to someone else. With state recording that the tool created A, B and C, removing C from the config becomes an unambiguous destroy.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="20" fill="var(--text-muted)">You deleted resource C from the config. The cloud still holds A, B and C.</text>
+
+              <!-- LEFT: no state -->
+              <rect x="8" y="34" width="264" height="256" rx="10" fill="none" stroke="var(--border)"/>
+              <text x="24" y="58" fill="var(--danger)" font-size="14">No state — pure discovery</text>
+              <text x="24" y="84" fill="var(--text-faint)" font-size="12">config</text>
+              <rect x="24"  y="92" width="52" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="50"  y="112" fill="var(--accent)" text-anchor="middle">A</text>
+              <rect x="84"  y="92" width="52" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="110" y="112" fill="var(--accent)" text-anchor="middle">B</text>
+              <text x="24" y="146" fill="var(--text-faint)" font-size="12">cloud</text>
+              <rect x="24"  y="154" width="52" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="50"  y="174" fill="var(--accent)" text-anchor="middle">A</text>
+              <rect x="84"  y="154" width="52" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="110" y="174" fill="var(--accent)" text-anchor="middle">B</text>
+              <rect x="144" y="154" width="52" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="170" y="174" fill="var(--danger)" text-anchor="middle">C</text>
+              <text x="24" y="212" fill="var(--text)">C is unrecognised.</text>
+              <text x="24" y="234" fill="var(--text-muted)" font-size="12">Delete it, or is it another team's?</text>
+              <text x="24" y="262" fill="var(--danger)" font-size="14">Undecidable.</text>
+
+              <!-- RIGHT: with state -->
+              <rect x="288" y="34" width="264" height="256" rx="10" fill="none" stroke="var(--border)"/>
+              <text x="304" y="58" fill="var(--accent)" font-size="14">With state — the tool's memory</text>
+              <text x="304" y="84" fill="var(--text-faint)" font-size="12">config</text>
+              <rect x="304" y="92" width="52" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="330" y="112" fill="var(--accent)" text-anchor="middle">A</text>
+              <rect x="364" y="92" width="52" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="390" y="112" fill="var(--accent)" text-anchor="middle">B</text>
+              <text x="304" y="146" fill="var(--text-faint)" font-size="12">state says: A, B, C were created by me</text>
+              <rect x="304" y="154" width="52" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="330" y="174" fill="var(--accent)" text-anchor="middle">A</text>
+              <rect x="364" y="154" width="52" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="390" y="174" fill="var(--accent)" text-anchor="middle">B</text>
+              <rect x="424" y="154" width="52" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="450" y="174" fill="var(--danger)" text-anchor="middle">C</text>
+              <text x="304" y="212" fill="var(--text)">C is in state but not in config.</text>
+              <text x="304" y="234" fill="var(--text-muted)" font-size="12">So it was mine, and you removed it.</text>
+              <text x="304" y="262" fill="var(--accent)" font-size="14">Plan: destroy C.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">State makes both "did you change this?" and "should I delete this?" decidable — at the cost of a critical, lockable, secret-bearing artifact you now have to operate.</figcaption>
+        </figure>
+
+        <p>CloudFormation and ARM make the same bet but hide the artifact inside the service, trading portability for one less thing to break.</p>
+
+        <p>The second non-obvious choice is <strong>declarative DSL over general-purpose language</strong>. A Turing-complete config can express anything, which is exactly the problem: reviewing a pull request means predicting what the program will emit. HCL and Bicep are deliberately weaker so <em>the diff is the review</em>. That constraint is why Pulumi and CDK remain minorities despite better ergonomics — and CDKTF's archival in December 2025 is the strongest evidence that a general-purpose wrapper over a declarative engine is a hard sell at scale.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026 IaC is not emerging technology; it is the assumed baseline for any cloud role above junior. What is actually moving is the layer above it:</p>
+        <ul>
+          <li><strong>State and run orchestration are commoditising.</strong> S3 native locking removed the DynamoDB table; Pulumi Cloud now speaks Terraform's backend API.</li>
+          <li><strong>Differentiation shifts to governance.</strong> Policy-as-code gates, cost preview in the pull request, and module registries as internal platforms — Azure Verified Modules is Microsoft's bet here.</li>
+          <li><strong>"Which engine" is a live question again.</strong> The BUSL relicense and the IBM acquisition gave the ecosystem a genuine second option in OpenTofu.</li>
+          <li><strong>LLM-generated infrastructure raises the value of the plan step.</strong> A machine-checked diff plus a policy gate is the control that makes generated config safe to apply.</li>
+        </ul>
+
+        <h2>Things to verify yourself</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions worth running in a sandbox</p>
+            <ul>
+              <li>Time <code>plan</code> versus <code>plan -refresh=false</code> on a state with ~200 resources, then again at ~2000. Find your own refresh cliff.</li>
+              <li>Break state deliberately: delete a resource in the console, then run plan. Delete the state object, then recover via <code>import</code> blocks — and time the recovery.</li>
+              <li>Test S3 <code>use_lockfile = true</code> under real contention: trigger two CI applies at once and confirm the 412 surfaces as a readable error, not a silent overwrite.</li>
+              <li>On Azure, run <code>what-if</code> against a Bicep file with several modules and check whether any resource comes back as <code>Ignore</code>. If so, your preview is lying and deployment stacks with <code>denySettings</code> matter more.</li>
+              <li>Apply a resource with a password argument, then grep the state file. Confirm whether write-only/ephemeral attributes actually keep it out.</li>
+              <li>Run one non-trivial module under both Terraform and OpenTofu with the same state, to see how real the compatibility claim is for your provider set.</li>
+              <li>Deliberately trigger a <code>ForceNew</code> replace on a throwaway resource and confirm your CI plan output makes it impossible to miss.</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
