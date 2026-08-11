@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CSS Grid — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CSS Grid</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CSS Grid</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/css-grid/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>frontend</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">CSS Grid</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">frontend</span>
+            <span class="badge">layout</span>
+            <span class="badge">browser primitive</span>
+          </div>
+          <h1 class="hero__title">CSS Grid</h1>
+          <p class="hero__tagline">A layout system where you draw the rows and columns first, then tell each element which cells it takes — two dimensions at once, decided by the parent.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">2017</div><div class="stat__label">March — shipped in Chrome 57, Firefox 52, Safari 10.1</div></div>
+          <div class="stat"><div class="stat__num">2</div><div class="stat__label">axes sized at once — rows and columns</div></div>
+          <div class="stat"><div class="stat__num">Mar 2026</div><div class="stat__label"><code>subgrid</code> reached Baseline "widely available"</div></div>
+          <div class="stat"><div class="stat__num">~60%</div><div class="stat__label">slower layout for <code>auto</code> tracks vs stretched (Igalia)</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED): the floor plan -->
+        <figure class="diagram">
+          <svg viewBox="0 0 640 320" role="img" aria-labelledby="planTitle planDesc" width="640" style="max-width:100%">
+            <title id="planTitle">A grid container drawn as a floor plan</title>
+            <desc id="planDesc">Three columns sized 200 pixels, one fraction and one fraction, and two rows. A nav area fills column one across both rows, a header spans columns two to four, and main and aside sit side by side in the second row.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="26" fill="var(--text-muted)" font-size="13">grid-template-columns: 200px 1fr 1fr;  gap: 16px</text>
+
+              <!-- track size labels -->
+              <text x="140" y="64" fill="var(--accent)" text-anchor="middle" font-size="12">200px</text>
+              <text x="295" y="64" fill="var(--accent)" text-anchor="middle" font-size="12">1fr</text>
+              <text x="465" y="64" fill="var(--accent)" text-anchor="middle" font-size="12">1fr</text>
+
+              <!-- grid lines -->
+              <g stroke="var(--border)" stroke-dasharray="4 4">
+                <line x1="70"  y1="72" x2="70"  y2="262"/>
+                <line x1="210" y1="72" x2="210" y2="262"/>
+                <line x1="380" y1="72" x2="380" y2="262"/>
+                <line x1="550" y1="72" x2="550" y2="262"/>
+                <line x1="60" y1="90"  x2="560" y2="90"/>
+                <line x1="60" y1="150" x2="560" y2="150"/>
+                <line x1="60" y1="250" x2="560" y2="250"/>
+              </g>
+
+              <!-- column line numbers -->
+              <g fill="var(--text-faint)" font-size="12" text-anchor="middle">
+                <text x="70" y="84">1</text><text x="210" y="84">2</text><text x="380" y="84">3</text><text x="550" y="84">4</text>
+                <text x="70" y="276">-4</text><text x="210" y="276">-3</text><text x="380" y="276">-2</text><text x="550" y="276">-1</text>
+              </g>
+              <!-- row line numbers -->
+              <g fill="var(--text-faint)" font-size="12" text-anchor="end">
+                <text x="56" y="94">1</text><text x="56" y="154">2</text><text x="56" y="254">3</text>
+              </g>
+
+              <!-- areas -->
+              <rect x="75"  y="95"  width="130" height="150" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="140" y="176" fill="var(--accent)" text-anchor="middle" font-size="14">nav</text>
+
+              <rect x="215" y="95"  width="330" height="50" rx="8" fill="var(--bg-elev-2)" stroke="var(--accent)"/>
+              <text x="380" y="125" fill="var(--text)" text-anchor="middle" font-size="14">header</text>
+
+              <rect x="215" y="155" width="160" height="90" rx="8" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="295" y="205" fill="var(--text)" text-anchor="middle" font-size="14">main</text>
+
+              <rect x="385" y="155" width="160" height="90" rx="8" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="465" y="205" fill="var(--text)" text-anchor="middle" font-size="14">aside</text>
+
+              <text x="20" y="302" fill="var(--text-faint)" font-size="12">header uses grid-column: 2 / 4 — the same rectangle as 2 / -1, whatever the track count.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The whole idea in one picture: the parent draws the tracks and the gaps, and each child claims a rectangle between numbered lines.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the bus-vs-floor-plan model, what Grid is <em>not</em>, and the vocabulary you need to keep reading.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: the two-phase placement and track-sizing algorithm, line-based placement, the full trade-off table, and seven failure modes.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Ten best practices with the Do/Why/Avoid triad, seven anti-patterns, four real case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to Grid? Read Overview first. Already writing <code>grid-template-columns</code> daily? Jump to Detail for the sizing algorithm and why a bare <code>1fr</code> overflows, or Practice for the rules that survive production.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

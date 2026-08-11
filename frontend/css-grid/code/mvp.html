@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CSS Grid — MVP</title>
+<style>
+/* ============================================================================
+   What this file proves, in three grids and zero dependencies:
+     1. The container owns the geometry (named areas + `auto 1fr auto` rows).
+     2. A bare `1fr` is `minmax(auto, 1fr)` — that is why layouts overflow.
+     3. `auto-fit` + `minmax()` is responsive with no media query, and
+        `subgrid` aligns card internals across the whole gallery.
+   Everything in the "chrome" block below is styling, not the concept.
+   ========================================================================= */
+
+/* --- chrome: ignore ------------------------------------------------------ */
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; background: #11151c; color: #e6e9ef;
+       font: 14px/1.4 system-ui, sans-serif; }
+h2 { margin: 28px 0 8px; font-size: 12px; letter-spacing: .08em;
+     text-transform: uppercase; color: #7f93ad; font-weight: 600; }
+.box { background: #1b2230; border: 1px solid #2f3a4c; border-radius: 4px; padding: 8px; }
+.card > * { margin: 0; }
+.card small { border-top: 1px dashed #4a5a72; padding-top: 4px; color: #9fb3cc; }
+/* --- end chrome ---------------------------------------------------------- */
+
+
+/* == CONCEPT 1 ============================================================
+   The parent draws the plan. Children never state their own width.
+   `grid-template-areas` is ASCII art of the layout — that readability is the
+   whole reason to prefer it over line numbers for a page shell.
+   ------------------------------------------------------------------------ */
+.shell {
+  display: grid;
+  /* A definite height. `1fr` rows inside an indefinite-height parent collapse
+     to zero — the classic "height: 100% chain" bug. */
+  height: 200px;
+  grid-template-areas:
+    'header header'
+    'nav    main  '
+    'footer footer';
+  /* 160px for the rail, everything left over for content. No calc(), because
+     `fr` divides the space remaining *after* fixed tracks and gaps. */
+  grid-template-columns: 160px minmax(0, 1fr);
+  /* `auto` lets header/footer size themselves. Magic numbers (64px 1fr 48px)
+     clip the moment a heading wraps or the user bumps their font size. */
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+}
+/* DOM order below matches visual order on purpose: tab order follows the DOM,
+   not the grid. Placing `nav` after `main` in HTML would look identical and
+   break keyboard navigation. */
+.shell > header { grid-area: header; }
+.shell > nav    { grid-area: nav; }
+.shell > main   { grid-area: main; }
+.shell > footer { grid-area: footer; }
+
+
+/* == CONCEPT 2 ============================================================
+   The single most common Grid surprise. Both rows hold the same long token.
+   ------------------------------------------------------------------------ */
+.row { display: grid; gap: 8px; margin-bottom: 8px; }
+
+/* `1fr` expands to `minmax(auto, 1fr)`. `auto` as a minimum means "at least
+   min-content", so an unbreakable string pushes the track past 1fr and the
+   page grows a horizontal scrollbar. */
+.row.trap  { grid-template-columns: 160px 1fr; }
+
+/* `minmax(0, 1fr)` drops the content floor. Now the track can shrink — which
+   means the item must say what to do with the excess, hence .clip. */
+.row.safe  { grid-template-columns: 160px minmax(0, 1fr); }
+.clip { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+
+/* == CONCEPT 3 ============================================================
+   Responsive without a single media query: the browser computes how many
+   180px-minimum columns fit, then splits the remainder with `1fr`.
+   ------------------------------------------------------------------------ */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+/* Subgrid: the card spans 3 of the gallery's rows and adopts them instead of
+   defining its own. Every card's price row therefore sits on the same line,
+   even though the titles wrap to different heights — no min-height magic
+   number, no ResizeObserver. */
+.card {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  gap: 4px;
+}
+</style>
+</head>
+<body>
+
+<h2>1 — Page shell: named areas, auto / 1fr / auto rows</h2>
+<section class="shell">
+  <header class="box">header — grid-area: header</header>
+  <nav class="box">nav — fixed 160px track</nav>
+  <main class="box">main — takes all leftover width and height</main>
+  <footer class="box">footer — sizes to its own content</footer>
+</section>
+
+<h2>2 — Why a bare 1fr overflows</h2>
+<div class="row trap">
+  <div class="box">160px</div>
+  <div class="box">1fr &rarr; https://example.com/unbreakable-token-abcdefghijklmnopqrstuvwxyz-0123456789</div>
+</div>
+<div class="row safe">
+  <div class="box">160px</div>
+  <div class="box clip">minmax(0,1fr) &rarr; https://example.com/unbreakable-token-abcdefghijklmnopqrstuvwxyz-0123456789</div>
+</div>
+
+<h2>3 — auto-fit gallery + subgrid card internals</h2>
+<div class="gallery">
+  <article class="card box"><h3>Alpha</h3><p>Short body.</p><small>$10</small></article>
+  <article class="card box"><h3>Beta with a deliberately long wrapping title</h3><p>Short body.</p><small>$20</small></article>
+  <article class="card box"><h3>Gamma</h3><p>A longer body that pushes this row taller than its neighbours.</p><small>$30</small></article>
+  <article class="card box"><h3>Delta</h3><p>Short body.</p><small>$40</small></article>
+</div>
+
+</body>
+</html>

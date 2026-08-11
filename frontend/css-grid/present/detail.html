@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CSS Grid · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CSS Grid</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CSS Grid</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/css-grid/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CSS Grid</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>CSS Grid Layout is a two-dimensional, line-based layout model, specified in the <a href="https://drafts.csswg.org/css-grid-2/" rel="noopener">CSS Grid Layout Module</a>. In one sentence:</p>
+        <ul>
+          <li>An element with <code>display: grid</code> becomes a <strong>grid container</strong> and starts its own
+            <span class="term">grid formatting context</span>
+            <span class="term__gloss">a self-contained layout world — margins, floats and sizing inside it do not leak out</span>.</li>
+          <li>Its in-flow <em>direct</em> children become <strong>grid items</strong>.</li>
+          <li>Each item occupies a rectangular <strong>grid area</strong> bounded by four <strong>grid lines</strong>: row-start, column-start, row-end, column-end.</li>
+        </ul>
+        <p>Sizes come from the <strong>grid sizing algorithm</strong> (§ 11–12 of the spec), which resolves column tracks and row tracks in separate passes over a set of track sizing functions. Placement of unpositioned items comes from the <strong>auto-placement algorithm</strong> (§ 8.5). Both are deterministic and specified step by step — this is not heuristic layout.</p>
+
+        <h3>The module is versioned</h3>
+        <ul>
+          <li><strong>Level 1</strong> — the core model. Shipped in Chrome 57 / Firefox 52 / Safari 10.1 (March 2017), Edge 16 (October 2017).</li>
+          <li><strong>Level 2</strong> — adds <code>subgrid</code>. Firefox 71 (2019), Safari 16 (2022), Chrome/Edge 117 (September 2023). Baseline "widely available" since March 2026.</li>
+          <li><strong>Level 3</strong> — adds masonry-style layout, now specified as <code>display: grid-lanes</code>. Shipped in Safari 26.4; behind a flag elsewhere as of mid-2026.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Explicit grid</dt><dd>Tracks you declare with <code>grid-template-columns</code> / <code>grid-template-rows</code> / <code>grid-template-areas</code>.</dd></div>
+          <div><dt>Implicit grid</dt><dd>Tracks the browser generates when an item lands outside the explicit grid. Sized by <code>grid-auto-rows</code> / <code>grid-auto-columns</code> (default <code>auto</code>).</dd></div>
+          <div><dt>Track sizing function</dt><dd>A <code>&lt;track-size&gt;</code>: a length, a percentage, <code>min-content</code>, <code>max-content</code>, <code>auto</code>, <code>fit-content(x)</code>, <code>minmax(min, max)</code>, or a flexible <code>&lt;flex&gt;</code> such as <code>1fr</code>.</dd></div>
+          <div><dt><code>fr</code>, the flexible length</dt><dd>A share of the <em>leftover</em> space after non-flexible tracks and gaps are resolved. Critically, a bare <code>1fr</code> means <code>minmax(auto, 1fr)</code>, not <code>minmax(0, 1fr)</code>. That one detail causes most grid overflow bugs.</dd></div>
+          <div><dt>Placement properties</dt><dd><code>grid-row</code> / <code>grid-column</code> (line-based, supporting <code>span N</code> and negative indices like <code>-1</code> for the last line), or <code>grid-area</code> referencing a name from <code>grid-template-areas</code>.</dd></div>
+          <div><dt><code>repeat()</code> with <code>auto-fill</code> / <code>auto-fit</code></dt><dd>Repetition count computed from available space. <code>auto-fill</code> keeps empty tracks; <code>auto-fit</code> collapses them to <code>0</code> so remaining items stretch.</dd></div>
+          <div><dt>Gutters</dt><dd><code>row-gap</code> / <code>column-gap</code> / <code>gap</code>. Gaps are consumed <em>before</em> <code>fr</code> distribution, so percentages never have to account for them.</dd></div>
+          <div><dt>Alignment</dt><dd><code>justify-*</code> on the inline axis, <code>align-*</code> on the block axis. <code>*-items</code> positions items in their areas, <code>*-content</code> positions the whole track set inside the container, <code>*-self</code> overrides per item.</dd></div>
+          <div><dt><code>subgrid</code></dt><dd>A nested grid whose tracks in one or both axes are adopted from the parent's spanned area rather than defined locally.</dd></div>
+        </dl>
+
+        <h3>How it fits with the rest of CSS</h3>
+        <p>Grid is one of the CSS <em>formatting contexts</em>, alongside block, inline, table, flex and (newer) masonry. The dividing line against Flexbox is dimensionality:</p>
+        <ul>
+          <li><strong>Flexbox</strong> sizes items along a <strong>main axis</strong>, from content outward.</li>
+          <li><strong>Grid</strong> sizes <strong>tracks</strong> from the container inward, then fits items into them.</li>
+          <li><strong>Tables</strong> size from content and cannot overlap cells.</li>
+          <li><strong>Absolute positioning</strong> gives you overlap but no automatic sizing.</li>
+        </ul>
+        <p>Grid is the only one of the four that gives you declared track geometry, two-axis alignment, overlap, and auto-placement at once.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Entirely in the browser's <strong>layout stage</strong> of the rendering pipeline — after style resolution, before paint and compositing. There is no runtime, no JavaScript, and no network cost. A grid layout invalidates and recomputes on container resize, font load, or content change — which is exactly where its performance characteristics bite.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A[HTML and CSS] --> B[Style resolution]
+    B --> C["Layout — grid placement + track sizing run here"]
+    C --> D[Paint]
+    D --> E[Composite]
+    C -.-> F["Blink LayoutNG · layout/grid/"]
+    C -.-> G["Gecko · nsGridContainerFrame"]
+    C -.-> H["WebKit · RenderGrid"]
+          </pre>
+          <figcaption class="diagram__caption">Grid is a layout-stage feature. Every engine implements the same spec in its own layout class, and nothing about it costs a network request.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Application shells</div><p>VS Code's web build, Grafana dashboards, admin panels: header / sidebar / main / status bar as named areas.</p></div>
+          <div class="card"><div class="card__title">Design systems</div><p>Tailwind's <code>grid-cols-*</code>, <code>col-span-*</code>, <code>auto-rows-*</code> utilities are thin wrappers over Grid. Bootstrap 5 ships a real CSS Grid mode alongside its Flexbox 12-column system.</p></div>
+          <div class="card"><div class="card__title">Editorial layouts</div><p>The "full-bleed inside a centered column" pattern, using named lines such as <code>[content-start] minmax(0, 65ch) [content-end]</code>.</p></div>
+          <div class="card"><div class="card__title">Card galleries</div><p><code>repeat(auto-fit, minmax(240px, 1fr))</code> for responsive tiles with no media queries.</p></div>
+          <div class="card"><div class="card__title">Card <em>internals</em></div><p><code>subgrid</code>, so every card's title, body and footer row line up across the gallery even with uneven content.</p></div>
+          <div class="card"><div class="card__title">Email and print</div><p>Mostly <em>not</em>. Grid support in email clients is patchy, and print engines vary.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Debugging</strong> — Chrome and Edge DevTools' Grid overlay (line numbers, area names, gap shading). Firefox's Grid Inspector is still the most complete, including "extend lines infinitely" and a track-size readout.</li>
+          <li><strong>Authoring</strong> — Tailwind CSS grid utilities; CSS Modules / vanilla-extract for scoped <code>grid-template-areas</code>; <code>@container</code> queries to switch templates on component width instead of viewport width.</li>
+          <li><strong>Compatibility checking</strong> — <a href="https://caniuse.com/css-grid" rel="noopener">caniuse.com/css-grid</a>, MDN's Baseline badges, and Rachel Andrew's <a href="https://github.com/rachelandrew/gridbugs" rel="noopener">gridbugs</a> list of known engine-specific bugs.</li>
+          <li><strong>Accessibility</strong> — the <code>reading-flow</code> / <code>reading-order</code> properties (Chrome 137, May 2025) decouple focus order from DOM order for grid and flex containers. That is the first real fix for Grid's source-order problem.</li>
+          <li><strong>Standards to read</strong> — <code>css-grid-2</code> (current), <code>css-grid-3</code> (grid-lanes), <code>css-align-3</code> (alignment), <code>css-box-alignment</code> for <code>gap</code>.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When it emerged, and when to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>Grid started at Microsoft. IE10 shipped a <code>-ms-grid-</code> prefixed implementation in 2012, derived from Silverlight/XAML's <code>Grid</code> panel. The W3C spec was first published in 2011, matured for six years, then landed near-simultaneously in Chrome, Firefox and Safari in <strong>March 2017</strong> — an unusually coordinated launch, driven by vendors deliberately holding back until interop was there.</p>
+            <p>The motivating problem: for two decades page layout was built from <code>float</code> (specified for wrapping text around images), <code>display: table</code> (specified for tabular data), and <code>position: absolute</code> (no auto-sizing). None of them expressed "columns of this size, rows of that size, this box spans two of each." Frameworks papered over it with percentage-width <code>float</code> classes and clearfix hacks, which broke the moment you added padding or a gutter. Flexbox (2012–2015) solved the one-dimensional case and got used for the two-dimensional case anyway, badly — nested flex rows that could not align across each other.</p>
+          </div>
+        </div>
+
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for Grid when</p>
+            <ul>
+              <li>The layout has <strong>alignment requirements across both axes</strong> — rows and columns must line up at the same time.</li>
+              <li>The container should <strong>own the geometry</strong> and children should not need to know their own width.</li>
+              <li>You want <strong>responsive behaviour without media queries</strong>, via <code>auto-fit</code> + <code>minmax()</code>.</li>
+              <li>Elements must <strong>overlap</strong> (image + caption, badge over card) and you still want automatic sizing.</li>
+              <li>You need <strong>source order independent of visual order</strong> for a specific reason — and you are prepared to handle focus order.</li>
+              <li>Nested components must <strong>share the parent's track geometry</strong> (<code>subgrid</code>).</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Avoid Grid when</p>
+            <ul>
+              <li>The layout is a <strong>single line</strong> of items — a toolbar, a button row, a tag list. Flexbox is fewer declarations and wraps more naturally.</li>
+              <li>The data is <strong>actually tabular</strong>. Use <code>&lt;table&gt;</code>; <code>display: grid</code> on a table strips its accessibility semantics unless you re-add ARIA roles, which is a maintenance trap.</li>
+              <li>Items must <strong>size themselves and wrap on their own content width</strong> with no cross-item alignment. That is exactly Flexbox's <code>flex-wrap</code>.</li>
+              <li>You are <strong>reordering content visually for aesthetics</strong> rather than structure — keyboard and screen-reader order still follows the DOM, and <code>reading-flow</code> is not yet cross-browser.</li>
+              <li>You are targeting <strong>email clients</strong> or legacy print pipelines.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Grid layout is a two-pass process: <strong>place first, then size</strong>. Sizing runs the same algorithm twice — once for columns, once for rows — because row sizes usually depend on column widths (text wraps), not the reverse.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph P1["Phase 1 — placement, spec 8.5"]
+        A1["1 · Place every item with a definite row AND column"] --> A2["2 · Place items locked to a row, growing the implicit grid as needed"]
+        A2 --> A3["3 · Fix the column count of the implicit grid"]
+        A3 --> A4["4 · Sweep the rest with a placement cursor. Sparse mode never moves backwards, so a wide item can leave a hole"]
+    end
+    subgraph P2["Phase 2 — track sizing, spec 12, run once per axis"]
+        B1["1 · Initialize base size and growth limit. fr tracks start with an infinite growth limit"] --> B2["2 · Resolve intrinsic sizes from item min-content and max-content contributions"]
+        B2 --> B3["3 · Maximize tracks — grow base sizes toward growth limits with free space"]
+        B3 --> B4["4 · Expand flexible tracks — hypothetical fr size times each flex factor"]
+        B4 --> B5["5 · Stretch auto tracks — split what remains equally"]
+    end
+    P1 --> P2
+          </pre>
+          <figcaption class="diagram__caption">The two phases. Placement decides <em>which</em> cells; sizing decides <em>how big</em> — and sizing runs twice, columns before rows.</figcaption>
+        </figure>
+
+        <h3>Phase 1 — placement (§ 8.5)</h3>
+        <ol class="steps">
+          <li><span class="steps__title">Definite items first.</span> Position anything with a definite row <em>and</em> column position.</li>
+          <li><span class="steps__title">Row-locked items.</span> Process items locked to a row (in <code>grid-auto-flow: row</code>), growing the
+            <span class="term">implicit grid</span>
+            <span class="term__gloss">extra tracks the browser invents because an item landed outside the tracks you declared</span>
+            as needed.</li>
+          <li><span class="steps__title">Column count.</span> Determine the number of columns in the implicit grid.</li>
+          <li><span class="steps__title">Cursor sweep.</span> Sweep the remaining items with a placement cursor. In default <em>sparse</em> mode the cursor never moves backwards, so a wide item can leave a hole. <code>grid-auto-flow: dense</code> resets the cursor and backfills holes — which is why <code>dense</code> visually reorders items and is an accessibility hazard.</li>
+        </ol>
+
+        <h3>Phase 2 — track sizing (§ 12), per axis</h3>
+        <ol class="steps">
+          <li><span class="steps__title">Initialize track sizes.</span> Each track gets a base size (from its min function) and a growth limit (from its max function). <code>fr</code> tracks start with an infinite growth limit.</li>
+          <li><span class="steps__title">Resolve intrinsic track sizes.</span> Items are laid out to find their min-content and max-content contributions. Items spanning several
+            <span class="term">intrinsic tracks</span>
+            <span class="term__gloss">tracks sized from their content — auto, min-content, max-content — rather than from a number</span>
+            are handled by distributing extra space across the spanned tracks (§ 12.5.1), smallest span count first.</li>
+          <li><span class="steps__title">Maximize tracks.</span> Grow base sizes toward growth limits using free space.</li>
+          <li><span class="steps__title">Expand flexible tracks.</span> Compute a <em>hypothetical fr size</em> and multiply by each flex factor. If the total flex factor is under 1, tracks get only their fraction of free space, not all of it.</li>
+          <li><span class="steps__title">Stretch <code>auto</code> tracks.</span> If <code>align-content</code> / <code>justify-content</code> is <code>normal</code> or <code>stretch</code>, remaining space is split equally among <code>auto</code>-max tracks.</li>
+        </ol>
+
+        <h3>Placement is line-based, and lines count from both ends</h3>
+        <p>Items are placed between numbered lines, not into cells. Positive numbers count from the start, negative numbers from the end, so <code>-1</code> is always the last line no matter how many tracks exist.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 250" role="img" aria-labelledby="lineTitle lineDesc" width="640" style="max-width:100%">
+            <title id="lineTitle">Line-based placement with negative indices</title>
+            <desc id="lineDesc">A three-track ruler with column lines numbered one to four on top and minus four to minus one below. An item placed from line two to line four is the same rectangle as one placed from line two to line minus one.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="24" fill="var(--text-muted)">grid-template-columns: 200px 1fr 1fr</text>
+
+              <!-- lines -->
+              <g stroke="var(--accent)" stroke-width="2">
+                <line x1="40"  y1="52" x2="40"  y2="196"/>
+                <line x1="220" y1="52" x2="220" y2="196"/>
+                <line x1="420" y1="52" x2="420" y2="196"/>
+                <line x1="620" y1="52" x2="620" y2="196"/>
+              </g>
+              <g fill="var(--accent)" font-size="13" text-anchor="middle">
+                <text x="40" y="46">1</text><text x="220" y="46">2</text><text x="420" y="46">3</text><text x="620" y="46">4</text>
+              </g>
+              <g fill="var(--text-faint)" font-size="13" text-anchor="middle">
+                <text x="40" y="214">-4</text><text x="220" y="214">-3</text><text x="420" y="214">-2</text><text x="620" y="214">-1</text>
+              </g>
+
+              <!-- track labels -->
+              <g fill="var(--text-muted)" font-size="12" text-anchor="middle">
+                <text x="130" y="74">200px</text><text x="320" y="74">1fr</text><text x="520" y="74">1fr</text>
+              </g>
+
+              <!-- items -->
+              <rect x="46" y="86" width="168" height="44" rx="6" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="130" y="113" fill="var(--text)" text-anchor="middle" font-size="13">nav · 1 / 2</text>
+
+              <rect x="226" y="86" width="388" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="420" y="113" fill="var(--accent)" text-anchor="middle" font-size="13">header · grid-column: 2 / 4</text>
+
+              <rect x="226" y="142" width="388" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="5 4"/>
+              <text x="420" y="169" fill="var(--accent)" text-anchor="middle" font-size="13">same rectangle written as 2 / -1</text>
+
+              <text x="20" y="240" fill="var(--text-faint)" font-size="12">Add a fourth track and 2 / -1 still reaches the end; 2 / 4 would have to be rewritten.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Why lines, not cells: spanning, negative indices and <code>subgrid</code> all fall out of a line model for free.</figcaption>
+        </figure>
+
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">The automatic minimum size rule (§ 6.6)</p>
+            <p>Underneath all of this: a grid item in a track with an <code>auto</code> minimum and a non-flexible max gets <code>min-width: auto</code>, meaning <em>at least its min-content size</em>. A long unbreakable string or a wide <code>&lt;img&gt;</code> therefore forces its column wider than <code>1fr</code> implies. This is the single most common surprise in Grid.</p>
+          </div>
+        </div>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>grid-template-areas</code> vs line numbers</td><td>Readable, self-documenting layout; trivial to re-map per breakpoint</td><td>Only rectangular areas; every area needs a name; awkward for dozens of items</td></tr>
+              <tr><td><code>1fr</code> vs <code>minmax(0, 1fr)</code></td><td><code>1fr</code> never clips content</td><td><code>1fr</code> lets wide content blow the track out; <code>minmax(0,1fr)</code> needs <code>overflow</code>/<code>text-overflow</code> handling</td></tr>
+              <tr><td><code>auto-fit</code> vs <code>auto-fill</code></td><td><code>auto-fit</code> stretches items to fill the row</td><td><code>auto-fill</code> keeps a stable column rhythm; <code>auto-fit</code> makes a single item full-width</td></tr>
+              <tr><td><code>dense</code> packing vs sparse</td><td>No holes, tighter visual result</td><td>Visual order diverges from DOM order — bad for keyboard users</td></tr>
+              <tr><td>Intrinsic tracks (<code>auto</code>, <code>min-content</code>) vs fixed/<code>fr</code></td><td>Content-driven sizing, no magic numbers</td><td>Measurably slower; cost scales with item count</td></tr>
+              <tr><td>Subgrid vs re-declaring tracks</td><td>True cross-component alignment</td><td>Deeper layout dependency chains; more relayout on change</td></tr>
+              <tr><td>Grid vs Flexbox for the same job</td><td>Two-axis control, no wrapper divs</td><td>More verbose for one-dimensional cases</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Column blows past its <code>1fr</code> width</p>
+            <p>A long URL, a <code>&lt;pre&gt;</code>, or an unsized image sets a min-content floor via <code>min-width: auto</code>. Fix: <code>minmax(0, 1fr)</code>, or <code>min-width: 0</code> on the item.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Grid ignores your grandchildren</p>
+            <p>Only direct children are grid items. A wrapper <code>&lt;div&gt;</code> between container and content silently breaks placement.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Rows collapse to zero on a <code>height: 100%</code> container</p>
+            <p>Percentage row tracks resolve against an indefinite height and behave as <code>auto</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>auto-fit</code> gives one giant card</p>
+            <p>With a single item, all other tracks collapse to <code>0</code> and the item stretches full width. Use <code>auto-fill</code>, or cap with <code>minmax(240px, 400px)</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Focus order jumps around</p>
+            <p><code>order</code>, <code>dense</code>, or explicit placement moved things visually; the tab sequence still follows the DOM. Fix the DOM, or use <code>reading-flow: grid-order</code> where supported.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Layout gets slow at scale</p>
+            <p>Items spanning intrinsic tracks must be measured against every candidate position, and the CSSWG has flagged this as quadratic in both spanning-item count and column count (<a href="https://lists.w3.org/Archives/Public/public-css-archive/2024May/0011.html" rel="noopener">csswg-drafts #10266</a>). Igalia's measurements found <code>auto</code> tracks roughly 60% slower than stretched tracks, with the gap widening as the grid grows. Fix: fixed or <code>fr</code> tracks, plus <code>content-visibility: auto</code> on off-screen sections.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Subgrid renders but nothing aligns</p>
+            <p><code>subgrid</code> only inherits the axis where you wrote the keyword, and only across the area the subgrid item actually spans.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Layout is a constraint-satisfaction problem: given a container of unknown size and content of unknown size, assign positions such that alignment, spacing and overflow rules hold. Before Grid, CSS had no vocabulary for expressing those constraints in two dimensions, so authors encoded them imperatively — in percentages, in JavaScript resize handlers, in nested wrapper elements whose only job was to create an axis. Grid moves the constraint solving into the engine, where it runs on every reflow at native speed and responds to font loads, zoom and container resize without an author-written listener.</p>
+
+        <p>The picture below is the bug that <code>minmax(0, 1fr)</code> prevents — and the one the <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/css-grid/code" target="_blank" rel="noopener">MVP demo</a> makes visible by producing a real horizontal scrollbar.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 250" role="img" aria-labelledby="ovfTitle ovfDesc" width="640" style="max-width:100%">
+            <title id="ovfTitle">Why a bare 1fr overflows</title>
+            <desc id="ovfDesc">Two rows hold the same long unbreakable URL. The row using a bare 1fr pushes past the container edge and creates a horizontal scrollbar. The row using minmax of zero and 1fr truncates the URL with an ellipsis and stays inside the container.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- container edge -->
+              <line x1="470" y1="26" x2="470" y2="230" stroke="var(--text-faint)" stroke-dasharray="5 4"/>
+              <text x="466" y="22" fill="var(--text-faint)" font-size="12" text-anchor="end">container edge</text>
+
+              <!-- row 1: 1fr -->
+              <text x="20" y="52" fill="var(--danger)" font-size="13">grid-template-columns: 160px 1fr</text>
+              <rect x="20" y="62" width="120" height="40" rx="6" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="80" y="87" fill="var(--text-muted)" text-anchor="middle" font-size="12">label</text>
+              <rect x="150" y="62" width="470" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="162" y="87" fill="var(--danger)" font-size="12">https://example.com/a-very-long-unbreakable-url…</text>
+              <polygon points="632,82 618,75 618,89" fill="var(--danger)"/>
+              <text x="20" y="122" fill="var(--danger)" font-size="12">min-width: auto forces the track to min-content ⇒ horizontal scrollbar.</text>
+
+              <!-- row 2: minmax(0,1fr) -->
+              <text x="20" y="160" fill="var(--success)" font-size="13">grid-template-columns: 160px minmax(0, 1fr)</text>
+              <rect x="20" y="170" width="120" height="40" rx="6" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="80" y="195" fill="var(--text-muted)" text-anchor="middle" font-size="12">label</text>
+              <rect x="150" y="170" width="320" height="40" rx="6" fill="var(--success-soft)" stroke="var(--success)"/>
+              <text x="162" y="195" fill="var(--success)" font-size="12">https://example.com/a-very-long-un…</text>
+              <text x="20" y="230" fill="var(--success)" font-size="12">Zero minimum ⇒ the track stays inside the container; the text ellipsises.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The failure Grid's default deliberately allows: a bare <code>1fr</code> never clips content, so wide content pushes the track — and the page — wider.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <ul>
+          <li><strong>Line-based placement rather than cell-based.</strong> Saying "this item is in cell (2,3)" would have been simpler — that is how HTML tables and most JS grid libraries work. Lines were chosen because spanning, negative indexing and <code>subgrid</code> then fall out for free: <code>grid-column: 1 / -1</code> means "first line to last line" regardless of how many tracks exist, so a layout stays correct when a track is added. A cell-coordinate model would need every span rewritten when the track count changes.</li>
+          <li><strong><code>fr</code> as a flexible length rather than a percentage.</strong> Percentages resolve against the container's content box and therefore double-count gaps; <code>fr</code> resolves against free space <em>after</em> gaps and fixed tracks, so <code>grid-template-columns: 200px 1fr; gap: 16px</code> is exact with no <code>calc()</code>. The cost: <code>fr</code> is not a plain length — it takes part in a separate expansion phase and cannot be used inside <code>calc()</code>.</li>
+          <li><strong><code>fr</code> defaulting to <code>minmax(auto, 1fr)</code>.</strong> The alternative, a <code>0</code> minimum, would silently clip content and make overflow the default. The committee chose "never lose content by default" and accepted that authors would sometimes need <code>minmax(0, 1fr)</code>. It is a defensible trade, and it is why that snippet is in every senior frontend engineer's muscle memory.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>Grid is stable infrastructure, not a trend, but three things changed recently enough to be worth re-learning:</p>
+        <ul>
+          <li><strong><code>subgrid</code></strong> reached Baseline "widely available" in March 2026, so cross-component alignment is finally safe to ship without fallbacks.</li>
+          <li><strong><code>reading-flow</code> / <code>reading-order</code></strong> (Chrome 137) begins closing the ten-year-old accessibility gap between visual and DOM order — watch for Firefox and Safari.</li>
+          <li><strong><code>display: grid-lanes</code></strong> in <a href="https://drafts.csswg.org/css-grid-3/" rel="noopener">CSS Grid Level 3</a> shipped in Safari 26.4, ending the long masonry debate. It reuses <code>fr</code>, <code>gap</code>, <code>auto-fill</code>, <code>minmax()</code>, spanning and <code>subgrid</code>, and adds <code>flow-tolerance</code> to control how aggressively items chase the shortest lane. Treat it as progressive enhancement behind <code>@supports (display: grid-lanes)</code> until Chromium ships it unflagged.</li>
+        </ul>
+        <p>Combined with container queries, Grid is also what makes genuinely component-scoped layout possible: a card can pick its own template based on its own width, with no viewport media query anywhere in the chain.</p>
+
+        <h2>Open questions to verify in practice</h2>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Things worth measuring yourself</p>
+            <ul>
+              <li>Build a 2,000-item grid with <code>auto</code> rows versus fixed rows and compare layout time in DevTools' Performance panel. Does the ~60% figure hold on current Blink?</li>
+              <li>Does <code>minmax(0, 1fr)</code> change anything visible in a layout with no overflowing content, or is it a free default you should always write?</li>
+              <li>How does <code>subgrid</code> behave when the subgrid item spans fewer tracks than it has children — does it overflow, or generate implicit tracks?</li>
+              <li>Test <code>reading-flow: grid-order</code> with a real screen reader (NVDA, VoiceOver). Does the announced order match the visual order, or only the tab order?</li>
+              <li>Compare <code>repeat(auto-fit, minmax(240px, 1fr))</code> against a container-query-driven template on the same component. Which gives better breakpoints for a card that appears in both a sidebar and a full-width page?</li>
+              <li>Confirm the current <code>grid-lanes</code> flag status in Chrome Canary and Firefox Nightly before assuming the mid-2026 picture still holds.</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

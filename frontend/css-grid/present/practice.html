@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CSS Grid · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CSS Grid</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CSS Grid</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/css-grid/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CSS Grid</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Grid is the one piece of CSS everyone touches and nobody wants to own, because a mistake in it shifts every screen in the product at once. Four settings dominate:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Admin tools and dashboards</div><p>Grid is the <strong>application shell</strong>: header, collapsible sidebar, main scroll region, status bar.</p></div>
+          <div class="card"><div class="card__title">E-commerce and content storefronts</div><p>Grid owns the <strong>product/card gallery</strong> and increasingly the <em>inside</em> of each card. This is where Grid meets Core Web Vitals: the gallery is usually where your
+            <span class="term">Largest Contentful Paint</span>
+            <span class="term__gloss">the metric for how long the biggest visible element takes to render</span>
+            element lives, and a badly sized track is a Cumulative Layout Shift bug reported as "the page jumps when images load".</p></div>
+          <div class="card"><div class="card__title">Design systems</div><p>Grid shows up twice — as blessed layout primitives (<code>&lt;Stack&gt;</code>, <code>&lt;Cluster&gt;</code>, <code>&lt;PageShell&gt;</code>), and as raw utility classes (<code>grid-cols-12</code>, <code>col-span-4</code>) sprinkled into JSX. Which of the two dominates tells you a lot about how the codebase will age.</p></div>
+          <div class="card"><div class="card__title">Editorial / CMS front ends</div><p>Grid implements "centered measure with full-bleed escapes": the article body constrained to <code>65ch</code>, with pull-quotes and hero images breaking out to the viewport edge, all from one template on the article container.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    Q1{"Do rows AND columns need to line up?"}
+    Q1 -- "no, it is one line of items" --> F["Flexbox — fewer declarations, wraps naturally"]
+    Q1 -- "it is real tabular data" --> T["Use a table element, not display: grid"]
+    Q1 -- yes --> Q2{"Stable, nameable regions?"}
+    Q2 -- yes --> A["grid-template-areas — shell, article, form"]
+    Q2 -- "no, it is generated from a list" --> B["Line-based placement — grid-column: span 4"]
+    A --> C{"Must nested cards align with siblings?"}
+    B --> C
+    C -- yes --> S["subgrid on the card"]
+    C -- no --> D["Plain nested grid"]
+          </pre>
+          <figcaption class="diagram__caption">The choice, in order: Flexbox or Grid, then named areas or line numbers, then subgrid or not.</figcaption>
+        </figure>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Write the DOM in reading order first, then lay it out</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Author the HTML in the order a screen-reader or keyboard user should meet it, then use Grid to place it visually. Treat any divergence as a decision that needs a reason.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Tab order and screen-reader order follow the DOM, not the grid. A "just move the sidebar up on mobile" CSS tweak silently produces a keyboard trap where focus jumps from the footer back to the nav.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Reordering with <code>order</code> or explicit placement purely because the visual comp reads better that way.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Use <code>minmax(0, 1fr)</code> for any track holding unknown content</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Default content-bearing columns to <code>minmax(0, 1fr)</code> and pair it with <code>overflow: hidden</code> / <code>text-overflow: ellipsis</code> or <code>overflow-wrap: anywhere</code> on the item.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A bare <code>1fr</code> is <code>minmax(auto, 1fr)</code>. One customer with a 90-character email address, one un-wrapped log line, one image without <code>max-width: 100%</code> — and the column blows out and the whole layout gets a horizontal scrollbar in production but not in your seeded dev data.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Debugging track overflow by adding <code>overflow: hidden</code> on the <em>container</em>. It hides the symptom and clips real content.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Named areas for shells, line numbers for data</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>grid-template-areas</code> for the handful of layouts with stable, nameable regions (shell, article, form). Use line-based placement (<code>grid-column: span 4</code>) for anything generated from a list.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Named areas let you re-map an entire layout per breakpoint in three lines of ASCII — the single biggest readability win in a shell. But an area name must exist for every region, so a 60-card gallery with named areas is unmaintainable.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Mixing both in one container. Reviewers can no longer tell where an item lands without running the page.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Know whether you want <code>auto-fit</code> or <code>auto-fill</code> before you type it</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>auto-fill</code> when a stable column rhythm matters (catalogue pages, dashboards). <code>auto-fit</code> when items should stretch to consume the row.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>With one item left after filtering, <code>auto-fit</code> collapses the empty tracks and you ship a single card that is 1400px wide. This is a real bug report, usually filed as "search results look broken".</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Copy-pasting <code>repeat(auto-fit, minmax(240px, 1fr))</code> everywhere. If you use <code>auto-fit</code>, cap it with <code>minmax(240px, 400px)</code> or a <code>justify-content: start</code>.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 250" role="img" aria-labelledby="fitTitle fitDesc" width="640" style="max-width:100%">
+            <title id="fitTitle">auto-fill versus auto-fit with one item left</title>
+            <desc id="fitDesc">With a single card remaining, auto-fill keeps the empty 220 pixel tracks so the card stays card-sized, while auto-fit collapses the empty tracks to zero and the single card stretches across the whole row.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="24" fill="var(--text-muted)">repeat(auto-fill | auto-fit, minmax(220px, 1fr))  ·  one search result left</text>
+
+              <!-- auto-fill -->
+              <text x="20" y="58" fill="var(--success)" font-size="13">auto-fill — empty tracks are kept</text>
+              <rect x="20"  y="70" width="140" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="90" y="103" fill="var(--accent)" text-anchor="middle" font-size="12">card</text>
+              <g fill="none" stroke="var(--border)" stroke-dasharray="5 4">
+                <rect x="172" y="70" width="140" height="56" rx="6"/>
+                <rect x="324" y="70" width="140" height="56" rx="6"/>
+                <rect x="476" y="70" width="140" height="56" rx="6"/>
+              </g>
+              <g fill="var(--text-faint)" font-size="12" text-anchor="middle">
+                <text x="242" y="103">empty</text><text x="394" y="103">empty</text><text x="546" y="103">empty</text>
+              </g>
+              <text x="20" y="146" fill="var(--text-faint)" font-size="12">Column rhythm stays stable — the card is still card-sized.</text>
+
+              <!-- auto-fit -->
+              <text x="20" y="184" fill="var(--danger)" font-size="13">auto-fit — empty tracks collapse to 0</text>
+              <rect x="20" y="196" width="596" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="318" y="218" fill="var(--danger)" text-anchor="middle" font-size="12">one card stretched to the full row width</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Same declaration, one keyword apart. <code>auto-fill</code> preserves the rhythm; <code>auto-fit</code> hands the whole row to whatever is left.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Switch templates on container width, not viewport width</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Wrap reusable layout components in <code>container-type: inline-size</code> and change <code>grid-template-columns</code> inside
+              <span class="term">@container queries</span>
+              <span class="term__gloss">CSS rules that respond to a parent element's width instead of the whole viewport</span>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The same card appears in a 320px sidebar and a 1200px main column. Viewport media queries give it the wide template in both, and you end up with per-page override classes — the exact thing that makes a design system stop being reusable.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>An <code>isCompact</code> React prop threaded through five components to do what one <code>@container</code> rule does.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Use <code>subgrid</code> instead of fixed heights or JS measuring</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For cards whose title/body/footer must line up across a row, make the card <code>display: grid; grid-template-rows: subgrid; grid-row: span 3</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The pre-2023 alternatives were <code>min-height</code> magic numbers (broken by translation into German) or a <code>ResizeObserver</code> loop that measures and sets heights — a reflow per frame, plus a flash of misalignment. Subgrid is Baseline widely available as of March 2026; the fallback burden is gone.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Writing <code>grid-template-rows: subgrid</code> on an element that is not a direct grid item, or on the axis you didn't span. It fails silently.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Keep track sizing functions cheap on large grids</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Prefer fixed lengths and <code>fr</code> over <code>auto</code> / <code>min-content</code> / <code>max-content</code> in grids with hundreds of items. Add <code>content-visibility: auto</code> plus <code>contain-intrinsic-size</code> on off-screen sections.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Intrinsic track sizing requires laying out items to measure them, and items spanning several intrinsic tracks are resolved by span count — cost grows superlinearly with spanning items and column count. On a 2,000-row grid this is the difference between a 4ms and a 90ms layout on every resize.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A
+              <span class="term">virtualized list</span>
+              <span class="term__gloss">a list that renders only the visible rows and swaps them as you scroll</span>
+              whose row template uses <code>auto</code> columns — you pay measurement cost on every scroll-driven DOM swap.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Put the grid in tokens, not in every component</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Define the gutter scale, the shell template and the card min-width once — CSS custom properties or design-system components — and reference them.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Otherwise <code>gap: 16px</code> / <code>gap: 1rem</code> / <code>gap: 15px</code> coexist, and a designer's "tighten the gutters" ticket becomes a 90-file PR.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hardcoding a 12-column grid because the design tool uses one. Most real layouts need 2–4 named regions, not 12 anonymous ones.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Let the grid handle direction; don't hardcode left and right</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Rely on Grid's logical axes (<code>justify-*</code> is the inline axis) and name areas semantically — <code>nav</code>, <code>main</code>, <code>aside</code> — not positionally.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Grid flips correctly for RTL locales out of the box. Area names called <code>left-rail</code> do not flip, and the mismatch surfaces as a confusing Arabic/Hebrew layout six months after launch.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>direction: rtl</code> overrides that re-specify column order manually.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Gate genuinely new features behind <code>@supports</code>, but stop writing legacy Grid fallbacks</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>@supports (display: grid-lanes)</code> for masonry-style layouts; ship plain Grid and <code>subgrid</code> unconditionally.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Grid Level 1 has been interoperable since 2017 — float fallbacks are dead weight that doubles the surface area of every layout change. Level 3 <code>grid-lanes</code> is not: it shipped in Safari 26.4 and is flagged elsewhere as of mid-2026.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>@supports not (display: grid)</code> blocks in a 2026 codebase, and <code>-ms-grid-</code> prefixes, which are a different, incompatible spec.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The wrapper div</p>
+            <p>Someone adds a <code>&lt;div className="wrapper"&gt;</code> between the grid container and its content, usually for a click handler or a React fragment replacement. Only <em>direct</em> children are grid items, so every placement rule silently applies to one full-width wrapper instead. Use <code>display: contents</code> on the wrapper — with care, it removes the box from the accessibility tree in older engines — or move the grid down a level.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Grid-as-table</p>
+            <p>Applying <code>display: grid</code> to a <code>&lt;table&gt;</code>, or building a data table from <code>&lt;div&gt;</code>s so columns can align. It strips the table's native semantics, and re-adding <code>role="grid"</code> gets you an interactive widget contract — arrow-key navigation, focus management — that you almost certainly haven't implemented. Use a real <code>&lt;table&gt;</code>; use <code>subgrid</code> if you need cross-row alignment inside cells.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Magic-number rows</p>
+            <p><code>grid-template-rows: 64px 1fr 48px</code> for a shell. It works until the header wraps to two lines at a narrow width or a user bumps their font size, and then content is clipped. Use <code>auto 1fr auto</code> and let the content declare its own height.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Dense packing on ordered content</p>
+            <p><code>grid-auto-flow: dense</code> to close the holes left by a spanning item. It reorders items visually while the DOM stays put, so "item 7" appears before "item 5" for sighted users and after it for everyone else. Only use <code>dense</code> when order genuinely carries no meaning — a photo mosaic, not search results.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Percentage tracks plus <code>gap</code></p>
+            <p><code>grid-template-columns: 33% 33% 33%; gap: 24px</code>. Percentages resolve against the content box and know nothing about gaps, so the row overflows. <code>fr</code> resolves against space remaining <em>after</em> gaps — that is the whole point of the unit.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The <code>height: 100%</code> chain</p>
+            <p>A grid with <code>1fr</code> rows inside a parent with indefinite height. Percentage and flexible row tracks collapse, and you get a zero-height main region. Give the container a definite height (<code>100dvh</code>), or <code>min-height: 0</code> on intermediate flex/grid items.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Utility-class layout sprawl</p>
+            <p><code>col-span-3 md:col-span-6 lg:col-span-4</code> repeated across 200 JSX files. Layout logic now lives in markup where no reviewer sees it as a whole, and a template change requires a regex. Extract the recurring shapes into named layout components.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Observability dashboard shell</div>
+            <p>B2B SaaS, tens of thousands of daily users. Header, resizable left nav, main panel, right drawer. The grid is defined once with named areas; the nav width is a custom property (<code>--nav-w</code>) that a drag handle writes to, so resizing is a single track-size change instead of a JS-driven relayout of every panel. <em>Non-obvious lesson:</em> animating a track size in <code>grid-template-columns</code> triggers full grid layout each frame. Animating the custom property with <code>@property</code> and <code>transition</code> gives the same visual result but only stays inside the compositor's budget if nothing inside the panel does intrinsic sizing. Test with the Performance panel, not by eye.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Product listing page</div>
+            <p>Retail, catalogue in the tens of thousands of SKUs. <code>repeat(auto-fill, minmax(220px, 1fr))</code> for the gallery, <code>subgrid</code> inside each card so title/price/rating rows align even when one title wraps to three lines. Images carry explicit <code>width</code>/<code>height</code> (or <code>aspect-ratio</code>) so the row height is known before the image loads. <em>Non-obvious lesson:</em> the CLS win comes from the image attributes, not from Grid — Grid just stops you needing a JS masonry library that would have made CLS worse.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Long-form editorial site</div>
+            <p>Publisher, CMS-authored body content. The article container uses named lines: <code>[full-start] minmax(1rem, 1fr) [content-start] min(65ch, 100%) [content-end] minmax(1rem, 1fr) [full-end]</code>. Every child defaults to <code>grid-column: content</code>, and a <code>.full-bleed</code> class opts into <code>grid-column: full</code>. <em>Non-obvious lesson:</em> the pattern survives arbitrary CMS output because it is opt-out by default — editors cannot break the measure, they can only escape it deliberately.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Design-system migration</div>
+            <p>Platform team, ~40 product engineers. A 12-column Flexbox framework grid replaced by three layout components backed by native Grid. The team kept both alive for two quarters behind a lint rule that blocked <em>new</em> uses of the old classes. <em>Non-obvious lesson:</em> the migration blocker was never the CSS — it was the ~200 places where the old grid's implicit <code>padding</code> on columns had been used as spacing. Grid's <code>gap</code> doesn't add padding, so every one of those sites needed a visual diff.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Overflow:</strong> does every <code>1fr</code> track holding user-supplied text use <code>minmax(0, 1fr)</code> or an explicit <code>min-width: 0</code>, and has the layout been tested with a 200-character unbroken string?</li>
+              <li><strong>Reading order:</strong> does tab order match visual order at every breakpoint? Tab through the page at 360px, 768px and 1440px — a 60-second check that catches most Grid a11y bugs.</li>
+              <li><strong>Zoom and text scaling:</strong> does the layout hold at 200% browser zoom and with <code>text-size-adjust</code> bumped? Fixed row heights fail here first.</li>
+              <li><strong>Layout shift:</strong> are images and embeds inside grid items given <code>aspect-ratio</code> or <code>width</code>/<code>height</code>, and is CLS monitored in RUM on the gallery/LCP page?</li>
+              <li><strong>Performance:</strong> on the largest grid in the app, what is layout time in the Performance panel on resize? Are intrinsic (<code>auto</code>, <code>min-content</code>) tracks used anywhere with more than ~100 items?</li>
+              <li><strong>Internationalization:</strong> does the layout flip correctly under <code>dir="rtl"</code>, and do the longest translated strings (German, Finnish) still fit their tracks?</li>
+              <li><strong>Semantics:</strong> is anything using <code>display: grid</code> on a <code>&lt;table&gt;</code>, <code>&lt;ul&gt;</code> or <code>&lt;dl&gt;</code> in a way that changes what assistive tech reports? <code>display: grid</code> on a <code>&lt;ul&gt;</code> removes list semantics in Safari/VoiceOver unless <code>role="list"</code> is restored.</li>
+              <li><strong>Ownership:</strong> is the gutter/track scale defined in one place, and can a new engineer find the page shell's grid definition in under two minutes?</li>
+              <li><strong>Progressive enhancement:</strong> is any Level 3 feature (<code>grid-lanes</code>) behind <code>@supports</code> with a tested non-masonry fallback?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">One grid — the page shell.</span> It replaces a nest of flex wrappers, everyone is pleased, and Grid is considered "adopted". Nothing else changes for months because the existing components already work.</li>
+          <li><span class="steps__title">Utility-class sprawl.</span> Grid utilities from Tailwind or an in-house equivalent leak into feature code, and layout decisions scatter across hundreds of components. This phase feels productive and is — until the first global design change, when you discover there is no single place that describes what the layouts are. The painful migration point is right here: consolidating scattered utilities into a small set of named layout primitives, which is tedious because every consolidation is a visual diff that only a human can approve.</li>
+          <li><span class="steps__title">Component-scoped layout.</span> Container queries plus <code>subgrid</code>, where a card decides its own template from its own width and inherits alignment from its gallery. This is where the codebase stops needing layout props and per-page overrides. Teams that reach it usually got there by first paying the consolidation cost — you cannot bolt container queries onto layout logic that lives in 200 JSX files. Budget for that consolidation before it becomes urgent.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.smashingmagazine.com/2018/04/best-practices-grid-layout/" rel="noopener">Best Practices With CSS Grid Layout</a> — Rachel Andrew, who edited the spec, on the questions that actually come up: areas vs lines, when to nest, when not to use Grid at all.</li>
+          <li><a href="https://matuzo.at/blog/the-dark-side-of-the-grid" rel="noopener">The Dark Side of the Grid, Part 1</a> and <a href="https://matuzo.at/blog/the-dark-side-of-the-grid-part-2" rel="noopener">Part 2</a> — Manuel Matuzovic on Grid's accessibility failure modes; Part 2 is the definitive treatment of source order vs visual order.</li>
+          <li><a href="https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_grid_layout/Grid_layout_and_accessibility" rel="noopener">Grid layout and accessibility</a> — MDN's short, authoritative version of the same problem, including the current state of <code>reading-flow</code>.</li>
+          <li><a href="https://drafts.csswg.org/css-grid-2/" rel="noopener">CSS Grid Layout Module Level 2</a> — read § 6.6 (automatic minimum size) and § 12 (track sizing) once; they explain nearly every Grid bug you will ever file.</li>
+          <li><a href="https://github.com/rachelandrew/gridbugs" rel="noopener">gridbugs</a> — a curated list of engine-specific Grid bugs with test cases. Check it before assuming your layout is wrong.</li>
+          <li><a href="https://webkit.org/blog/15269/help-us-invent-masonry-layouts-for-css-grid-level-3/" rel="noopener">Help us invent CSS Grid Level 3, aka "Masonry" layout</a> — WebKit's argument for why masonry belongs in Grid, useful background before you adopt <code>grid-lanes</code>.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/css-grid/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

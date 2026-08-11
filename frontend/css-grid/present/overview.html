@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CSS Grid · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">CSS Grid</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">CSS Grid</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/css-grid/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">CSS Grid</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Before Grid, page layout was built out of tools meant for other jobs: floats (made for wrapping text around images) and tables (made for tabular data). Both worked. Both were miserable.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Grid has shipped in every browser since 2017. A container declares an actual grid of
+              <span class="term">tracks</span>
+              <span class="term__gloss">rows and columns — one track is one row or one column</span>
+              — <code>grid-template-columns: 200px 1fr 200px</code> — and each child claims a rectangle inside it. The layout maths (leftover space, gaps, stretching) is the browser's problem, not yours. If you have ever fought a three-column dashboard with a sticky sidebar, this is the tool that ends the fight.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of laying out a floor of an office building.</p>
+        <ul>
+          <li><strong>Flexbox is seating people on a bus.</strong> One aisle, one direction. You hand the driver a rule — "spread everyone out evenly", "push the last two to the back" — and passengers arrange themselves along that single line. Simple, and it adapts well when someone gets off. But if you want the person in seat 3 to line up with someone in a different row, you are out of luck: rows do not know about each other.</li>
+          <li><strong>Grid is the architect's floor plan.</strong> You draw the walls before anyone moves in: three columns, four rows, a 16px corridor between everything. Then you assign tenants: "Accounting takes the whole top strip. Engineering takes columns 1 through 2, rows 2 through 4." Tenants can span several cells, sit on top of each other, or be dropped in unassigned and let the building manager find them a free room — that is
+            <span class="term">auto-placement</span>
+            <span class="term__gloss">the algorithm that finds a slot for items you did not position yourself</span>.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 250" role="img" aria-labelledby="axesTitle axesDesc" width="640" style="max-width:100%">
+            <title id="axesTitle">Flexbox versus Grid</title>
+            <desc id="axesDesc">On the left, Flexbox arranges four boxes along a single horizontal line. On the right, Grid draws a three by three set of cells, and one item claims a rectangle two cells wide and two cells tall.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- LEFT: flexbox -->
+              <text x="14" y="24" fill="var(--text)" font-size="14">Flexbox — one axis (the bus aisle)</text>
+              <line x1="18" y1="120" x2="292" y2="120" stroke="var(--text-faint)" stroke-dasharray="5 4"/>
+              <polygon points="292,120 282,115 282,125" fill="var(--text-faint)"/>
+              <g fill="var(--bg-elev-2)" stroke="var(--border)">
+                <rect x="22"  y="94" width="56" height="52" rx="6"/>
+                <rect x="88"  y="94" width="56" height="52" rx="6"/>
+                <rect x="154" y="94" width="56" height="52" rx="6"/>
+                <rect x="220" y="94" width="56" height="52" rx="6"/>
+              </g>
+              <g fill="var(--text-muted)" font-size="12" text-anchor="middle">
+                <text x="50" y="125">1</text><text x="116" y="125">2</text><text x="182" y="125">3</text><text x="248" y="125">4</text>
+              </g>
+              <text x="14" y="186" fill="var(--text-faint)" font-size="12">One direction only.</text>
+              <text x="14" y="206" fill="var(--text-faint)" font-size="12">Rows know nothing about</text>
+              <text x="14" y="226" fill="var(--text-faint)" font-size="12">each other.</text>
+
+              <!-- divider -->
+              <line x1="316" y1="14" x2="316" y2="236" stroke="var(--border)"/>
+
+              <!-- RIGHT: grid -->
+              <text x="340" y="24" fill="var(--text)" font-size="14">Grid — two axes (the floor plan)</text>
+              <g fill="var(--bg-elev-2)" stroke="var(--border)">
+                <rect x="344" y="46"  width="88" height="46" rx="6"/>
+                <rect x="440" y="46"  width="88" height="46" rx="6"/>
+                <rect x="536" y="46"  width="88" height="46" rx="6"/>
+                <rect x="344" y="100" width="88" height="46" rx="6"/>
+                <rect x="440" y="100" width="88" height="46" rx="6"/>
+                <rect x="536" y="100" width="88" height="46" rx="6"/>
+                <rect x="344" y="154" width="88" height="46" rx="6"/>
+                <rect x="440" y="154" width="88" height="46" rx="6"/>
+                <rect x="536" y="154" width="88" height="46" rx="6"/>
+              </g>
+              <rect x="344" y="46" width="184" height="100" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+              <text x="436" y="101" fill="var(--accent)" text-anchor="middle" font-size="13">spans 2 × 2</text>
+              <text x="340" y="226" fill="var(--text-faint)" font-size="12">Items claim rectangles; everything lines up on both axes.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">One aisle versus a floor plan. Flexbox flows items along a line; Grid gives every item a rectangle of declared tracks.</figcaption>
+        </figure>
+
+        <h3>Two consequences of "the parent draws the plan"</h3>
+        <ul>
+          <li><strong>A child's position is decided by the layout, not by its own size.</strong> A <code>&lt;div&gt;</code> can start at column 2 and stretch to column 4 without knowing what is inside it.</li>
+          <li><strong>Source order and visual order can differ.</strong> You can put the sidebar last in HTML and first on screen. Useful, and a real accessibility trap — keyboard and screen-reader order still follows the HTML.</li>
+        </ul>
+
+        <h3>The killer unit: <code>fr</code></h3>
+        <p>One <code>fr</code> is one <em>fraction of the leftover space</em>.
+          <span class="term">fr</span>
+          <span class="term__gloss">a share of the free space left after fixed tracks and gaps are subtracted</span>
+          means <code>grid-template-columns: 200px 1fr</code> reads as "200 pixels for the nav, and whatever remains for the content" — no <code>calc()</code>, no percentages that break the moment you add a gap.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 190" role="img" aria-labelledby="frTitle frDesc" width="640" style="max-width:100%">
+            <title id="frTitle">How fr divides leftover space</title>
+            <desc id="frDesc">A 600 pixel wide container holds a fixed 200 pixel nav track, a 16 pixel gap, and a flexible track that therefore resolves to 384 pixels.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="26" fill="var(--text-muted)">grid-template-columns: 200px 1fr;  gap: 16px  ·  container = 600px</text>
+
+              <!-- container bar -->
+              <rect x="20" y="52" width="580" height="58" rx="8" fill="none" stroke="var(--border)"/>
+
+              <!-- 200px track: 200/600 * 580 = 193.3 -->
+              <rect x="20" y="52" width="193" height="58" rx="8" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <text x="116" y="87" fill="var(--text)" text-anchor="middle">nav · 200px</text>
+
+              <!-- gap: 16/600 * 580 = 15.5 -->
+              <rect x="213" y="52" width="16" height="58" fill="var(--warn-soft)" stroke="var(--warn)"/>
+
+              <!-- 1fr: 384/600 * 580 = 371 -->
+              <rect x="229" y="52" width="371" height="58" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="414" y="87" fill="var(--accent)" text-anchor="middle">content · 1fr resolves to 384px</text>
+
+              <!-- annotations -->
+              <text x="221" y="134" fill="var(--warn)" text-anchor="middle" font-size="12">gap 16px</text>
+              <text x="20" y="160" fill="var(--text)" font-size="13">600 − 200 − 16 = 384px of free space, and 1fr takes all of it.</text>
+              <text x="20" y="180" fill="var(--text-faint)" font-size="12">Gaps are subtracted before fr is shared out, so no calc() is ever needed here.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Fixed tracks and gaps are taken out first; <code>fr</code> shares whatever is left. That is why <code>fr</code> beats percentages.</figcaption>
+        </figure>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a replacement for Flexbox.</strong> Flexbox is one-dimensional — a row of buttons, a toolbar. The two are used together, constantly.</li>
+              <li><strong>Not <code>display: table</code>.</strong> Tables size themselves from their content; a grid's tracks are declared up front.</li>
+              <li><strong>Not a CSS framework.</strong> Bootstrap's "grid" is a 12-column convention built from classes; CSS Grid is a browser primitive with no classes at all.</li>
+              <li><strong>Not a component system.</strong> It positions boxes. It says nothing about state, styling, or reuse.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You need page-level scaffolding: header / sidebar / main / footer.</li>
+              <li>Things must align across both rows <em>and</em> columns — dashboards, pricing tables, card galleries.</li>
+              <li>You want responsive layout without media queries, via <code>repeat(auto-fit, minmax(240px, 1fr))</code>.</li>
+              <li>Elements must overlap — a caption sitting on top of an image — without <code>position: absolute</code>.</li>
+              <li>Nested cards' internal rows must line up with their siblings. That is what <code>subgrid</code> is for.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It is a single row or column with no cross-axis alignment needs — Flexbox is less code.</li>
+              <li>The content is real tabular data — use a <code>&lt;table&gt;</code>; semantics matter more than layout convenience.</li>
+              <li>Content flows and items size themselves, and you genuinely do not care about column alignment.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Grid container</dt><dd>The element with <code>display: grid</code>; it owns the plan.</dd></div>
+          <div><dt>Grid item</dt><dd>A <em>direct</em> child of that container. Grandchildren are not items.</dd></div>
+          <div><dt>Track</dt><dd>One row or one column.</dd></div>
+          <div><dt>Grid line</dt><dd>The numbered dividers between tracks; placement is expressed in lines, not tracks.</dd></div>
+          <div><dt>Cell / area</dt><dd>One square; an area is any rectangle of cells.</dd></div>
+          <div><dt><code>fr</code></dt><dd>A share of the free space remaining after fixed sizes and gaps.</dd></div>
+          <div><dt>Explicit vs implicit grid</dt><dd>Tracks you declared, versus tracks the browser invented because items overflowed.</dd></div>
+          <div><dt>Auto-placement</dt><dd>The algorithm that finds a slot for items you did not position.</dd></div>
+          <div><dt><code>minmax()</code> / <code>repeat()</code></dt><dd>Track-sizing helpers; <code>minmax(200px, 1fr)</code> is the responsive workhorse.</dd></div>
+          <div><dt><code>subgrid</code></dt><dd>A nested grid that inherits its parent's tracks instead of defining its own. Baseline in all major browsers since 2023.</dd></div>
+        </dl>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">One thing still in motion</p>
+            <p>Native masonry — Pinterest-style staggered columns — is being standardised in Grid Level 3 and has shipped in Safari, but is flagged or absent elsewhere as of mid-2026. Treat it as progressive enhancement behind <code>@supports</code>.</p>
+          </div>
+        </div>
+
+        <h2>What's next</h2>
+        <p>Detail answers What / Where / When / How / Why: the track-sizing algorithm, line-based versus area-based placement, how <code>fr</code> interacts with <code>min-content</code>, and where Grid and Flexbox draw the line against each other.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
