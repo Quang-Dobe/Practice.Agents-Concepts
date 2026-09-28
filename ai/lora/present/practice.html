@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LoRA · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">LoRA</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">LoRA</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/lora/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">LoRA</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>LoRA is the step between "the prompt is 3,000 tokens of instructions and still breaks the JSON schema 4% of the time" and "we need a training cluster". You'll meet it in four settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Product team, open-weights LLM</div><p>Train an adapter on a few thousand curated examples, ship a few-hundred-MB file, load it onto the base model the inference fleet already serves.</p></div>
+          <div class="card"><div class="card__title">Multi-tenant SaaS</div><p>Support bots per customer, per-tenant classifiers, per-language SQL generators. One base stays on the GPU; each request names its adapter. The engine's
+            <span class="term">adapter cache</span>
+            <span class="term__gloss">the set of adapters kept loaded in GPU and CPU memory, ready to apply</span>
+            and rank limits become capacity inputs, like connection pools.</p></div>
+          <div class="card"><div class="card__title">ML platform / post-training</div><p>SFT, DPO and GRPO runs with <code>trl</code> plus a <code>peft_config</code>, evaluated and promoted like any other build artifact.</p></div>
+          <div class="card"><div class="card__title">Image generation</div><p>"A LoRA" is a style or character file that users swap at runtime.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Set a prompt-only and a RAG baseline before training anything</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Measure the base model with your best prompt (plus few-shot examples, and retrieval if the task is fact-heavy) on the same eval set you'll use for the adapter.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Half of "we need fine-tuning" requests are solved by a better prompt or retrieval. Without a baseline you can't prove the adapter earns its running cost: a training pipeline, a model registry, a serving config and a retraining cadence.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Fine-tuning to teach facts that change weekly. The adapter goes stale and nobody can audit where an answer came from.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Target all linear layers, not just <code>q_proj</code>/<code>v_proj</code></h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>target_modules="all-linear"</code> (attention and MLP) as the default, then shrink <code>r</code> if you need fewer parameters.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>LoRA Without Regret found attention-only rank 256 underperforms MLP-only rank 128 at about the same parameter count. Raschka's runs showed a clear gain from enabling all layers for about 2.4 GB more memory on a 7B model.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Copying the 2021 paper's <code>q_proj</code>/<code>v_proj</code> config from an old tutorial, then raising rank to compensate.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Re-tune the learning rate — don't copy it from full fine-tuning</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Start at about 10× your full-fine-tuning LR (e.g. <code>2e-4</code> instead of <code>2e-5</code> for a 7B SFT run) and sweep 3–4 values around it. Short runs of about 100 steps may want closer to 15×.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A full-fine-tuning LR gives an adapter that barely moves. The team decides "LoRA doesn't work for our task" and burns weeks on full fine-tuning it didn't need.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Changing <code>r</code> and <code>lora_alpha</code> without re-checking the LR. The effective update scale is <code>LR × α/r</code> (or <code>α/√r</code> with rsLoRA).</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Assert the trainable parameter count in the training script</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Call <code>model.print_trainable_parameters()</code> and fail the job if the ratio falls outside an expected band (e.g. 0.1%–2% for a 7B model at <code>r=16</code>).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Wrong <code>target_modules</code> names (GPT-2's <code>c_attn</code> vs Llama's <code>q_proj</code>) give a silent run that trains almost nothing. You find out after hours of GPU time and a flat eval curve.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting that a falling training loss means the adapter attached where you meant.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Pin the base revision, tokenizer and chat template with the adapter</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Record the base model's commit hash, tokenizer version and exact
+              <span class="term">chat template</span>
+              <span class="term__gloss">the text format that wraps system, user and assistant turns before tokenizing</span>
+              in the adapter's metadata or registry entry. Make the server refuse a mismatched pair.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An adapter is a delta against <em>one specific</em> set of weights. Loaded onto <code>Llama-3.1-8B-Instruct</code> instead of <code>Llama-3.1-8B</code>, or served with another template, it gives subtly wrong output that passes health checks.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>base_model_name_or_path: "meta-llama/..."</code> with no revision, pointing at a Hub repo that can change under you.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Size rank to data, and stop early</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Start at <code>r=16</code> for a few thousand examples. Go higher only when eval loss plateaus above target while training loss keeps falling slowly (a capacity limit). Train 1–3 epochs and pick the checkpoint by eval loss, not the last one.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Raschka found that doubling passes over Alpaca <em>lowered</em> benchmark scores. High rank on small data memorizes; in production the model repeats training examples word for word.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>r=256</code> on 800 examples because "more capacity is safer".</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Merge into a bf16 base, never into the quantized one</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>After QLoRA training, reload the base in bf16, merge the adapter, then quantize the merged model with a proper method (GPTQ/AWQ/GGUF) and evaluate <em>that</em> artifact.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Merging into NF4 weights, or naively re-quantizing, hurts quality in ways training eval never showed. The model you tested is not the model you shipped.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Evaluating the unmerged 4-bit base plus adapter, then shipping a merged, re-quantized file without re-running evals.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    Q["QLoRA training: 4-bit NF4 base + bf16 adapter"] --> R["Reload base in bf16"]
+    R --> M["Merge adapter: W0 + (alpha/r) BA"]
+    M --> Z["Quantize merged model (GPTQ / AWQ / GGUF)"]
+    Z --> E["Evaluate THIS artifact"]
+    E --> S["Ship"]
+    Q -. "wrong: merge into NF4 or re-quantize blindly" .-> X["Untested quality drop"]
+          </pre>
+          <figcaption class="diagram__caption">The safe QLoRA shipping path: merge in bf16, quantize after, and evaluate the file you actually ship.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Choose merged vs unmerged per deployment, from measurements</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Merge when one adapter serves most traffic. Keep adapters unmerged when you have many tenants and a batched-LoRA engine (vLLM, LoRAX, TensorRT-LLM). Benchmark both at your real batch sizes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Unmerged adapters add small extra matmuls per token and cache pressure. Merged adapters cost a full model copy per variant and a cold start to swap.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Running a single-tenant production model unmerged "for flexibility" and paying the latency tax forever.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Start{"How many adapters share the traffic?"}
+    Start -- "one adapter serves most traffic" --> Merge["Merge: zero latency, one full copy per variant"]
+    Start -- "many tenants" --> Eng{"Batched-LoRA engine? (vLLM, LoRAX, TensorRT-LLM)"}
+    Eng -- yes --> Unm["Keep unmerged: small extra matmuls, cache pressure"]
+    Eng -- no --> Bench["Measure first: per-request overhead may be large"]
+    Merge --> Verify["Benchmark both at real batch sizes"]
+    Unm --> Verify
+    Bench --> Verify
+          </pre>
+          <figcaption class="diagram__caption">Merged vs unmerged is a deployment decision, settled by measurement at your real batch sizes.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Set serving limits to match your real adapters</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set vLLM <code>--max-lora-rank</code> to your highest adapter rank, <code>--max-loras</code> to your concurrent hot set, and <code>--max-cpu-loras</code> to the warm set. Enforce a rank ceiling in CI before an adapter reaches the registry.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A rank-64 adapter fails to load on a server set for 16, and it surfaces as an incident when a tenant goes live. Setting the limit high "just in case" reserves GPU memory that could have been KV cache.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Letting each training team pick rank freely with no contract with the serving team.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Evaluate for forgetting, not only for the target task</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run a small held-out general suite (instruction following, refusal behavior, a reasoning set) against every adapter, beside the task eval.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Biderman et al. show LoRA "forgets less" than full fine-tuning — but it still
+              <span class="term">forgets</span>
+              <span class="term__gloss">loses general skills the base model had, while learning the new task</span>.
+              A support-bot adapter that stops following safety instructions is a security incident, not a quality blip.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Promoting an adapter because the task metric went up 8 points.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Fine-tuning as a knowledge base</p>
+            <p>Training an adapter on the product docs so the model "knows" them. It hallucinates with more confidence, can't cite, and goes stale on the next release. Use RAG for facts and LoRA for format, tone and behavior.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The eval-on-training-distribution trap</p>
+            <p>The eval set is a random 10% split of the same synthetic data. Near-duplicates leak, scores look superb, and real traffic looks nothing like it. Build the eval set from real, deduplicated production inputs, and freeze it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Pickle adapters from strangers</p>
+            <p>Pulling <code>adapter_model.bin</code> or <code>.ckpt</code> LoRAs from community hubs and loading them with <code>torch.load</code>. Pickle files can run arbitrary code on load. Accept only
+              <span class="term">.safetensors</span>
+              <span class="term__gloss">a tensor file format that stores raw data only, with no executable code</span>
+              and scan or sandbox third-party artifacts.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Runtime adapter loading on a public endpoint</p>
+            <p>Turning on vLLM's <code>/v1/load_lora_adapter</code> (<code>VLLM_ALLOW_RUNTIME_LORA_UPDATING=True</code>) in a shared cluster. The vLLM docs warn against this outside a fully trusted, isolated environment. Load adapters through a controlled deploy path.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Stacking adapters and hoping they compose</p>
+            <p>Merging a "legal tone" adapter with a "JSON output" adapter by adding the deltas. The deltas interfere and each behavior degrades unpredictably. Train one adapter on the combined data, or evaluate any merge (TIES/DARE-style) as a new model.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Hyperparameter archaeology</p>
+            <p><code>alpha = 2 × r</code>, <code>lora_dropout=0.05</code> and <code>r=8</code> copied from a 2023 notebook and never questioned. Raschka's best run used <code>alpha = 0.5 × r</code> at <code>r=256</code>. Treat <code>α</code>, <code>r</code> and LR as one coupled knob and sweep them.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Orphaned adapters</p>
+            <p>Forty adapters in a bucket named <code>final_v2_really_final</code>, none tied to a base revision, dataset hash or eval report. When the base upgrades, nobody knows which must be retrained. Register adapters like any build artifact.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Structured-output adapter for an agent platform</div>
+            <p>A mid-size company runs Llama-class 8B models behind tool-calling agents. Prompting alone gave invalid tool-call JSON on a few percent of calls. A rank-16 all-linear adapter trained on about 5K validated traces fixed format errors, merged for zero-overhead serving. <em>Lesson:</em> the win came from cleaning the traces — rejecting every example with a malformed call mattered more than any hyperparameter.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Many-tenant serving on one GPU</div>
+            <p>Predibase's <a href="https://arxiv.org/abs/2405.00732" rel="noopener">LoRA Land</a> trained 310 QLoRA adapters across 10 base models and 31 tasks, averaging 10 points above GPT-4 on those narrow tasks, and served 25 Mistral-7B adapters from a single A100 via LoRAX. <em>Lesson:</em> small specialized adapters beat a frontier generalist on <em>narrow</em> tasks; the economics hinge on the batched-LoRA engine and adapter cache, not on training.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">RL post-training on a budget</div>
+            <p>Research and startup teams run GRPO-style reasoning tuning with LoRA, because policy-gradient signal carries so little information per episode that LoRA matches full fine-tuning even at rank 1 (LoRA Without Regret). <em>Lesson:</em> for RL the bottleneck is rollout generation, not trainable parameters — spend on sampling throughput, not rank.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Diffusion style marketplace</div>
+            <p>Image products let users pick style or character LoRAs per request, often several per image with per-adapter weights. <em>Lesson:</em> adapter weights are user-facing parameters. Clamp them — stacking three LoRAs at weight 1.0 each routinely gives broken output that users report as "the model is bad".</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Param guard:</strong> does the training job assert the trainable parameter ratio, and fail on zero or out-of-band values?</li>
+              <li><strong>Registry:</strong> is every adapter registered with base revision, tokenizer, chat template, dataset hash and eval report — and does the server refuse a mismatched base?</li>
+              <li><strong>Shipped artifact:</strong> was the <em>shipped</em> file (merged, re-quantized) evaluated, not only the training-time adapter?</li>
+              <li><strong>Eval scope:</strong> do results include a general-capability and safety-behavior suite, not only the task metric?</li>
+              <li><strong>Monitoring:</strong> are per-adapter request rate, latency (p50/p99), adapter cache hit/miss and load time, and GPU memory split (weights vs KV cache vs adapters) on a dashboard?</li>
+              <li><strong>Failure handling:</strong> when an adapter fails to load (rank too high, file missing, base mismatch), does the request fail loudly or fall back to the base? Is that fallback what the product wants, and is it tested?</li>
+              <li><strong>Security:</strong> are only <code>.safetensors</code> adapters accepted, and is runtime adapter loading off or limited to a trusted control plane?</li>
+              <li><strong>Cost:</strong> is <code>--max-lora-rank</code> set to the real maximum, with a rank ceiling in CI? Are idle tenants' adapters evicted rather than pinned on the GPU?</li>
+              <li><strong>Onboarding:</strong> can a new engineer find, in one place, which base each adapter targets, how to retrain it, and who owns its eval set?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Notebook.</span> One QLoRA run on a single GPU, <code>r=8</code> on <code>q_proj</code>/<code>v_proj</code>, eval by eyeballing ten outputs, a merged checkpoint uploaded by hand. It demos well — and that success creates demand for a second and third adapter.</li>
+          <li><span class="steps__title">The painful middle.</span> Adapters multiply, each with its own script, hyperparameters and base revision. Then the base upgrades (Llama 3 to 3.1, say) and every adapter must be retrained, because deltas don't transfer across base weights. Teams that never recorded dataset versions and eval sets can't reproduce their own adapters; teams that merged everything now store and serve N full model copies.</li>
+          <li><span class="steps__title">Adapters as build artifacts.</span> One config-driven pipeline (Axolotl, torchtune or <code>trl</code> with templated configs), a registry keyed by base revision, a frozen eval suite with a
+            <span class="term">promotion gate</span>
+            <span class="term__gloss">an automatic pass/fail check an adapter must clear before it can be deployed</span>,
+            and a multi-LoRA serving tier with explicit rank and cache limits. Base upgrades become a scheduled retrain-and-evaluate batch job, not a fire drill. At this scale the recurring cost is data curation and evaluation, not GPUs.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://thinkingmachines.ai/blog/lora/" rel="noopener">LoRA Without Regret (Thinking Machines, 2025)</a> — the best current evidence on when LoRA matches full fine-tuning, with concrete guidance on LR, target layers and batch size.</li>
+          <li><a href="https://magazine.sebastianraschka.com/p/practical-tips-for-finetuning-llms" rel="noopener">Practical Tips for Finetuning LLMs Using LoRA (Sebastian Raschka)</a> — hundreds of controlled runs on QLoRA cost, epochs, rank/alpha and layer choice, with numbers.</li>
+          <li><a href="https://arxiv.org/abs/2405.09673" rel="noopener">LoRA Learns Less and Forgets Less (Biderman et al., 2024)</a> — the clearest statement of where LoRA falls short (continued pretraining, code/math at scale) and why.</li>
+          <li><a href="https://arxiv.org/abs/2405.00732" rel="noopener">LoRA Land technical report (Predibase, 2024)</a> — 310 adapters benchmarked, plus the multi-LoRA serving economics behind per-task adapters.</li>
+          <li><a href="https://docs.vllm.ai/en/latest/features/lora.html" rel="noopener">vLLM LoRA adapters docs</a> — the serving flags (<code>--max-loras</code>, <code>--max-lora-rank</code>, <code>--max-cpu-loras</code>) and the runtime-loading security warning.</li>
+          <li><a href="https://huggingface.co/docs/peft/developer_guides/lora" rel="noopener">Hugging Face PEFT LoRA guide</a> — the reference for <code>LoraConfig</code> options like <code>use_rslora</code>, <code>use_dora</code>, <code>modules_to_save</code> and merging APIs.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/lora/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

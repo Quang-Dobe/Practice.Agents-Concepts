@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LoRA · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">LoRA</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">LoRA</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/lora/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">LoRA</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>LoRA (<a href="https://arxiv.org/abs/2106.09685" rel="noopener">Hu et al., 2021</a>) is a
+          <span class="term">reparameterization-based</span>
+          <span class="term__gloss">it rewrites the weight update in a compact form instead of adding new modules</span>
+          parameter-efficient fine-tuning (PEFT) method.</p>
+        <ul>
+          <li>Take a frozen pretrained matrix <code>W₀ ∈ ℝ^(d×k)</code>.</li>
+          <li>Force the update to be a rank-<code>r</code> product: <code>ΔW = B·A</code>, with <code>B ∈ ℝ^(d×r)</code>, <code>A ∈ ℝ^(r×k)</code>, and <code>r ≪ min(d, k)</code>.</li>
+          <li>Only <code>A</code> and <code>B</code> get gradients. <code>W₀</code> has no gradient and no optimizer state.</li>
+          <li>Trainable parameters per adapted matrix fall from <code>d·k</code> to <code>r·(d + k)</code>.</li>
+        </ul>
+        <p>The forward pass of an adapted linear layer becomes:</p>
+        <pre><code>h = W₀·x + (α / r) · B·A·x</code></pre>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Frozen base weights (<code>W₀</code>)</dt><dd>The pretrained matrices. Stored in bf16/fp16 (plain LoRA) or 4-bit (QLoRA). Never updated.</dd></div>
+          <div><dt>Down-projection <code>A</code> (r × k)</dt><dd>Maps the layer input into an <code>r</code>-dimensional subspace. Random init: Gaussian in the paper, Kaiming-uniform in Hugging Face <code>peft</code>.</dd></div>
+          <div><dt>Up-projection <code>B</code> (d × r)</dt><dd>Maps back to the output size. <strong>Initialized to zero</strong>, so <code>ΔW = 0</code> at step 0 and the adapted model computes exactly what the base computes.</dd></div>
+          <div><dt>Scaling factor <code>α / r</code></dt><dd>Multiplies the delta. The paper holds <code>α</code> fixed while you vary <code>r</code>, so you don't re-tune the learning rate per rank. rsLoRA (<a href="https://arxiv.org/abs/2312.03732" rel="noopener">Kalajdzievski, 2023</a>) uses <code>α / √r</code>, which stays stable at high ranks.</dd></div>
+          <div><dt>Target modules</dt><dd>The linear layers that get adapters. The paper adapted only <code>W_q</code> and <code>W_v</code>. Current practice adapts every linear layer (attention and MLP).</dd></div>
+          <div><dt>Adapter artifact</dt><dd>In <code>peft</code>: <code>adapter_model.safetensors</code> + <code>adapter_config.json</code>. Holds only the <code>A</code>/<code>B</code> tensors plus metadata naming the base model.</dd></div>
+          <div><dt>Merge operation</dt><dd><code>W' = W₀ + (α/r)·B·A</code>. A one-time fold, lossless in full precision, that removes all inference overhead.</dd></div>
+        </dl>
+
+        <h3>Where it sits in the PEFT family</h3>
+        <p>PEFT has three branches (<a href="https://arxiv.org/abs/2303.15647" rel="noopener">Lialin et al., 2023</a>):</p>
+        <ul>
+          <li><strong>Additive</strong> — insert new modules or tokens: adapter layers (<a href="https://arxiv.org/abs/1902.00751" rel="noopener">Houlsby et al., 2019</a>), prefix tuning, prompt tuning.</li>
+          <li><strong>Selective</strong> — train a subset of existing weights. BitFit trains only the biases.</li>
+          <li><strong>Reparameterization</strong> — express the update in a compact form. LoRA lives here.</li>
+        </ul>
+        <p>LoRA's mark: the update runs <em>in parallel</em> with an existing linear layer and can be merged back into it. It is the only mainstream PEFT method that can have <strong>zero inference cost</strong>. Its descendants (QLoRA, DoRA, LoRA+, PiSSA, rsLoRA) keep that shape and change the precision, the init, the scaling or the decomposition.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>LoRA lives in the <strong>model-training layer</strong> and, when adapters stay unmerged, in the <strong>inference-serving layer</strong>.</p>
+        <ul>
+          <li><strong>Training time:</strong> a module wrapper around <code>nn.Linear</code> (or <code>Conv2d</code> / <code>Embedding</code>) inside the framework graph.</li>
+          <li><strong>Serving time:</strong> the engine either loads merged weights (an ordinary checkpoint) or keeps one base model resident and applies per-request adapter deltas with batched kernels.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Train["Training layer"]
+      T1["peft wraps nn.Linear / Conv2d / Embedding"]
+      T2["trl / Axolotl / Unsloth / torchtune loop"]
+      T1 --> T2
+    end
+    subgraph Art["Artifact"]
+      A1["adapter_model.safetensors + adapter_config.json"]
+    end
+    subgraph Serve["Serving layer"]
+      S1["Merged: ordinary checkpoint"]
+      S2["Unmerged: one base + per-request adapters (vLLM, LoRAX, S-LoRA)"]
+    end
+    T2 --> A1
+    A1 --> S1
+    A1 --> S2
+          </pre>
+          <figcaption class="diagram__caption">Two layers of the stack: a wrapper in the training graph, and either a merged checkpoint or a multi-adapter tier at serving time.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Open-weights LLMs</div><p>Fine-tuned Llama, Mistral, Qwen and Gemma variants on the Hugging Face Hub, most published as LoRA adapters.</p></div>
+          <div class="card"><div class="card__title">Diffusion models</div><p>Stable Diffusion / SDXL / Flux "LoRAs" for styles and characters, shipped as small <code>.safetensors</code> files.</p></div>
+          <div class="card"><div class="card__title">Multi-tenant serving</div><p>One base model serving many customer adapters: vLLM, TGI/LoRAX, NVIDIA NIM, Amazon SageMaker, Anyscale.</p></div>
+          <div class="card"><div class="card__title">Managed fine-tuning APIs</div><p>Several hosted services train adapter-style updates behind the API. Vendors generally don't document the exact method.</p></div>
+          <div class="card"><div class="card__title">RL post-training</div><p>Thinking Machines' <a href="https://thinkingmachines.ai/blog/lora/" rel="noopener">LoRA Without Regret</a> (2025): LoRA matches full fine-tuning on policy-gradient RL even at rank 1.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Defining adapters:</strong> Hugging Face <a href="https://huggingface.co/docs/peft" rel="noopener"><code>peft</code></a> (<code>LoraConfig</code>, <code>get_peft_model</code>), Microsoft's original <code>loralib</code>.</li>
+          <li><strong>Training loops:</strong> <code>transformers</code> Trainer and <code>trl</code> (SFT, DPO, GRPO trainers taking a <code>peft_config</code>), Axolotl, Unsloth (fused kernels, lower memory), LLaMA-Factory, torchtune.</li>
+          <li><strong>Quantized bases:</strong> <code>bitsandbytes</code> (NF4 for QLoRA), plus GPTQ/AWQ bases in some stacks.</li>
+          <li><strong>Serving many adapters:</strong> vLLM (<code>--enable-lora</code>, <code>--max-loras</code>, <code>--max-lora-rank</code>, with Punica-derived SGMV kernels), <a href="https://arxiv.org/abs/2311.03285" rel="noopener">S-LoRA</a>, LoRAX, TensorRT-LLM.</li>
+          <li><strong>Diffusion:</strong> <code>diffusers</code> (<code>load_lora_weights</code>), kohya-ss scripts, ComfyUI / Automatic1111 loaders.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <h3>When it emerged, and why</h3>
+        <p>By 2020 GPT-3 (175B) made full fine-tuning impractical for most teams: each task needed a <strong>350 GB</strong> checkpoint and about <strong>1.2 TB</strong> of training VRAM. The PEFT options of the day each had a cost:</p>
+        <ul>
+          <li><strong>Adapter layers</strong> added sequential compute — the LoRA paper measured <strong>+20.7% to +30.3%</strong> latency at batch size 1 on GPT-2 Medium.</li>
+          <li><strong>Prefix tuning</strong> was hard to optimize and ate context length.</li>
+        </ul>
+        <p>Earlier research showed fine-tuning has a low
+          <span class="term">intrinsic dimension</span>
+          <span class="term__gloss">the useful change lives in a much smaller space than the full parameter count</span>
+          (<a href="https://arxiv.org/abs/1804.08838" rel="noopener">Li et al., 2018</a>; <a href="https://arxiv.org/abs/2012.13255" rel="noopener">Aghajanyan et al., 2020</a>). Hu et al. at Microsoft turned that into a practical method in <strong>June 2021</strong>. On GPT-3 it:</p>
+        <ul>
+          <li>cut training VRAM from <strong>1.2 TB to 350 GB</strong></li>
+          <li>shrank checkpoints from <strong>350 GB to 35 MB</strong> (<code>r=4</code>, <code>W_q</code>/<code>W_v</code> only)</li>
+          <li>trained <strong>25% faster</strong> than full fine-tuning</li>
+        </ul>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">The 2023 jump</p>
+            <p>Adoption rose sharply in 2023. <a href="https://arxiv.org/abs/2305.14314" rel="noopener">QLoRA</a> (Dettmers et al., May 2023) made it possible to fine-tune a <strong>65B</strong> model on a single <strong>48 GB</strong> GPU, and the open-weights Llama models gave people something to fine-tune.</p>
+          </div>
+        </div>
+
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You own the weights and need behavior change (format, tone, tool-call schema, domain style, classification head) that prompting can't reliably produce.</li>
+              <li>Your dataset is small to medium — hundreds to roughly 100K examples, the "low-regret" regime per LoRA Without Regret.</li>
+              <li>You need N variants of one base and can't store or serve N full copies.</li>
+              <li>Your GPU budget is a single 24–80 GB card, not a multi-node cluster.</li>
+              <li>You are doing RL/preference post-training (DPO, GRPO): the reward carries little information per episode, so even a very low rank is enough.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The goal is <strong>knowledge injection at scale</strong> (continued pretraining on billions of tokens, a new language). <a href="https://arxiv.org/abs/2405.09673" rel="noopener">Biderman et al., 2024</a>: LoRA "learns less" here; full fine-tuning learns perturbations of <strong>10–100× higher rank</strong> than typical LoRA configs.</li>
+              <li>The facts change weekly. RAG is cheaper to update and can be audited.</li>
+              <li>You have no weight access, only a closed API.</li>
+              <li>Latency is critical, adapters must stay unmerged (multi-tenant), and your engine lacks batched LoRA kernels — per-request overhead becomes measurable.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <h3>Training lifecycle</h3>
+        <ol class="steps">
+          <li><span class="steps__title">Load the base.</span> In bf16, or 4-bit NF4 for QLoRA. Set <code>requires_grad=False</code> on every parameter.</li>
+          <li><span class="steps__title">Wrap target modules.</span> <code>peft</code> swaps each matching <code>nn.Linear</code> for a <code>lora.Linear</code> holding the original layer plus <code>lora_A</code>, <code>lora_B</code> and a dropout. Matching is by module-name suffix (<code>q_proj</code>, <code>down_proj</code>, …) or <code>"all-linear"</code>.</li>
+          <li><span class="steps__title">Initialize.</span> <code>A</code> random, <code>B = 0</code> — output is bit-identical to the base at step 0.</li>
+          <li><span class="steps__title">Forward.</span> Compute <code>W₀x</code> as normal, compute <code>B(A(dropout(x)))</code>, scale by <code>α/r</code>, add. Extra FLOPs: <code>2·r·(d+k)</code> per token per layer, a small slice of <code>2·d·k</code>.</li>
+          <li><span class="steps__title">Backward.</span> Gradients still flow <em>through</em> <code>W₀</code> to earlier layers, so
+            <span class="term">activation memory</span>
+            <span class="term__gloss">the saved intermediate values the backward pass needs</span>
+            is similar to full fine-tuning. Only <code>A</code> and <code>B</code> collect weight gradients.</li>
+          <li><span class="steps__title">Optimizer step.</span> AdamW keeps two fp32 moments per <em>trainable</em> parameter only. Most of the memory saving comes from here.</li>
+          <li><span class="steps__title">Save.</span> Only the adapter tensors.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant X as Input x
+    participant W as W0 (frozen)
+    participant AB as A then B (trainable)
+    participant O as AdamW
+    X->>W: W0 x
+    X->>AB: B(A(dropout(x))) scaled by alpha/r
+    W-->>X: sum = h
+    AB-->>X: sum = h
+    Note over W,AB: step 0: B = 0 so h equals base output
+    X->>W: backward: gradient flows through, no weight grad
+    X->>AB: backward: weight grads for A and B only
+    AB->>O: two fp32 moments per trainable param
+    O-->>AB: update A, B
+          </pre>
+          <figcaption class="diagram__caption">One training step. The frozen path passes gradients through but never updates; only the thin branch and its optimizer state change.</figcaption>
+        </figure>
+
+        <h3>Memory arithmetic (7B model, rule of thumb)</h3>
+        <ul>
+          <li><strong>Full fine-tuning</strong> with mixed-precision AdamW: about <strong>16 bytes per parameter</strong> (weights, gradients, fp32 master copy, two moments) → about <strong>112 GB</strong> before activations.</li>
+          <li><strong>LoRA on a bf16 base:</strong> about <strong>14 GB</strong> for weights plus a few hundred MB for the adapter and its optimizer state.</li>
+          <li><strong>QLoRA:</strong> base drops to about <strong>4 GB</strong>.</li>
+          <li>In every case, activations and KV/sequence length come on top.</li>
+        </ul>
+        <figure class="diagram">
+          <svg viewBox="0 0 560 190" role="img" aria-labelledby="memTitle memDesc" width="560" style="max-width:100%">
+            <title id="memTitle">Training memory for a 7B model</title>
+            <desc id="memDesc">Bar chart: full fine-tuning about 112 GB, LoRA on bf16 base about 14 GB plus a few hundred MB, QLoRA base about 4 GB. Activations come on top in all cases.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="40" fill="var(--text)">Full FT</text>
+              <rect x="90" y="24" width="400" height="26" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="500" y="42" fill="var(--danger)">~112 GB</text>
+              <text x="10" y="90" fill="var(--text)">LoRA</text>
+              <rect x="90" y="74" width="50" height="26" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="150" y="92" fill="var(--accent)">~14 GB + few hundred MB</text>
+              <text x="10" y="140" fill="var(--text)">QLoRA</text>
+              <rect x="90" y="124" width="15" height="26" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="115" y="142" fill="var(--accent)">~4 GB base</text>
+              <text x="10" y="178" fill="var(--text-faint)" font-size="12">16 bytes/param × 7B for full FT. Activations and KV/sequence length are extra in every row.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Where the savings come from: no gradients or AdamW moments for the frozen base, and 4-bit storage for QLoRA.</figcaption>
+        </figure>
+
+        <p><strong>Parameter count example.</strong> A Llama-2-7B-shaped model (32 layers, hidden 4096, MLP 11008) with <code>r=16</code> on all seven linear projections has <code>16·(4·8192 + 3·15104)</code> ≈ <strong>1.25M</strong> parameters per layer, or about <strong>40M</strong> total — about <strong>0.6%</strong> of 6.7B.</p>
+
+        <h3>QLoRA additions</h3>
+        <p><a href="https://arxiv.org/abs/2305.14314" rel="noopener">Dettmers et al., 2023</a> added three pieces:</p>
+        <ul>
+          <li><span class="term">NF4</span> <span class="term__gloss">a 4-bit data type whose levels are placed for normally distributed weights</span>.</li>
+          <li><strong>Double quantization</strong> — also quantizes the per-block scaling constants.</li>
+          <li><strong>Paged optimizers</strong> — spill optimizer state to CPU RAM when memory spikes.</li>
+        </ul>
+        <p>Compute runs in bf16: each NF4 block is dequantized on the fly, and gradients flow into the bf16 LoRA weights.</p>
+
+        <h3>DoRA</h3>
+        <p><a href="https://arxiv.org/abs/2402.09353" rel="noopener">Liu et al., ICML 2024</a> rewrites each weight as <code>m · (W₀ + BA) / ‖W₀ + BA‖_c</code>:</p>
+        <ul>
+          <li><code>m</code> is a learned per-column magnitude vector.</li>
+          <li>LoRA updates only the direction.</li>
+          <li>Its update patterns look more like full fine-tuning's, at some extra training compute.</li>
+        </ul>
+
+        <h3>Inference paths</h3>
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph Merged["Merged: zero overhead, one model per adapter"]
+      MX[x] --> MW["W0 + (alpha/r) BA"] --> MH[h]
+    end
+    subgraph Unmerged["Unmerged: one base, many adapters, small extra matmuls"]
+      UX[x] --> UW[W0] --> Plus(("+"))
+      UX --> UA[A] --> UB[B] --> US["x alpha/r"] --> Plus
+      Plus --> UH[h]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Merged folds the delta into one matrix. Unmerged keeps a parallel branch so each request can pick its own adapter.</figcaption>
+        </figure>
+        <p>In multi-adapter serving, one batch mixes requests aimed at different adapters. Engines like vLLM gather each request's <code>A</code>/<code>B</code> with segmented kernels (
+          <span class="term">SGMV/BGMV</span>
+          <span class="term__gloss">Punica's batched kernels that apply a different adapter to each request in one pass</span>
+          ) and keep hot adapters in an LRU cache in GPU memory, with CPU memory as a fallback tier.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Low rank <code>r</code> (4–16) vs high (64–256)</td><td>Fewer parameters, less overfitting, smaller files</td><td>Capacity. Large or knowledge-heavy datasets underfit at low rank</td></tr>
+              <tr><td>Attention-only vs all linear layers</td><td>Fewer parameters, matches the paper</td><td>Quality. LoRA Without Regret finds attention-only underperforms even at matched parameter count</td></tr>
+              <tr><td>Merge vs keep unmerged</td><td>Zero latency, standard checkpoint</td><td>Hot-swapping and multi-tenant batching; one full copy per adapter</td></tr>
+              <tr><td>QLoRA (4-bit base) vs bf16 base</td><td>About 4× less base memory</td><td>Slower steps (dequantization), a small quality risk, a lossy merge unless you re-merge into a bf16 base</td></tr>
+              <tr><td>LoRA vs full fine-tuning</td><td>Order-of-magnitude memory savings, less forgetting of base skills</td><td>Peak in-domain quality on large or continued-pretraining workloads</td></tr>
+              <tr><td><code>α/r</code> vs rsLoRA <code>α/√r</code></td><td>Paper-compatible defaults</td><td>High-rank stability (plain <code>α/r</code> shrinks the update as <code>r</code> grows)</td></tr>
+              <tr><td>DoRA vs LoRA</td><td>Closer to full fine-tuning at the same rank</td><td>Extra compute and memory in training, less mature kernel support in serving</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Trainable parameter count is zero or tiny</p>
+            <p>Cause: <code>target_modules</code> names don't match the architecture (e.g. <code>c_attn</code> in GPT-2 vs <code>q_proj</code> in Llama).</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Loss barely moves</p>
+            <p>Cause: the learning rate was copied from full fine-tuning. LoRA's best LR is about <strong>10× higher</strong> (LoRA Without Regret), and a very small <code>α/r</code> shrinks the step further.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Divergence or NaNs at high rank</p>
+            <p>Cause: <code>α</code> scaling clashes with high rank, or LoRA+ ratios are too aggressive. Fix: use rsLoRA or lower the LR.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Good eval, garbage in production</p>
+            <p>Cause: chat template or tokenizer differs between training and serving, or the adapter is loaded onto a different base revision.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Quality drops after merging a QLoRA adapter</p>
+            <p>Cause: merged into a quantized base, or the merged weights were re-quantized. Fix: merge into a bf16 base.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Serving engine rejects the adapter</p>
+            <p>Cause: adapter rank exceeds the engine's limit. vLLM's <code>--max-lora-rank</code> defaults to <strong>16</strong> in current docs.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">New special tokens produce noise</p>
+            <p>Cause: embeddings and <code>lm_head</code> were frozen. Fix: list them in <code>modules_to_save</code> or train the embedding rows.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Gradient checkpointing crashes or yields no gradients</p>
+            <p>Cause: frozen input embeddings produce tensors without <code>requires_grad</code>. Fix: call <code>enable_input_require_grads()</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">The adapter memorizes the training set</p>
+            <p>Cause: too few examples, too many epochs, or too high a rank for the data size.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Fine-tuning cost grows with the parameter count. The information a task adds does not — it is bounded by the dataset, which is tiny next to pretraining. LoRA uses that gap: it spends memory, storage and optimizer compute on an <code>r</code>-dimensional subspace that roughly matches the task's information content.</p>
+        <ul>
+          <li><strong>Cost</strong> — GPU memory is the binding limit.</li>
+          <li><strong>Modularity</strong> — a base/delta split, like a base image plus layers.</li>
+          <li><strong>Latency</strong> — zero overhead once merged.</li>
+        </ul>
+
+        <h3>Why it looks the way it does</h3>
+        <figure class="diagram">
+          <svg viewBox="0 0 580 230" role="img" aria-labelledby="parTitle parDesc" width="580" style="max-width:100%">
+            <title id="parTitle">Serial adapter layer versus parallel LoRA branch</title>
+            <desc id="parDesc">Left: an adapter layer sits in series after W, adding depth and latency at batch size 1. Right: LoRA's branch runs in parallel with W and is linear, so it folds into W as W plus BA.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="22" fill="var(--danger)">Serial adapter layer</text>
+              <rect x="40" y="40" width="120" height="34" rx="6" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="100" y="62" fill="var(--text)" text-anchor="middle">W</text>
+              <line x1="100" y1="74" x2="100" y2="96" stroke="var(--text-muted)"/>
+              <rect x="40" y="96" width="120" height="34" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="100" y="118" fill="var(--danger)" text-anchor="middle">bottleneck MLP</text>
+              <line x1="100" y1="130" x2="100" y2="152" stroke="var(--text-muted)"/>
+              <text x="100" y="170" fill="var(--text-muted)" text-anchor="middle">h</text>
+              <text x="20" y="200" fill="var(--text-faint)" font-size="12">+ depth = +20.7% to +30.3% latency</text>
+              <text x="20" y="218" fill="var(--text-faint)" font-size="12">at batch 1 (GPT-2 Medium). Can't fold.</text>
+
+              <line x1="290" y1="10" x2="290" y2="220" stroke="var(--border-soft)"/>
+
+              <text x="320" y="22" fill="var(--accent)">Parallel LoRA branch</text>
+              <text x="430" y="52" fill="var(--text-muted)" text-anchor="middle">x</text>
+              <line x1="420" y1="58" x2="370" y2="80" stroke="var(--text-muted)"/>
+              <line x1="440" y1="58" x2="490" y2="80" stroke="var(--text-muted)"/>
+              <rect x="320" y="80" width="100" height="34" rx="6" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="370" y="102" fill="var(--text)" text-anchor="middle">W₀</text>
+              <rect x="440" y="80" width="100" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="490" y="102" fill="var(--accent)" text-anchor="middle">B·A</text>
+              <line x1="370" y1="114" x2="420" y2="140" stroke="var(--text-muted)"/>
+              <line x1="490" y1="114" x2="440" y2="140" stroke="var(--text-muted)"/>
+              <circle cx="430" cy="148" r="10" fill="none" stroke="var(--text-muted)"/>
+              <text x="430" y="153" fill="var(--text)" text-anchor="middle">+</text>
+              <text x="430" y="182" fill="var(--text-muted)" text-anchor="middle">h</text>
+              <text x="320" y="210" fill="var(--text-faint)" font-size="12">Linear + linear → folds into W₀ + BA. Zero cost.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The design choice that makes zero-cost inference possible: a parallel linear branch can be added into the matrix; a serial one can't.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Parallel, not serial.</strong> Adapter layers put a bottleneck MLP <em>in series</em>, adding depth and latency that batching can't hide at batch size 1. A parallel low-rank branch on an existing linear map is also linear, so it folds into <code>W₀</code>. No serial design can do that.</li>
+          <li><strong>A factorization, not a sparse mask or bias-only update.</strong> BitFit (biases only) is cheaper but has little capacity. Sparse updates have irregular memory access that GPUs handle poorly. A dense low-rank product is two small GEMMs, which GPUs run fast.</li>
+          <li><strong><code>B = 0</code> init.</strong> The model starts exactly at the pretrained function, so early training can't damage it. The side effect — at step 0, <code>A</code> gets no gradient while <code>B = 0</code> — is what LoRA+ (<a href="https://arxiv.org/abs/2402.12354" rel="noopener">Hayou et al., 2024</a>) addresses by giving <code>B</code> a higher learning rate.</li>
+          <li><strong><code>α/r</code> scaling.</strong> Keeps the update size roughly constant as you sweep <code>r</code>, so hyperparameters transfer. rsLoRA later showed <code>√r</code> is the scaling that stays stable as <code>r</code> grows.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026 LoRA is the default fine-tuning primitive for open-weights models — changing, not fading:</p>
+        <ul>
+          <li>RL post-training (GRPO-style reasoning tuning) often uses LoRA, because rank-1 adapters absorb the reward signal.</li>
+          <li>Serving stacks treat per-tenant adapters as a first-class feature.</li>
+          <li>Research moved from "does LoRA work?" to "when does it match full fine-tuning?". Answer: most post-training workloads, if you target all layers and use about <strong>10×</strong> the full-fine-tuning learning rate.</li>
+        </ul>
+        <p>The main open gap is large-scale knowledge acquisition, where full fine-tuning and continued pretraining still win.</p>
+
+        <h3>Open questions to verify in practice</h3>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Test these on your own task</p>
+            <ul>
+              <li>Does <code>"all-linear"</code> at <code>r=16</code> beat <code>q_proj</code>/<code>v_proj</code> at <code>r=64</code>, at matched parameter count?</li>
+              <li>Where is the LR sweet spot relative to your full-fine-tuning baseline — really about 10×?</li>
+              <li>How big is the latency and throughput overhead of unmerged adapters in your engine at real batch sizes, vs a merged checkpoint?</li>
+              <li>After QLoRA training, is there a measurable gap between merging into the bf16 base and running the 4-bit base plus adapter?</li>
+              <li>How much general capability (e.g. a held-out general benchmark) does your adapter cost, vs a full fine-tune on the same data?</li>
+              <li>Do your adapter's rank and target modules fit your serving engine's limits (<code>--max-lora-rank</code>, supported module types)?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

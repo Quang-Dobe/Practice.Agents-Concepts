@@ -1,11 +1,11 @@
-# Infrastructure as Code
+# LoRA
 
-Infrastructure as Code means your servers, networks, databases, and permissions are defined in text files that live in Git and get applied by a tool. Instead of clicking through the AWS or Azure portal to create a VM, a load balancer, and a firewall rule, you write a file that says these things should exist, configured this way. A tool reads that file, compares it to what actually exists in your cloud account, and makes reality match. The cloud console stops being the source of truth.
+LoRA, short for Low-Rank Adaptation, is a way to fine-tune a large pretrained model without changing any of its original weights. It freezes the model and, next to selected weight matrices, trains two thin matrices whose product is a small correction, usually well under 1% of the model's size.
 
-You reach for it when staging needs to actually match production rather than approximately match it, when more than one person changes infrastructure and you want review and an audit trail, when you build the same stack per customer or per region, or when disaster recovery has to be a rebuild instead of a restore-from-memory. You skip it for a one-off experiment you will delete this afternoon, during a real outage where you fix by hand first and reconcile after, and on fully managed platforms where there is barely any infrastructure to describe.
+It matters because full fine-tuning updates every weight: for a 7B-parameter model that means several high-memory GPUs and a full-size copy for every task. LoRA gets most of the quality on a single GPU and produces a small adapter file you can swap in and out, so one base model can serve many task-specific variants. Engineers reach for it when a model must adopt a consistent style, format, or domain vocabulary that prompting cannot reliably produce. It is not the right tool for fast-changing facts, where retrieval (RAG) works better, or when a good prompt already solves the problem.
 
-The useful mental model is a recipe versus a food order. An imperative script is a recipe: create the VPC, then the subnet, then the gateway. It works the first time; run it again and you get two VPCs. Declarative IaC is a food order: a table set for six with three plates of pasta. The kitchen looks at what is already on the table and adjusts. Run the same order twice and nothing happens, because the table already matches. That property is idempotency, and it is the whole reason IaC scales.
+Think of the base model as a printed encyclopedia. Full fine-tuning reprints the whole book with your edits. LoRA leaves the book alone and hands you transparent overlay sheets, one per chapter, each holding a few pencil strokes. In numbers, one 4096 by 4096 attention matrix has about 16.8 million weights, while a rank-8 LoRA adapter for it holds 65,536, about 0.4%. For deployment, the overlay can be merged into the weights so inference runs at the original speed.
 
 ---
 
-Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/cloud/infrastructure-as-code/present/index.html
+Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/ai/lora/present/index.html

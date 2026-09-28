@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LoRA · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">LoRA</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">LoRA</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/lora/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">LoRA</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">LoRA fine-tunes a large pretrained model by freezing all of its original weights and training a small add-on correction per layer — usually well under 1% of the model's size.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <ul>
+              <li><strong>Full fine-tuning</strong> updates every weight. For a 7B-parameter LLM that means gradients and optimizer state for all 7 billion numbers, several high-memory GPUs, and a full-size model copy per task.</li>
+              <li><strong>LoRA</strong> leaves the base model untouched. Next to chosen weight matrices it trains two thin matrices whose product is a small "delta".</li>
+              <li>You get most of full fine-tuning's quality, train on a single GPU, and end up with an
+                <span class="term">adapter</span>
+                <span class="term__gloss">the trained LoRA matrices, saved apart from the base model</span>
+                file of a few MB to a few hundred MB that you can swap in and out.</li>
+              <li>The original paper (<a href="https://arxiv.org/abs/2106.09685" rel="noopener">Hu et al., 2021</a>) reports that on GPT-3 175B it trained about <strong>10,000× fewer parameters</strong> and used about <strong>3× less GPU memory</strong>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of the base model as a <strong>printed encyclopedia</strong>: huge, expensive to reprint, and mostly right for you. You just want it to write in your company's style, or know your product's jargon.</p>
+        <ul>
+          <li><strong>Full fine-tuning</strong> reprints the whole encyclopedia with your edits worked into every page. You get a second full-size copy — and another one for every other customer.</li>
+          <li><strong>LoRA</strong> leaves the book alone and hands you a <strong>stack of transparent overlay sheets</strong>, one per chapter. Each sheet holds only a few pencil strokes. Read a chapter with its overlay on top and you see the original text plus the corrections.</li>
+        </ul>
+
+        <p>Why are a few strokes enough? The <em>change</em> a fine-tune needs is simple, even though the model is not. In math terms, the update to each weight matrix has
+          <span class="term">low rank</span>
+          <span class="term__gloss">it can be written as a tall-thin matrix times a short-wide matrix</span>:</p>
+        <pre><code>W_effective = W_frozen + B · A
+              (d × d)    (d × r)(r × d),  r is small (e.g. 8 or 16)</code></pre>
+        <p>Concrete numbers: one 4096 × 4096 attention matrix has about <strong>16.8M</strong> weights. At
+          <span class="term">rank (r)</span>
+          <span class="term__gloss">the inner size of B·A — more rank means more capacity and more parameters</span>
+          = 8, <code>B</code> and <code>A</code> together hold 8 × (4096 + 4096) = <strong>65,536</strong> weights, about <strong>0.4%</strong> of the original.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    Base["Base model (frozen, one copy)"]
+    Base --> L["+ legal adapter"]
+    Base --> S["+ support-bot adapter"]
+    Base --> Q["+ SQL adapter"]
+    L --> Swap["Swap per task (few MB each)"]
+    S --> Swap
+    Q --> Swap
+    Base --> M["Merge: W + BA"]
+    M --> Fast["One model, original inference speed"]
+          </pre>
+          <figcaption class="diagram__caption">One base model, many overlays. Keep adapters separate to swap them, or merge one in for zero extra latency.</figcaption>
+        </figure>
+
+        <p>The overlays can be <strong>peeled off or swapped</strong>: one base model can serve a "legal", a "support-bot" and a "SQL" adapter. For deployment you can also
+          <span class="term">merge</span>
+          <span class="term__gloss">fold B·A into W for good, so no extra layers remain</span>
+          an overlay into the weights (<code>W + BA</code>), so inference runs at exactly the original speed.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not full fine-tuning.</strong> Full fine-tuning updates every weight. LoRA updates none of the original ones.</li>
+              <li><strong>Not RAG.</strong> RAG adds knowledge at query time by fetching documents. LoRA changes behavior by training weights.</li>
+              <li><strong>Not prompt engineering or prompt tuning.</strong> Those steer the model through its input. LoRA changes the inner layers.</li>
+              <li><strong>Not quantization.</strong> Quantization shrinks the model's numbers to save memory. QLoRA <em>combines</em> the two: a 4-bit frozen base plus LoRA adapters.</li>
+              <li><strong>Not a model architecture.</strong> It is a training technique you apply to an existing transformer (or diffusion model, CNN, and so on).</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You need a steady style, format or domain vocabulary that prompting can't reliably produce.</li>
+              <li>You have one or a few consumer or cloud GPUs, not a training cluster.</li>
+              <li>You want many task-specific variants of one base model without storing many full copies.</li>
+              <li>You are customizing an open-weights model (Llama, Mistral, Qwen, Stable Diffusion) and want a small, shareable file.</li>
+              <li>You want fast loops: train, evaluate, throw away, retrain — all in hours.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The model lacks <em>facts</em> that change often. Use RAG — fine-tuning is a poor, stale database.</li>
+              <li>A well-written prompt or a few examples already solve it.</li>
+              <li>You only have API access to a closed model with no weights. Use the vendor's fine-tuning service if it has one.</li>
+              <li>You are teaching a truly new capability or language at scale — full fine-tuning or continued pretraining still wins.</li>
+              <li>You have fewer than a few hundred good examples. The adapter will likely overfit or learn noise.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Base model</dt><dd>The pretrained model whose weights stay frozen.</dd></div>
+          <div><dt>Adapter</dt><dd>The trained LoRA matrices (<code>A</code> and <code>B</code>), saved apart from the base.</dd></div>
+          <div><dt>Rank (<code>r</code>)</dt><dd>The inner size of <code>B · A</code>. Higher means more capacity and more parameters. Common values: 4–64.</dd></div>
+          <div><dt>Alpha (<code>lora_alpha</code>)</dt><dd>A scaling factor for how strongly the delta is applied (effective scale <code>alpha / r</code>).</dd></div>
+          <div><dt>Target modules</dt><dd>Which layers get adapters — usually the attention projections (<code>q_proj</code>, <code>v_proj</code>, …) and sometimes the MLP layers.</dd></div>
+          <div><dt>Merging</dt><dd>Folding <code>B · A</code> into <code>W</code> so the deployed model has no extra layers or latency.</dd></div>
+          <div><dt>PEFT</dt><dd>Parameter-Efficient Fine-Tuning, the family LoRA belongs to. Also the name of Hugging Face's <a href="https://huggingface.co/docs/peft" rel="noopener"><code>peft</code></a> library.</dd></div>
+          <div><dt>QLoRA / DoRA</dt><dd>Popular variants. QLoRA keeps the base in 4-bit to save memory. DoRA splits each weight into magnitude and direction to close more of the gap to full fine-tuning.</dd></div>
+        </dl>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">What's next</p>
+            <p>Detail covers why the low-rank bet holds, how <code>A</code> and <code>B</code> start so training begins from the unchanged model, how to pick rank and target modules, and how QLoRA and DoRA change the recipe.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
