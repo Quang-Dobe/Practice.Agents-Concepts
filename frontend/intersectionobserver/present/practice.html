@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IntersectionObserver · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">IntersectionObserver</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">IntersectionObserver</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/intersectionobserver/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">IntersectionObserver</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~9 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Most of the time you meet IO indirectly — through a framework primitive (Angular <code>@defer (on viewport)</code>, Astro <code>client:visible</code>, Next.js <code>&lt;Link&gt;</code> prefetch) or a hook (<code>useInView</code>). Knowing the timing model from Detail is what lets you debug those. Three settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Content / e-commerce site</div><p>Sits between the product grid and the network. Decides when a product image, a recommendations carousel, or a "you may also like" widget starts fetching. Wrong rules → <span class="term" data-gloss="Largest Contentful Paint: when the biggest above-the-fold element finishes rendering">LCP</span> regresses, or mobile users download 40 images they never scroll to.</p></div>
+          <div class="card"><div class="card__title">Social feed / timeline</div><p>The trigger for pagination (a
+            <span class="term">sentinel</span>
+            <span class="term__gloss">an empty marker element at the end of a list; when it shows, load more</span>
+            at the bottom), "seen" receipts, and video autoplay/pause. Typical failure: a feed that stops loading, or a read-receipt counter that double-counts.</p></div>
+          <div class="card"><div class="card__title">Ads &amp; analytics product</div><p>The measurement layer. Impressions, MRC-style
+            <span class="term">viewability</span>
+            <span class="term__gloss">an industry rule for when an ad counts as seen</span>
+            ("50% visible for 1 continuous second" for display, 2 seconds for video), and scroll-depth metrics are all IO plus a timer. Bugs show up on the finance dashboard, not in the UI.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Try the declarative option before writing an observer</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>loading="lazy"</code> for below-the-fold <code>&lt;img&gt;</code>/<code>&lt;iframe&gt;</code>, <code>content-visibility: auto</code> to skip render work, and CSS <code>animation-timeline: view()</code> for reveal-on-scroll. Write IO code only when you need a custom distance, a callback, or analytics.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Native lazy loading is tuned by the browser (Chrome uses roughly 1250px ahead on fast connections and 2500px on slow ones) and needs zero JS, zero hydration, zero tests.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A hand-rolled <code>img[data-src]</code> lazy-loader in 2026 just because the old codebase had one.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Never lazy-load what is in the initial viewport</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Render the hero/LCP image eagerly with a real <code>src</code> and <code>fetchpriority="high"</code>. Lazy-load (IO or native) only below the fold.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An IO-gated image can't start fetching until JS runs, the observer is created, and one rendering pass completes. web.dev measured LCP regressions from exactly this pattern on WordPress sites.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Applying the same <code>&lt;LazyImage&gt;</code> component to every image on the page.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Share one observer per configuration</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Create one observer per unique <code>(root, rootMargin, threshold)</code> tuple and route entries through a <code>WeakMap&lt;Element, handler&gt;</code>. <code>react-intersection-observer</code> already does this internally.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Chrome's implementers confirmed a shared observer is cheaper, and Ben Nadel measured visibly slower deferred rendering with one observer per element in an Angular list. Per-element observers also mean per-element callback tasks.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>new IntersectionObserver(...)</code> inside every list-item component.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Always branch on <code>isIntersecting</code></h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Start every callback loop with <code>if (!entry.isIntersecting) continue;</code> — or handle the leave case explicitly.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every <code>observe()</code> produces an initial entry, often with <code>isIntersecting: false</code>. Code that treats "callback fired" as "became visible" loads everything, or fires an impression for every card on mount.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using <code>intersectionRatio &gt; 0</code> as the test. Edge-adjacent and zero-area targets break it.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Unobserve one-shot targets, disconnect on unmount</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Call <code>observer.unobserve(entry.target)</code> right after a lazy load or a single impression fires. In SPAs, <code>disconnect()</code> in the cleanup of the effect/directive that created the observer.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Leftover registrations keep detached DOM subtrees reachable and keep the browser computing geometry for targets you no longer care about. Over a long feed-app session this is a slow heap leak.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Relying on garbage collection to clean up observers held in module-level singletons.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Keep the callback cheap and write-only</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Read geometry from the entry (<code>boundingClientRect</code>, <code>intersectionRect</code>), record IDs, and push heavy work to <code>requestIdleCallback</code> or a batched <code>requestAnimationFrame</code> write.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A fling can deliver hundreds of entries in one task. Calling <code>el.getBoundingClientRect()</code> or reading <code>offsetHeight</code> in the loop forces synchronous layout every iteration and shows up as a long task on <span class="term" data-gloss="Interaction to Next Paint: how fast the page responds to clicks and taps">INP</span>.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Calling <code>fetch</code>, <code>setState</code>, and layout reads per entry inside the loop.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Pick thresholds you can actually reach</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>threshold: 0</code> for "about to appear", <code>0.5</code> for viewability. Compute "fully visible" as <code>entry.intersectionRatio &gt;= 0.99</code>, or <code>intersectionRect.height &gt;= rootBounds.height</code> for tall targets.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>threshold: 1</code> never fires for targets taller than the viewport, and fractional pixels under zoom cap the ratio at 0.9999. Impressions for tall cards silently drop to zero on some devices.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>threshold: [0, 0.01, 0.02, ... 1]</code> to fake a scroll-progress value. Use scroll-driven animations instead.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Use <code>rootMargin</code> in <code>px</code>, and <code>scrollMargin</code> for nested scrollers</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Prefetch ahead with <code>rootMargin: "0px 0px 400px 0px"</code> (bottom only for vertical feeds). For carousels, set <code>scrollMargin</code> (Baseline since September 2025) or use the carousel element as <code>root</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>rootMargin</code> only grows the root. A horizontal carousel still clips at its own edge, so slide 2 loads with a visible blank. Percentages resolve against the root size, which varies wildly between a phone and a 4K monitor.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>rootMargin: "50%"</code> copied from a desktop-only prototype.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Pair viewability tracking with <code>visibilitychange</code> and a timer</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For "visible for N seconds": start a timer on enter, cancel on leave, and also cancel when <code>document.visibilityState === "hidden"</code>. Send the event once and <code>unobserve</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>As far as your timer knows, IO keeps saying "intersecting" for a background tab, and callbacks are throttled there. Without the visibility check, a user who switches tabs generates impressions ad buyers will later dispute.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Counting an impression on the first <code>isIntersecting: true</code>.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Waiting
+    Waiting --> Timing: isIntersecting and ratio at least 0.5
+    Timing --> Waiting: leaves (ratio below 0.5)
+    Timing --> Waiting: visibilityState is hidden
+    Timing --> Counted: 1 s continuous (display) or 2 s (video)
+    Counted --> [*]: send event once, unobserve
+          </pre>
+          <figcaption class="diagram__caption">A viewability timer: IO starts and stops the clock, <code>visibilitychange</code> stops it for background tabs, and the target is unobserved after one impression.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Mock IO in unit tests, exercise it for real in E2E</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Install a controllable mock in the Jest/Vitest setup (for React, <code>react-intersection-observer/test-utils</code> provides <code>mockAllIsIntersecting</code>) and cover real scrolling in Playwright.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>jsdom has no IntersectionObserver, so tests either crash with <code>IntersectionObserver is not defined</code> or someone adds a no-op stub that never fires, and every "visible" branch goes untested.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A global <code>window.IntersectionObserver = class { observe() {} }</code> stub with no way to trigger entries.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Sentinel that stays visible</p>
+            <p>Page 1 returns 5 short items and the sentinel never leaves the viewport. No state change means no new callback, so the feed stalls on large monitors. After appending, check whether the sentinel is still intersecting (latest entry or one <code>getBoundingClientRect()</code>) and fetch again, or <code>unobserve</code>/<code>observe</code> it to force a fresh initial entry.</p></div></div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    A["sentinel enters → callback"] --> B[fetch next page]
+    B --> C[append items]
+    C --> D{"sentinel still in view?"}
+    D -- "no: it scrolls out" --> E["user scrolls, sentinel re-enters → new entry"]
+    E --> B
+    D -- "yes: page too short" --> F{"re-armed?"}
+    F -- no --> G["no state change → no entry → feed stalls"]
+    F -- "yes: unobserve + observe" --> H["fresh initial entry, isIntersecting true"]
+    H --> B
+          </pre>
+          <figcaption class="diagram__caption">The sentinel stall. IO fires on changes, not on states, so a sentinel that never leaves the screen goes silent unless you re-arm it — the case the MVP's <code>REARM_SENTINEL</code> flag demonstrates.</figcaption>
+        </figure>
+
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Observer in a render function</p>
+            <p>In React, <code>new IntersectionObserver</code> in the component body, or an effect with unstable dependencies (an <code>options</code> object literal). It reconnects every render, re-emits initial entries, and fires duplicate analytics. Memoize options and depend on primitives, or use a shared-observer hook.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">"Intersecting means seen"</p>
+            <p>Treating v1 intersection as proof the user saw it. A <code>position: fixed</code> banner, an <code>opacity: 0</code> wrapper, or a closed <code>&lt;details&gt;</code> can hide it and IO still says <code>true</code>. For fraud-sensitive metrics, add v2 <code>trackVisibility</code> in Chromium and label non-Chromium numbers as geometry-only.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Explicit <code>root</code> that is not an ancestor</p>
+            <p>A sibling scroll panel, or a <code>ref</code> pointing at the wrong wrapper. Nothing throws and nothing ever intersects, so it looks like "lazy images never load in the sidebar." Assert <code>root.contains(target)</code> in development builds.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">IO as a scroll-position engine</p>
+            <p>Parallax, progress bars, or sticky-header shrink driven by dense thresholds. Callbacks are async and sampled per frame, so the effect lags and a fast fling skips targets. Use CSS scroll-driven animations or a passive scroll listener with rAF.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Premature polyfill</p>
+            <p>Shipping the W3C <code>intersection-observer</code> polyfill to everyone. It adds bytes and a scroll-listener fallback for browsers that have had the API since 2019. Delete it unless analytics show real traffic from pre-Safari-12.1 clients.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Server-side construction</p>
+            <p>Touching <code>IntersectionObserver</code> at module top level in an SSR app. Node has no such global, so the build or first request throws. Create observers only in client lifecycle hooks (<code>useEffect</code>, <code>onMounted</code>, <code>afterNextRender</code>).</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Marketplace product grid, 60 cards/page</div>
+            <p>One shared observer with <code>rootMargin: "0px 0px 600px 0px"</code> swaps in image <code>src</code> and mounts the "add to cart" island only when a card is near. <em>Lesson:</em> exclude the first row from the lazy path. The team's LCP regression came from one component that lazy-loaded row one, not from the observer.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">News site, scroll-spy TOC</div>
+            <p>Each <code>&lt;h2&gt;</code> is observed with <code>rootMargin: "0px 0px -70% 0px"</code>, so a heading turns "active" once it enters the top 30% of the viewport. <em>Lesson:</em> several headings can sit in that band, so one task brings several entries. Track the full set of intersecting headings and pick the top-most — "last entry wins" makes the highlight flicker.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Publisher, ad viewability</div>
+            <p>An observer at <code>threshold: 0.5</code> starts a 1-second timer per slot. Timers pause on <code>visibilitychange</code>; the slot is unobserved after the impression. <em>Lesson:</em> counts diverged from the ad server's until the team saw it measured inside a cross-origin iframe, where <code>rootMargin</code> is ignored and <code>rootBounds</code> is <code>null</code>. Both sides must agree which frame measures.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Social feed, autoplay video</div>
+            <p>Videos play at <code>threshold: 0.75</code> and pause below 0.25 — two thresholds with
+              <span class="term">hysteresis</span>
+              <span class="term__gloss">a gap between the "on" and "off" points so a value near the line doesn't flip back and forth</span>
+              in code. <em>Lesson:</em> a single 0.5 threshold made videos thrash between play and pause when a user stopped with a card half-visible, burning battery and re-triggering media buffering.</p>
+          </div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Paused
+    Paused --> Playing: ratio reaches 0.75
+    Playing --> Paused: ratio drops below 0.25
+    note right of Playing: between 0.25 and 0.75 nothing changes
+          </pre>
+          <figcaption class="diagram__caption">Two thresholds, one gap: a card resting half-visible stays in whatever state it was in, so video no longer thrashes.</figcaption>
+        </figure>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> are LCP and INP tracked in RUM and checked against the lazy-load boundary? Are impressions de-duplicated per target ID, with an alert if the impression-to-pageview ratio drops after a deploy?</li>
+              <li><strong>Failure handling:</strong> if the next-page fetch fails, can the sentinel re-trigger, or does infinite scroll stay dead until reload?</li>
+              <li><strong>Failure handling:</strong> is "sentinel still visible after append" tested on a tall viewport (for example 2560x1440)?</li>
+              <li><strong>Correctness:</strong> does every callback branch on <code>isIntersecting</code>, and does every <code>threshold: 1</code> target fit inside the root?</li>
+              <li><strong>Lifecycle:</strong> does every observer have a matching <code>disconnect()</code> on unmount, and do one-shot targets call <code>unobserve</code>?</li>
+              <li><strong>Security/privacy:</strong> are viewability numbers labelled geometry-only (v1) where <code>trackVisibility</code> is unavailable, and is no IO data used as click-fraud proof outside Chromium?</li>
+              <li><strong>Cost:</strong> does a wide <code>rootMargin</code> pull images or API calls for content most users never reach? Check bytes-per-session on mobile before and after.</li>
+              <li><strong>Testing:</strong> is there a controllable IO mock in unit tests and at least one real-browser E2E scroll test?</li>
+              <li><strong>Onboarding:</strong> does the codebase document which shared hook or observer pool to use, so new engineers don't create ad-hoc observers?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">One snippet → five wrappers.</span> It starts with a copy-pasted lazy-image component or infinite-scroll hook, each with its own <code>new IntersectionObserver</code>. It works, so it gets copied. Six months later:
+            <ul>
+              <li>five slightly different wrappers, each with its own options;</li>
+              <li>a few missing <code>disconnect()</code>;</li>
+              <li>at least one that treats the initial entry as "visible".</li>
+            </ul>
+            Analytics impressions and lazy images are now tied to the same accidental behaviour.</li>
+          <li><span class="steps__title">Consolidation — the painful step.</span> Moving to a shared observer pool or a single <code>useInView</code> hook changes timing subtly: entries batch together, and initial entries arrive in a different task. Analytics numbers shift and someone has to explain the dip to product or ad sales. Plan it with a before/after comparison of impression counts, and ship it behind a flag.</li>
+          <li><span class="steps__title">Less IO code, not more.</span> Mature codebases shrink it:
+            <ul>
+              <li>native <code>loading="lazy"</code> replaces image lazy-loaders;</li>
+              <li><code>content-visibility: auto</code> replaces render-skipping;</li>
+              <li>CSS scroll-driven animations replace reveal effects;</li>
+              <li>framework primitives (<code>@defer</code>, islands) absorb component deferral.</li>
+            </ul>
+            What remains is a small, well-tested module for what CSS can't express: pagination sentinels, viewability timers, and custom prefetch distances.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://w3c.github.io/IntersectionObserver/" rel="noopener">W3C Intersection Observer spec</a> — the source of truth for initial entries, cross-origin margin rules, and threshold math.</li>
+          <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API" rel="noopener">MDN: Intersection Observer API</a> — the clearest reference for options, entry fields, and root/margin behaviour.</li>
+          <li><a href="https://web.dev/articles/lcp-lazy-loading" rel="noopener">web.dev: The performance effects of too much lazy loading</a> — field data on how lazy-loading above-the-fold images hurts LCP.</li>
+          <li><a href="https://web.dev/articles/browser-level-image-lazy-loading" rel="noopener">web.dev: Browser-level image lazy loading</a> — Chrome's native distance thresholds, useful for deciding when you still need IO.</li>
+          <li><a href="https://www.bennadel.com/blog/3954-intersectionobserver-api-performance-many-vs-shared-in-angular-11-0-5.htm" rel="noopener">Ben Nadel: IntersectionObserver performance, many vs. shared</a> — a concrete measurement of per-element vs. shared observers, with Chrome implementer input.</li>
+          <li><a href="https://web.dev/articles/intersectionobserver-v2" rel="noopener">web.dev: Trust is good, observation is best (Intersection Observer v2)</a> — what <code>trackVisibility</code> guarantees and why <code>delay</code> must be at least 100 ms.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/intersectionobserver/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

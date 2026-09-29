@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IntersectionObserver · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">IntersectionObserver</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">IntersectionObserver</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/intersectionobserver/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">IntersectionObserver</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Lots of features care whether something is on screen: lazy images, infinite scroll, "mark as read", ad impressions, scroll-in animations. The old way measured every element on every scroll event. IntersectionObserver lets the browser do that work for you.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <ul>
+              <li><strong>The old way:</strong> listen to <code>scroll</code> and call <code>getBoundingClientRect()</code> on each element. That runs on the main thread dozens of times per second and forces
+                <span class="term">layout</span>
+                <span class="term__gloss">the browser's step that works out every element's size and position</span>
+                work.</li>
+              <li><strong>The IO way:</strong> you list the elements you care about. The browser calls you back only when their visibility crosses a line you picked.</li>
+              <li><strong>Why it's cheaper:</strong> the browser already computes layout and clipping while it renders, so it does the geometry for you.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a security guard watching a wall of CCTV monitors.</p>
+        <ul>
+          <li>The monitor frame is the
+            <span class="term">root</span>
+            <span class="term__gloss">the box that counts as "visible"; usually the browser viewport</span>.</li>
+          <li>The people walking past are your
+            <span class="term">targets</span>
+            <span class="term__gloss">the elements being watched, added with <code>observe(el)</code></span>.</li>
+          <li><strong>Scroll listener:</strong> you phone the guard every 16 ms: "Is Alice on camera? What about Bob?" Most answers haven't changed, and every call interrupts the guard.</li>
+          <li><strong>IntersectionObserver:</strong> you hand the guard a list and a rule: "Radio me when Alice is at least half on screen, and again when she leaves." You stop asking. The guard reports only when someone crosses your line, and saves up several reports to hand over together.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph Old["Scroll listener: you ask"]
+      direction TB
+      S1[scroll event] --> S2["getBoundingClientRect() per element"]
+      S2 --> S3[forced layout on main thread]
+      S3 --> S1
+    end
+    subgraph New["IntersectionObserver: browser tells you"]
+      direction TB
+      N1["observe(targets) once"] --> N2[browser renders a frame]
+      N2 --> N3{crossed a threshold?}
+      N3 -- no --> N2
+      N3 -- yes --> N4["callback(entries) in a batch"]
+      N4 --> N2
+    end
+          </pre>
+          <figcaption class="diagram__caption">Polling vs being told. The scroll loop does geometry on every event; the observer piggybacks on the frame the browser already renders and wakes you only on a crossing.</figcaption>
+        </figure>
+
+        <h3>The two knobs</h3>
+        <ul>
+          <li><strong>Threshold</strong> — how much of the target must show before the guard reports.
+            <ul>
+              <li><code>0</code> = any pixel showing.</li>
+              <li><code>1</code> = fully in frame.</li>
+              <li><code>[0, 0.5, 1]</code> = report at each of those points.</li>
+            </ul>
+          </li>
+          <li><strong>Root margin</strong> — stretch or shrink the monitor frame before checking. <code>rootMargin: "200px"</code> means "tell me when Alice is within 200px of coming on camera". That is how lazy-loaders start fetching an image before you see it.</li>
+        </ul>
+
+        <pre><code>const io = new IntersectionObserver((entries) =&gt; {
+  for (const e of entries) {
+    if (e.isIntersecting) loadImage(e.target);
+  }
+}, { rootMargin: "200px", threshold: 0 });
+
+document.querySelectorAll("img[data-src]").forEach((img) =&gt; io.observe(img));</code></pre>
+
+        <p>This is a simplification. The callback runs
+          <span class="term">asynchronously</span>
+          <span class="term__gloss">later, in its own task, not at the exact moment a pixel crosses the line</span>.
+          The Detail page covers the timing you do get.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not <code>ResizeObserver</code>.</strong> That reports when an element's <em>size</em> changes, not whether it is visible.</li>
+              <li><strong>Not <code>MutationObserver</code>.</strong> That reports <em>DOM changes</em> — added nodes, changed attributes.</li>
+              <li><strong>Not proof a human saw it.</strong> An element can "intersect" while hidden behind another element or at <code>opacity: 0</code>. The experimental v2 option <code>trackVisibility</code> tries to close that gap; browser support varies.</li>
+              <li><strong>Not a scroll-position API.</strong> It reports threshold crossings, not a steady stream of scroll offsets. For effects tied to scroll position, use CSS scroll-driven animations.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Lazy-loading images, iframes, or heavy components as they get close to the viewport.</li>
+              <li>Infinite scroll: watch a sentinel <code>&lt;div&gt;</code> at the bottom of the list and fetch the next page when it shows.</li>
+              <li>Analytics and ad viewability: "was this card at least 50% visible?"</li>
+              <li>Starting and pausing videos or animations based on whether they are on screen.</li>
+              <li>Highlighting the active section in a table of contents as the reader scrolls.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You need pixel-accurate, per-frame scroll effects like parallax. Batched, async callbacks look janky.</li>
+              <li>Native <code>loading="lazy"</code> on <code>&lt;img&gt;</code> or <code>&lt;iframe&gt;</code> already does the job.</li>
+              <li>You check visibility once. A single <code>getBoundingClientRect()</code> is simpler.</li>
+              <li>You must prove an element was not covered or tampered with — unless you accept v2's limited browser support.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Target</dt><dd>The element being watched, registered with <code>observe(el)</code>.</dd></div>
+          <div><dt>Root</dt><dd>The box used as the visible area. <code>null</code> means the viewport; otherwise it must be an ancestor of the target.</dd></div>
+          <div><dt>Threshold</dt><dd>One or more ratios from 0 to 1 that trigger a callback when crossed.</dd></div>
+          <div><dt>rootMargin</dt><dd>A CSS-margin-style string that grows or shrinks the root box before intersection is tested.</dd></div>
+          <div><dt>IntersectionObserverEntry</dt><dd>The object your callback gets for each change, with <code>isIntersecting</code>, <code>intersectionRatio</code>, <code>boundingClientRect</code>, and <code>time</code>.</dd></div>
+          <div><dt>intersectionRatio</dt><dd>The fraction of the target currently visible inside the root, from 0 to 1.</dd></div>
+          <div><dt>unobserve / disconnect</dt><dd>Stop watching one target, or stop watching all of them.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

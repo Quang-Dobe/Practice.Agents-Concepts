@@ -1,11 +1,11 @@
-# LoRA
+# IntersectionObserver
 
-LoRA, short for Low-Rank Adaptation, is a way to fine-tune a large pretrained model without changing any of its original weights. It freezes the model and, next to selected weight matrices, trains two thin matrices whose product is a small correction, usually well under 1% of the model's size.
+IntersectionObserver is a browser Web API that tells you when an element enters or leaves a visible area, usually the viewport. You list the elements you care about, and the browser calls you back only when their visibility crosses a line you picked, so you never have to measure positions yourself.
 
-It matters because full fine-tuning updates every weight: for a 7B-parameter model that means several high-memory GPUs and a full-size copy for every task. LoRA gets most of the quality on a single GPU and produces a small adapter file you can swap in and out, so one base model can serve many task-specific variants. Engineers reach for it when a model must adopt a consistent style, format, or domain vocabulary that prompting cannot reliably produce. It is not the right tool for fast-changing facts, where retrieval (RAG) works better, or when a good prompt already solves the problem.
+It matters because many features depend on whether something is on screen: lazy-loading images, infinite scroll, "mark as read", ad impressions, and scroll-triggered animations. The old way listened to scroll events and called getBoundingClientRect() on each element dozens of times per second, which forced layout work on the main thread. The browser already computes layout while rendering, so letting it do the geometry is cheaper. Two settings shape the rule: a threshold (how much of the element must show, from 0 to 1) and a root margin (grow or shrink the visible box, so a lazy-loader can start fetching an image 200px before it appears). It is not the right tool for pixel-accurate per-frame effects like parallax, because callbacks arrive batched and asynchronously.
 
-Think of the base model as a printed encyclopedia. Full fine-tuning reprints the whole book with your edits. LoRA leaves the book alone and hands you transparent overlay sheets, one per chapter, each holding a few pencil strokes. In numbers, one 4096 by 4096 attention matrix has about 16.8 million weights, while a rank-8 LoRA adapter for it holds 65,536, about 0.4%. For deployment, the overlay can be merged into the weights so inference runs at the original speed.
+Picture a security guard watching CCTV monitors. Instead of phoning every 16 ms to ask whether Alice is on camera, you hand the guard a list and a rule: "radio me when Alice is at least half on screen, and again when she leaves." The guard reports only when something crosses that line, and bundles several reports together.
 
 ---
 
-Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/ai/lora/present/index.html
+Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/frontend/intersectionobserver/present/index.html

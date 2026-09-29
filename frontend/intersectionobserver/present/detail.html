@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IntersectionObserver · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">IntersectionObserver</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">IntersectionObserver</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/intersectionobserver/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">IntersectionObserver</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p><code>IntersectionObserver</code> is a W3C Web API (<a href="https://w3c.github.io/IntersectionObserver/" rel="noopener">Intersection Observer spec</a>, Editor's Draft, last revised March 2026). It lets script register interest in the overlap between a <strong>target</strong> element and an
+          <span class="term">intersection root</span>
+          <span class="term__gloss">an ancestor element, a <code>Document</code>, or the implicit top-level viewport</span>.</p>
+        <ul>
+          <li>The browser computes the overlap during the <strong>rendering phase</strong> of the event loop.</li>
+          <li>When the overlap crosses a configured <strong>threshold</strong>, or <code>isIntersecting</code> flips, the browser queues an <code>IntersectionObserverEntry</code>.</li>
+          <li>Later it delivers a batch of entries to your callback in a normal task.</li>
+          <li>So the API is <strong>asynchronous, batched, and threshold-driven</strong> — not continuous, not synchronous.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt><code>IntersectionObserver(callback, options)</code></dt><dd>The constructor. Options: <code>root</code>, <code>rootMargin</code>, <code>scrollMargin</code>, <code>threshold</code>, plus v2's <code>delay</code> and <code>trackVisibility</code>. A bad margin string throws <code>SyntaxError</code>; a threshold outside <code>[0, 1]</code> throws <code>RangeError</code>.</dd></div>
+          <div><dt>Intersection root</dt><dd><code>null</code> = the implicit root: the top-level browsing context's viewport, even from inside an iframe. An explicit <code>Element</code> or <code>Document</code> root must be an ancestor of the target in the containing-block chain — if not, the target never intersects.</dd></div>
+          <div><dt>Root intersection rectangle</dt><dd>The root's content box (or the viewport), grown or shrunk by <code>rootMargin</code>. Accepts <code>px</code> and <code>%</code> only; percentages resolve against the root's size.</dd></div>
+          <div><dt><code>scrollMargin</code></dt><dd>Grows or shrinks the clip rect of <em>every</em> scroll container between target and root. <code>rootMargin</code> moves only the root's edge; <code>scrollMargin</code> also moves the edges of nested scrollers such as carousels.</dd></div>
+          <div><dt>Thresholds</dt><dd>A sorted list of ratios. The browser tracks which "bucket" the current ratio sits in (the <em>threshold index</em>) and notifies on bucket changes.</dd></div>
+          <div><dt><code>IntersectionObserverEntry</code></dt><dd>A snapshot: <code>time</code>, <code>rootBounds</code>, <code>boundingClientRect</code>, <code>intersectionRect</code>, <code>intersectionRatio</code>, <code>isIntersecting</code>, <code>isVisible</code> (v2), <code>target</code>.</dd></div>
+          <div><dt>Registration</dt><dd>Each target keeps a list of <code>(observer, previousThresholdIndex, previousIsIntersecting)</code> records. On <code>observe()</code>, <code>previousThresholdIndex</code> starts at <code>-1</code>, so the first computation always differs — every new target gets <strong>one initial entry</strong>, even off screen.</dd></div>
+          <div><dt>Control methods</dt><dd><code>observe(el)</code>, <code>unobserve(el)</code>, <code>disconnect()</code>, and <code>takeRecords()</code>, which synchronously drains queued entries not yet delivered.</dd></div>
+        </dl>
+
+        <h3>Its family</h3>
+        <p>IO belongs to the browser's <strong>observer family</strong>. All share one shape: register once, get batched async callbacks.</p>
+        <ul>
+          <li><code>MutationObserver</code> — DOM tree changes, delivered as microtasks.</li>
+          <li><code>ResizeObserver</code> — box-size changes, during rendering.</li>
+          <li><code>PerformanceObserver</code> — timing entries.</li>
+          <li><code>IntersectionObserver</code> — <em>geometry relative to an ancestor</em>.</li>
+        </ul>
+        <p>Its closest functional neighbours are not observers but declarative features built on the same machinery: <code>loading="lazy"</code>, <code>content-visibility: auto</code>, and CSS scroll-driven animations.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <ul>
+          <li>In the browser, on the client, on the renderer's <strong>main thread</strong>.</li>
+          <li>Geometry is computed inside the rendering pipeline, after style and layout, using the same clip and scroll data the
+            <span class="term">compositor</span>
+            <span class="term__gloss">the browser part that assembles painted layers into the final frame, often on its own thread</span>
+            uses.</li>
+          <li>Your callback is plain JavaScript on the main thread. MDN says keep it short and defer heavy work, for example with <code>requestIdleCallback</code>.</li>
+          <li>It does <strong>not exist on the server</strong>. SSR frameworks must guard it behind a client-only lifecycle hook.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Server["SSR server (Node)"]
+      X["no IntersectionObserver global — construct only in client hooks"]
+    end
+    subgraph Browser["Browser renderer · main thread"]
+      direction TB
+      St[style] --> L[layout]
+      L --> IO["IO compute: clip + scroll data"]
+      IO --> P[paint]
+      IO -.->|entries, one task later| CB["your callback (plain JS)"]
+    end
+    Server -- "HTML + JS" --> Browser
+          </pre>
+          <figcaption class="diagram__caption">Where it runs: geometry inside the browser's rendering pipeline, callback on the main thread, nothing at all on the server.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Lazy loading</div><p>Chromium builds native <code>loading="lazy"</code> on its internal IO machinery. Libraries like lazysizes and lozad use the public API.</p></div>
+          <div class="card"><div class="card__title">Infinite scroll / feeds</div><p>Sentinel elements in React (<code>react-intersection-observer</code>), TanStack Virtual demos, and Twitter/X-style timelines.</p></div>
+          <div class="card"><div class="card__title">Ad viewability &amp; analytics</div><p>The MRC standard ("50% of pixels visible for 1 continuous second" for display ads) maps onto <code>threshold: 0.5</code> plus a timer. Google Publisher Tag and most analytics SDKs use it.</p></div>
+          <div class="card"><div class="card__title">Framework primitives</div><p>Angular <code>@defer (on viewport)</code>, Astro <code>client:visible</code> islands, and Next.js <code>&lt;Link&gt;</code> viewport prefetch are all IO underneath.</p></div>
+          <div class="card"><div class="card__title">Docs sites</div><p>Scroll-spy tables of contents in Docusaurus, VitePress, and MDN itself.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Framework integration:</strong> <code>react-intersection-observer</code> (<code>useInView</code>), VueUse <code>useIntersectionObserver</code>, Svelte actions, Angular <code>@defer</code>.</li>
+          <li><strong>Declarative alternatives:</strong> <code>loading="lazy"</code> on <code>&lt;img&gt;</code>/<code>&lt;iframe&gt;</code>, <code>content-visibility: auto</code>, CSS <code>animation-timeline: view()</code>.</li>
+          <li><strong>Legacy support:</strong> the W3C <code>intersection-observer</code> polyfill on npm — effectively obsolete, since the API has been Baseline since March 2019 (Safari 12.1).</li>
+          <li><strong>Testing:</strong> jsdom does not implement it, so Jest/Vitest need a mock. Playwright and Cypress run real browsers and exercise it natively.</li>
+          <li><strong>Conformance:</strong> the web-platform-tests <code>intersection-observer/</code> directory. Interop 2024/2025 proposals tracked v2 visibility work.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When it appeared</h2>
+        <p>Before 2016, visibility checks meant <code>scroll</code> + <code>resize</code> listeners calling <code>getBoundingClientRect()</code> or <code>offsetTop</code> per element.</p>
+        <ul>
+          <li>Each call can force
+            <span class="term">synchronous layout</span>
+            <span class="term__gloss">the browser pausing your script to recompute layout right now so it can answer a geometry read</span>.</li>
+          <li>Cross-origin iframes could not see their own position at all. Ad networks hacked around it with timing side channels (<code>requestAnimationFrame</code> rates, Flash tricks).</li>
+          <li>Google proposed IO as a cheap, privacy-preserving answer for ads and lazy loaders.</li>
+        </ul>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th scope="col">Milestone</th><th scope="col">Shipped in</th></tr></thead>
+            <tbody>
+              <tr><td>IntersectionObserver v1</td><td>Chrome 51 (2016) → Edge 15 and Firefox 55 (2017) → Safari 12.1 (March 2019, Baseline)</td></tr>
+              <tr><td>v2: <code>trackVisibility</code>, <code>delay</code>, <code>isVisible</code></td><td>Chrome 74 (April 2019), as an anti-clickjacking and ad-fraud measure. Firefox and Safari still do not implement it.</td></tr>
+              <tr><td><code>scrollMargin</code></td><td>Chrome 120 (December 2023), Firefox 141, Safari 26.0 — Baseline in September 2025</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You react to <strong>coarse visibility changes</strong> (entered, left, crossed 50%) for many elements.</li>
+              <li>Work should start <em>before</em> the user gets there. <code>rootMargin: "300px"</code> prefetches one screen ahead.</li>
+              <li>The target may live in a <strong>cross-origin iframe</strong> and needs to know if it's on screen — scroll math can't tell it.</li>
+              <li>You build a framework primitive (defer, hydrate-on-visible, prefetch-on-visible) that must stay cheap with thousands of targets.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You need <strong>per-frame scroll position</strong> (parallax, progress bars). Use CSS scroll-driven animations or a passive <code>scroll</code> listener with <code>requestAnimationFrame</code>.</li>
+              <li>Native <code>loading="lazy"</code> covers it — less code, and the browser tunes distance thresholds per network type.</li>
+              <li>You need a <strong>one-off check</strong>. One <code>getBoundingClientRect()</code> is simpler.</li>
+              <li>You need <strong>proof of human visibility</strong> in every browser. v2 is Chromium-only; v1 ignores occlusion, opacity, and <code>visibility</code>.</li>
+              <li>You want to <strong>skip rendering</strong> off-screen content. <code>content-visibility: auto</code> does it without script.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>The browser computes intersections once per
+          <span class="term">rendering opportunity</span>
+          <span class="term__gloss">a chance to draw a frame; usually about 60 per second, fewer in background tabs</span>
+          — not on every scroll event.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Register.</span> <code>observe(target)</code> adds a record with <code>previousThresholdIndex = -1</code> and <code>previousIsIntersecting = false</code>, and marks the document as having observations to run.</li>
+          <li><span class="steps__title">Render step.</span> During the event loop's <em>update the rendering</em> — after <code>requestAnimationFrame</code> callbacks and ResizeObserver delivery, before paint — the HTML Standard runs the <strong>update intersection observations steps</strong> for each document.</li>
+          <li><span class="steps__title">Root rectangle.</span> Take the root's content box or the viewport and apply <code>rootMargin</code>. For targets in a cross-origin-domain frame against the implicit root, <code>rootMargin</code> and <code>scrollMargin</code> are <strong>ignored</strong> and <code>rootBounds</code> is <code>null</code>, so the frame can't probe the embedder's geometry.</li>
+          <li><span class="steps__title">Intersection.</span> Start from the target's border box. Walk up the containing-block chain, clipping by each ancestor with <code>overflow</code> clipping or <code>clip-path</code>. Each scrollport is grown by <code>scrollMargin</code>. At an iframe edge, clip to that frame's viewport and continue in the parent. Finally, intersect with the root rectangle.</li>
+          <li><span class="steps__title">Derive state.</span>
+            <ul>
+              <li><code>intersectionRatio = area(intersectionRect) / area(boundingClientRect)</code>.</li>
+              <li>A zero-area target counts as ratio <code>1</code> if it intersects.</li>
+              <li><code>isIntersecting</code> is true if the rectangles overlap <strong>or touch edges</strong>, even with zero area.</li>
+              <li>The threshold index is the position of the first threshold greater than the ratio.</li>
+            </ul>
+          </li>
+          <li><span class="steps__title">Compare.</span> If the threshold index or <code>isIntersecting</code> changed, create an entry, append it to the observer's <code>[[QueuedEntries]]</code>, and update the stored state. v2 also skips the target if fewer than <code>delay</code> ms have passed since its last notification.</li>
+          <li><span class="steps__title">Deliver.</span> Queue an intersection observer task on the IntersectionObserver task source — at most one pending per document. When it runs, each observer with queued entries gets its callback called <strong>once</strong>, with all its entries as an array.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    SC["scroll / layout change"] --> UR
+    subgraph UR["update the rendering (one frame)"]
+      direction LR
+      R[rAF callbacks] --> RO[ResizeObserver] --> C["IO compute (geometry)"] --> PA[paint]
+    end
+    C --> Q{"threshold index or isIntersecting changed?"}
+    Q -- no --> N[nothing queued]
+    Q -- yes --> E["[[QueuedEntries]] += entry"]
+    E --> T["queue IO task (once per document)"]
+    T --> CB["callback(entries[], observer) in a later task"]
+          </pre>
+          <figcaption class="diagram__caption">The delivery pipeline. Geometry is computed inside the frame; your callback sees that frame's state one task later.</figcaption>
+        </figure>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">What that means for you</p>
+            <ul>
+              <li>Your callback sees the state <strong>as of the last rendered frame</strong>, one task later.</li>
+              <li>It never runs mid-scroll-event and never forces layout.</li>
+              <li><code>entry.boundingClientRect</code> was captured during rendering, so reading it is free. Calling <code>target.getBoundingClientRect()</code> yourself is not.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>How threshold buckets decide</h3>
+        <p>With <code>threshold: [0, 0.5, 1]</code> the ratio line splits into buckets. Moving inside a bucket is silent; crossing into another bucket queues an entry.</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 560 190" role="img" aria-labelledby="bucketTitle bucketDesc" width="560" style="max-width:100%">
+            <title id="bucketTitle">Threshold buckets for thresholds 0, 0.5 and 1</title>
+            <desc id="bucketDesc">A number line from ratio 0 to 1 with ticks at 0, 0.5 and 1. The segment from 0 up to 0.5 is bucket index 1, from 0.5 up to 1 is bucket index 2, and ratio 1 is bucket index 3. A new registration starts at index minus 1, so its first computation always produces an entry.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="24" fill="var(--text-muted)">intersectionRatio →</text>
+              <rect x="40"  y="50" width="240" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="280" y="50" width="230" height="40" rx="6" fill="var(--info-soft)" stroke="var(--info)"/>
+              <rect x="510" y="50" width="14"  height="40" rx="3" fill="var(--success-soft)" stroke="var(--success)"/>
+              <text x="160" y="75" fill="var(--accent)" text-anchor="middle">index 1 · 0 ≤ r &lt; 0.5</text>
+              <text x="395" y="75" fill="var(--info)" text-anchor="middle">index 2 · 0.5 ≤ r &lt; 1</text>
+              <line x1="40"  y1="44" x2="40"  y2="104" stroke="var(--text-muted)"/>
+              <line x1="280" y1="44" x2="280" y2="104" stroke="var(--text-muted)"/>
+              <line x1="517" y1="44" x2="517" y2="104" stroke="var(--text-muted)"/>
+              <text x="40"  y="120" fill="var(--text)" text-anchor="middle">0</text>
+              <text x="280" y="120" fill="var(--text)" text-anchor="middle">0.5</text>
+              <text x="517" y="120" fill="var(--text)" text-anchor="middle">1</text>
+              <text x="517" y="138" fill="var(--success)" text-anchor="middle" font-size="12">index 3</text>
+              <text x="20" y="164" fill="var(--text-faint)" font-size="12">New registration starts at index −1, so the first compute always differs → one initial entry.</text>
+              <text x="20" y="182" fill="var(--text-faint)" font-size="12">0.30 → 0.45: same bucket, no entry. 0.45 → 0.55: new bucket, entry queued.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Buckets, not a smooth value: that is why IO is cheap, and why it can't drive a progress bar.</figcaption>
+        </figure>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gained</th><th scope="col">Given up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Sampled once per frame</td><td>Cost bounded by frame rate, not scroll event rate</td><td>Fast flings can skip a target entirely: it enters and exits between two samples and no entry is queued</td></tr>
+              <tr><td>Threshold buckets instead of a continuous ratio</td><td>Few callbacks, predictable load</td><td>No smooth progress value. Faking one with <code>threshold: [0, 0.01, ..., 1]</code> gives up most of the savings</td></tr>
+              <tr><td>Async task delivery</td><td>Never blocks rendering, batches naturally</td><td>At least one frame of latency. Not for synchronous layout decisions</td></tr>
+              <tr><td>Geometry-only (v1)</td><td>Cheap. Reuses layout and clip data</td><td>Ignores opacity, <code>visibility: hidden</code>, z-order occlusion, and transforms that hide content</td></tr>
+              <tr><td>v2 <code>trackVisibility</code></td><td>Strong "unoccluded, unfiltered" guarantee</td><td>Expensive hit testing. <code>delay</code> forced to at least 100 ms. Chromium-only. Conservative: any non-2D transform or opacity below 1 gives <code>false</code></td></tr>
+              <tr><td><code>rootMargin</code> ignored cross-origin</td><td>Embedder geometry does not leak to third-party frames</td><td>Lazy-loading inside cross-origin embeds can't prefetch ahead with the implicit root</td></tr>
+              <tr><td>One observer, many targets</td><td>One options object, shared batching</td><td>All targets share one root, margin, and threshold. Different configs need separate observers</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>threshold: 1</code> never fires</p>
+            <p>The target is taller than the root, so the ratio caps below 1. Or fractional pixels under zoom and transforms give 0.9999.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Initial callback treated as "entered"</p>
+            <p>Every <code>observe()</code> produces an entry right away, often with <code>isIntersecting: false</code>. Code that ignores the flag loads everything at once.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Lazy images in a horizontal carousel load late</p>
+            <p><code>rootMargin</code> only grows the root. The carousel's own <code>overflow</code> still clips at 0 px. Fix with <code>scrollMargin</code>, or use the carousel as <code>root</code>.</p>
+          </div>
+        </div>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 250" role="img" aria-labelledby="carTitle carDesc" width="560" style="max-width:100%">
+            <title id="carTitle">rootMargin versus scrollMargin in a carousel</title>
+            <desc id="carDesc">A viewport with a dashed rootMargin band around it contains a horizontal carousel. Slides 1 and 2 are visible. Slide 3 sits just past the carousel's right edge. rootMargin alone does not help, because the carousel's overflow still clips slide 3. A dashed scrollMargin band extends the carousel's clip edge so slide 3 counts as intersecting early.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="20" y="16" width="520" height="220" rx="10" fill="none" stroke="var(--accent)" stroke-dasharray="6 5"/>
+              <text x="30" y="34" fill="var(--accent)" font-size="12">rootMargin grows the root only</text>
+              <rect x="50" y="44" width="330" height="172" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+              <text x="62" y="64" fill="var(--text)">viewport (root)</text>
+              <!-- carousel scrollport -->
+              <rect x="70" y="90" width="290" height="100" rx="8" fill="var(--bg-elev-2)" stroke="var(--text-muted)"/>
+              <text x="80" y="108" fill="var(--text-muted)" font-size="12">carousel · overflow clips here</text>
+              <!-- scrollMargin extension -->
+              <rect x="70" y="84" width="400" height="112" rx="8" fill="none" stroke="var(--info)" stroke-dasharray="4 4"/>
+              <text x="390" y="212" fill="var(--info)" font-size="12">scrollMargin</text>
+              <!-- slides -->
+              <rect x="90"  y="118" width="120" height="60" rx="6" fill="var(--success-soft)" stroke="var(--success)"/>
+              <text x="150" y="152" fill="var(--success)" text-anchor="middle">slide 1</text>
+              <rect x="230" y="118" width="120" height="60" rx="6" fill="var(--success-soft)" stroke="var(--success)"/>
+              <text x="290" y="152" fill="var(--success)" text-anchor="middle">slide 2</text>
+              <rect x="370" y="118" width="90" height="60" rx="6" fill="none" stroke="var(--danger)" stroke-dasharray="3 3"/>
+              <text x="415" y="146" fill="var(--danger)" text-anchor="middle" font-size="12">slide 3</text>
+              <text x="415" y="164" fill="var(--danger)" text-anchor="middle" font-size="12">clipped</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Slide 3 is inside the grown root but outside the carousel's clip, so with <code>rootMargin</code> alone it reports 0 and loads with a visible blank. <code>scrollMargin</code> moves the carousel's edge too.</figcaption>
+        </figure>
+
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Explicit <code>root</code> that is not an ancestor</p>
+            <p>No entry ever reports intersecting, and nothing throws.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Embedded widget ignores <code>rootMargin</code></p>
+            <p>The target sits in a cross-origin iframe with the implicit root, and the spec discards margins there.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Infinite scroll stalls</p>
+            <p>The sentinel stays intersecting after a page loads and fills less than one screen. No state change, so no new callback. Re-check after appending, or <code>unobserve</code>/<code>observe</code> the sentinel.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Memory growth in SPAs</p>
+            <p>Observers are never <code>disconnect()</code>ed on unmount, so detached subtrees stay registered.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Tests crash with <code>IntersectionObserver is not defined</code></p>
+            <p>jsdom lacks the API, so unit tests need a mock.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Heavy callback causes jank</p>
+            <p>Synchronous fetch setup, DOM writes, and forced layout inside a callback that handles hundreds of entries. Batch the work and yield.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>It solves three first-principles problems:</p>
+        <ul>
+          <li><strong>Cost.</strong> Layout reads inside scroll handlers cause forced synchronous layout and main-thread contention exactly when the user wants smooth scrolling.</li>
+          <li><strong>Information boundaries.</strong> A cross-origin iframe can't legally learn where it sits on the page, yet ads and embeds need to know if they're on screen.</li>
+          <li><strong>Separation of concerns.</strong> The renderer already knows every element's clipped geometry. Asking the app to recompute it duplicates work at a worse time.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 200" role="img" aria-labelledby="costTitle costDesc" width="560" style="max-width:100%">
+            <title id="costTitle">Scroll-listener cost versus per-frame IO cost</title>
+            <desc id="costDesc">Two timelines over three frames. The top one shows many scroll events, each followed by a forced layout block on the main thread. The bottom one shows one IO geometry check per frame inside the rendering step and a single batched callback.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="22" fill="var(--text-muted)">Scroll listener + getBoundingClientRect()</text>
+              <line x1="20" y1="60" x2="540" y2="60" stroke="var(--border)"/>
+              <g fill="var(--danger-soft)" stroke="var(--danger)">
+                <rect x="30"  y="40" width="22" height="20"/><rect x="72"  y="40" width="22" height="20"/>
+                <rect x="114" y="40" width="22" height="20"/><rect x="156" y="40" width="22" height="20"/>
+                <rect x="198" y="40" width="22" height="20"/><rect x="240" y="40" width="22" height="20"/>
+                <rect x="282" y="40" width="22" height="20"/><rect x="324" y="40" width="22" height="20"/>
+                <rect x="366" y="40" width="22" height="20"/><rect x="408" y="40" width="22" height="20"/>
+                <rect x="450" y="40" width="22" height="20"/><rect x="492" y="40" width="22" height="20"/>
+              </g>
+              <text x="20" y="80" fill="var(--danger)" font-size="12">every scroll event → forced layout on the main thread</text>
+
+              <text x="20" y="116" fill="var(--text-muted)">IntersectionObserver</text>
+              <line x1="20" y1="154" x2="540" y2="154" stroke="var(--border)"/>
+              <line x1="193" y1="126" x2="193" y2="160" stroke="var(--text-faint)" stroke-dasharray="3 3"/>
+              <line x1="366" y1="126" x2="366" y2="160" stroke="var(--text-faint)" stroke-dasharray="3 3"/>
+              <rect x="150" y="134" width="30" height="20" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="323" y="134" width="30" height="20" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="496" y="134" width="30" height="20" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="372" y="134" width="40" height="20" fill="var(--success-soft)" stroke="var(--success)"/>
+              <text x="392" y="148" fill="var(--success)" text-anchor="middle" font-size="11">cb</text>
+              <text x="20" y="178" fill="var(--accent)" font-size="12">one geometry check per frame (≈60 Hz), reusing render data</text>
+              <text x="20" y="194" fill="var(--success)" font-size="12">one batched callback only when a bucket changes</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The failure it prevents: layout thrash on the scroll hot path. IO moves the check into work the renderer does anyway.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <ul>
+          <li><strong>A synchronous <code>isVisible(el)</code> query</strong> was the obvious alternative. It forces layout on demand — the same thrash problem again.</li>
+          <li><strong>An inline event fired with scroll</strong> ties script to the scroll hot path, and with async scrolling on the compositor thread it can't even be accurate.</li>
+          <li><strong>The chosen design</strong> piggybacks on work the renderer already does (layout and clip during <em>update the rendering</em>) and hands back a precomputed snapshot one task later.</li>
+          <li><strong>Thresholds cut notifications.</strong> The browser tracks bucket changes, so a list of targets costs about one comparison per target per frame, not one callback per pixel.</li>
+          <li><strong>Ignoring <code>rootMargin</code> cross-origin</strong> looks odd but follows from privacy: a margin would let a frame binary-search the embedder's layout.</li>
+          <li><strong>v2 is conservative</strong> and says <code>false</code> whenever it can't prove visibility, because its users (click-jacking defence, ad fraud) need a guarantee, not a best guess.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <ul>
+          <li>In 2026 the API is stable and widely used. It sits under much of the declarative web: framework viewport triggers (Angular <code>@defer</code>, Astro islands, Next.js prefetch) and native lazy loading.</li>
+          <li>Growth is at the edges. <code>scrollMargin</code> reached Baseline in September 2025 and closes the long-standing nested-scroller gap.</li>
+          <li>CSS scroll-driven animations (Chromium 115+, Safari 26) are taking over the "animate on scroll" cases people used to force onto IO.</li>
+          <li>v2 visibility is still Chromium-only, and interop work is ongoing.</li>
+          <li>The skill that matters is knowing the sampling and timing model well enough to choose between IO, CSS, and native attributes — not the syntax.</li>
+        </ul>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify in practice</p>
+            <ul>
+              <li>How often does a fast trackpad fling or <code>scrollTo({behavior: "instant"})</code> skip a small target entirely, and does adding <code>rootMargin</code> hide the gap?</li>
+              <li>What is the real per-frame cost of 5,000 targets with one observer versus 50 observers, measured in the Performance panel?</li>
+              <li>Does <code>scrollMargin</code> behave the same across Chrome 120+, Firefox 141+, and Safari 26 for nested horizontal scrollers inside a vertical page?</li>
+              <li>How does <code>entry.time</code> relate to <code>performance.now()</code> inside the callback? That gap is the real delivery latency.</li>
+              <li>In Chrome, what does <code>isVisible</code> report under a <code>position: fixed</code> header, at <code>opacity: 0.99</code>, or with <code>transform: rotate(1deg)</code>?</li>
+              <li>Does the sentinel stall reproduce in my infinite-scroll setup, and which re-arm (<code>takeRecords</code>, unobserve/observe, or a manual check) is cleanest?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
