@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SOLID Principles · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">SOLID Principles</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">SOLID Principles</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/solid-principles/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">SOLID Principles</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>SOLID is a set of five module-level design heuristics for managing <strong>source-code dependencies</strong> in object-oriented (and, by extension, modular) systems.</p>
+        <ul>
+          <li><strong>Shared goal:</strong> keep the
+            <span class="term">change-propagation cost</span>
+            <span class="term__gloss">how many modules you must edit, recompile, retest, and redeploy when one requirement changes</span>
+            low.</li>
+          <li><strong>S</strong> governs how you cut modules in the first place.</li>
+          <li><strong>O, L, I, D</strong> govern how abstractions sit between modules.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>SRP — Single Responsibility</dt><dd>"A module should be responsible to one, and only one, actor." Martin's original phrasing was "one reason to change"; his 2014 clarification says "the reasons for change are people": gather things that change for the same reasons, separate things that change for different reasons. A cohesion rule, not a size rule.</dd></div>
+          <div><dt>OCP — Open/Closed</dt><dd>"Software entities should be open for extension, but closed for modification." Coined by Bertrand Meyer in <em>Object-Oriented Software Construction</em> (1988), where extension meant subclassing. Martin's version, used today, is <strong>polymorphic OCP</strong>: callers depend on an abstract interface, and new behavior arrives as a new implementation.</dd></div>
+          <div><dt>LSP — Liskov Substitution</dt><dd>From Barbara Liskov's 1987 OOPSLA keynote, formalized in Liskov &amp; Wing, "A Behavioral Notion of Subtyping" (TOPLAS, 1994). A subtype must: not strengthen preconditions, not weaken postconditions, preserve invariants, and obey the
+            <span class="term">history constraint</span>
+            <span class="term__gloss">no new methods that allow state changes the supertype forbids</span>.
+            This <em>behavioral</em> subtyping is stricter than anything a compiler checks.</dd></div>
+          <div><dt>ISP — Interface Segregation</dt><dd>"Clients should not be forced to depend upon interfaces that they do not use." From Martin's consulting at Xerox, where one fat <code>Job</code> class served printing, stapling, and other clients, so a change for one client forced rebuilds for all.</dd></div>
+          <div><dt>DIP — Dependency Inversion</dt><dd>(a) High-level modules should not depend on low-level modules; both should depend on abstractions. (b) Abstractions should not depend on details. The key move is <strong>ownership</strong>: the interface belongs to the high-level module's package, so the source-code dependency points <em>against</em> the runtime call direction.</dd></div>
+        </dl>
+
+        <h3>Where it sits among related ideas</h3>
+        <ul>
+          <li><strong>Roots:</strong> David Parnas's information hiding ("On the Criteria To Be Used in Decomposing Systems into Modules", 1972), then coupling/cohesion metrics and Meyer's Design by Contract.</li>
+          <li><strong>GRASP</strong> (Larman) — responsibility-assignment patterns.</li>
+          <li><strong>Martin's package principles</strong> — REP, CCP, CRP, ADP, SDP, SAP: SOLID applied at component level.</li>
+          <li><strong>Law of Demeter.</strong></li>
+          <li><strong>CUPID</strong> (Dan North, 2022) — the counter-proposal: properties instead of principles (Composable, Unix philosophy, Predictable, Idiomatic, Domain-based). SOLID prescribes <em>structure</em>; CUPID describes <em>qualities</em>.</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Nowhere at runtime. SOLID lives in <strong>source-code structure</strong>: class boundaries, interface placement, package/assembly dependency graphs, and build order. It matters most at the seam between <strong>domain logic and infrastructure</strong> (persistence, HTTP, messaging, clocks, file systems), and at module boundaries where separate teams or deployables meet.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph DOM["Domain / application — stable policy"]
+        R["Business rules"]
+        P(["Ports: PaymentGateway, Clock, OrderReader"])
+    end
+    subgraph INF["Infrastructure — volatile details"]
+        A1["Database adapter"]
+        A2["HTTP / SDK adapter"]
+        A3["Messaging, files, clock"]
+    end
+    R --> P
+    A1 --> P
+    A2 --> P
+    A3 --> P
+          </pre>
+          <figcaption class="diagram__caption">The seam that matters most: every source-code arrow crosses the boundary pointing inward, toward the domain-owned ports.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Clean / Hexagonal / Onion</div><p>DIP is the central rule: the domain defines ports, infrastructure implements adapters.</p></div>
+          <div class="card"><div class="card__title">ASP.NET Core</div><p><code>Microsoft.Extensions.DependencyInjection</code> is built in, and the templates push constructor-injected interfaces.</p></div>
+          <div class="card"><div class="card__title">Spring Framework</div><p>The IoC container exists to wire DIP-shaped code; <code>@Service</code> classes receive interfaces.</p></div>
+          <div class="card"><div class="card__title">Angular and NestJS</div><p>Hierarchical injectors built around constructor injection of abstract tokens.</p></div>
+          <div class="card"><div class="card__title">Plugin systems</div><p>IDE extensions, Webpack/Vite plugins, logging sinks — OCP in its purest form: the host never changes when a new plugin ships.</p></div>
+          <div class="card"><div class="card__title">Code review and interviews</div><p>The most common place engineers meet the vocabulary.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Wiring dependencies (DIP in practice):</strong> Spring, <code>Microsoft.Extensions.DependencyInjection</code>, Autofac, Google Guice/Dagger, Python <code>dependency-injector</code>, NestJS.</li>
+          <li><strong>Enforcing dependency direction:</strong> ArchUnit (Java), NetArchTest / ArchUnitNET (.NET), <code>import-linter</code> (Python), <code>dependency-cruiser</code> (JS/TS), Nx module boundaries.</li>
+          <li><strong>Spotting SRP/ISP smells:</strong> LCOM (lack of cohesion of methods), afferent/efferent coupling, NDepend, SonarQube's cognitive complexity and "god class" rules.</li>
+          <li><strong>Checking LSP:</strong> contract tests — one shared suite run against every implementation — plus property-based testing (Hypothesis, jqwik, FsCheck).</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <ul>
+              <li>The ideas predate the acronym: OCP (Meyer, 1988), LSP (Liskov, 1987/1994), and Martin's <em>C++ Report</em> columns on OCP, LSP, DIP and ISP (1996).</li>
+              <li>Martin collected them in the 2000 paper "Design Principles and Design Patterns" and the 2002 book <em>Agile Software Development: Principles, Patterns, and Practices</em>.</li>
+              <li>Michael Feathers rearranged the initials into "SOLID" around 2004.</li>
+              <li><strong>The problem:</strong> rigid, fragile, immobile C++ code — changing one header triggered hour-long rebuilds and surprise breakage, and no module could be reused without dragging its whole dependency tree along.</li>
+              <li><strong>Before SOLID:</strong> structured design (Yourdon/Constantine coupling and cohesion) and information hiding — phrased for procedural modules, with less guidance on inheritance and interfaces.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>The codebase will live for years and be changed by more than one team.</li>
+              <li>Business rules must be tested without a database, network, or wall clock.</li>
+              <li>A dimension of variation is <strong>already demonstrated</strong> (two payment providers exist, a third is scheduled).</li>
+              <li>You are publishing a library or plugin API that outside code will extend.</li>
+              <li>Merge conflicts cluster in one file because several teams edit it for unrelated reasons (an SRP signal).</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it (or go light) when</p>
+            <ul>
+              <li>The code is a script, spike, or prototype with a lifespan measured in weeks.</li>
+              <li>There is one implementation and no concrete second one — an interface costs a file and an indirection hop and buys nothing.</li>
+              <li>The language offers a lighter tool: first-class functions, modules, or structural typing often give OCP/DIP without an interface-plus-class pair.</li>
+              <li>The team cannot yet name the axes of change. Speculative abstraction locks in wrong seams, and wrong abstractions cost more to remove than duplication.</li>
+              <li>Performance-critical inner loops where virtual dispatch or a per-strategy allocation is measurable.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Every SOLID principle reshapes the <strong>dependency graph</strong> of the source code. Here they are applied, in order, to one class.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Start with the violation.</span> <code>OrderService</code> computes totals, renders an invoice PDF, and calls <code>StripeClient</code> directly. Finance, the documents team, and payments all edit it (SRP broken); adding PayPal means a new <code>if</code> (OCP broken); tests need Stripe credentials (DIP broken).</li>
+          <li><span class="steps__title">Split by actor (SRP).</span> Extract <code>PricingPolicy</code>, <code>InvoiceRenderer</code>, and payment handling into separate modules. Each now has exactly one group of people who ask for changes.</li>
+          <li><span class="steps__title">Add the abstraction where variation lives (OCP).</span> Define <code>PaymentGateway.charge(order, amount)</code>. A new provider becomes a new class; <code>OrderService</code> is no longer edited.</li>
+          <li><span class="steps__title">Move ownership of the abstraction (DIP).</span> Put <code>PaymentGateway</code> in the domain package next to <code>OrderService</code>, not in infrastructure. The source-code arrow now runs <code>infrastructure → domain</code>, while the runtime call still runs <code>domain → infrastructure</code>. That reversal is the "inversion".</li>
+          <li><span class="steps__title">Keep the abstraction narrow (ISP).</span> If refunds are used only by the back-office tool, <code>Refunder</code> is a separate interface. <code>OrderService</code> no longer recompiles or redeploys when refund signatures change.</li>
+          <li><span class="steps__title">Make every implementation substitutable (LSP).</span> <code>StripeGateway</code> and <code>PayPalGateway</code> must accept every input the contract allows (no extra "amount must be under X" precondition), return what it promises, and raise only the errors it declares. A shared contract-test suite runs against both.</li>
+          <li><span class="steps__title">Wire it at the composition root.</span> One place at startup (<code>main</code> or the DI container) creates concrete classes and passes them in. That is Dependency Injection — the technique that makes DIP-shaped code runnable.</li>
+        </ol>
+
+        <p>The starting point, illustrative only:</p>
+        <pre><code>class OrderService:
+    def checkout(self, order):
+        total = sum(i.price * i.qty for i in order.items)   # finance rules
+        pdf = render_invoice_pdf(order, total)              # documents team
+        if order.method == "stripe":                        # payments team
+            StripeClient(API_KEY).charge(order.card, total)
+        elif order.method == "paypal":
+            PayPalSdk().pay(order.account, total)</code></pre>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph BEFORE["Before — one class, three actors"]
+        F1["Finance"] --> G["OrderService"]
+        D1["Documents team"] --> G
+        P1["Payments team"] --> G
+    end
+    subgraph AFTER["After SRP split — one actor each"]
+        F2["Finance"] --> PP["PricingPolicy"]
+        D2["Documents team"] --> IR["InvoiceRenderer"]
+        P2["Payments team"] --> PGW["PaymentGateway implementations"]
+    end
+    BEFORE --> AFTER
+          </pre>
+          <figcaption class="diagram__caption">Steps 1–2: split by who asks for changes, not by line count.</figcaption>
+        </figure>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph domain["domain package"]
+        OS["OrderService"]
+        PG(["«PaymentGateway»"])
+    end
+    subgraph infra["infra package"]
+        SG["StripeGateway"]
+    end
+    OS -- "uses" --> PG
+    SG -- "compile-time: implements" --> PG
+    OS -. "run-time: calls via the interface" .-> SG
+          </pre>
+          <figcaption class="diagram__caption">Step 4, the inversion: the compile-time arrow runs infra → domain while the run-time call still runs domain → infra.</figcaption>
+        </figure>
+
+        <p>The runnable version lives in <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/solid-principles/code" target="_blank" rel="noopener">the code folder</a> (<code>mvp.py</code>, Python 3.11+, standard library only): <code>PricingPolicy</code> for SRP, <code>StripeGateway</code>/<code>PayPalGateway</code> behind a domain-owned <code>PaymentGateway</code> Protocol, a separate <code>Refunder</code> role, and a <code>CappedGateway</code> that a shared <code>contract_check</code> catches refusing 250.00.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Split classes by actor (SRP)</td><td>Isolated changes, fewer cross-team merge conflicts</td><td>More files; behavior spread across modules, harder to read in one sitting</td></tr>
+              <tr><td>Interface at an extension point (OCP)</td><td>New variants without editing tested code</td><td>Adding a new <em>operation</em> now means editing every implementation (the
+                <span class="term">expression problem</span>
+                <span class="term__gloss">you can make new types cheap or new operations cheap, rarely both</span>)</td></tr>
+              <tr><td>Polymorphism over <code>switch</code> (OCP)</td><td>Open for new types</td><td>Closed for new operations; a <code>switch</code>/pattern match is the opposite trade</td></tr>
+              <tr><td>Domain-owned interfaces (DIP)</td><td>Testable domain, swappable infrastructure, stable core</td><td>Indirection; "Go to definition" lands on an interface; runtime wiring errors instead of compile errors in some containers</td></tr>
+              <tr><td>Narrow role interfaces (ISP)</td><td>Smaller rebuild/redeploy blast radius, easier fakes</td><td>More types; risk of interface proliferation that mirrors every class 1:1</td></tr>
+              <tr><td>Strict behavioral subtyping (LSP)</td><td>Callers never type-check</td><td>Some intuitive "is-a" hierarchies (Square/Rectangle, read-only list extends list) must be rejected in favor of composition</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">The central tension</p>
+            <p>SRP and ISP push toward <strong>more, smaller</strong> pieces; readability and locality push toward <strong>fewer, larger</strong> ones. OCP only pays off if you guessed the axis of change correctly.</p>
+          </div>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Interface-per-class explosion</p>
+            <p>Every <code>FooService</code> has an <code>IFooService</code> with one implementer. Cause: DIP applied by rule rather than at real boundaries.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">SRP as "one method per class"</p>
+            <p>Hundreds of tiny classes with no cohesion. Cause: reading "responsibility" as "task" instead of "actor".</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Refused bequest</p>
+            <p>A subclass overrides a method to throw <code>NotImplementedException</code>, and callers add <code>isinstance</code> checks. Cause: inheritance used for code reuse, violating LSP.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Wrong seam</p>
+            <p>The abstraction varies the payment provider, but the real change request varies currency handling, which cuts across every implementation. Cause: speculative OCP before the axis of change was known.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Leaky abstraction</p>
+            <p><code>PaymentGateway.charge()</code> returns a <code>StripeCharge</code> object. Cause: abstraction written from the low-level side, so the domain still depends on details (DIP part b broken).</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Service-locator relapse</p>
+            <p>Classes call <code>container.resolve&lt;T&gt;()</code> internally. Cause: DI container treated as a global, hiding dependencies and bringing coupling back.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Fat interface in a shared library</p>
+            <p>A 40-method <code>IRepository</code> forces every consumer to redeploy on any signature change. Cause: ISP ignored at package boundaries.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>The main cost of software is not writing it but changing it, and change cost grows with how far an edit travels along dependency edges. SOLID attacks that from first principles:</p>
+        <ul>
+          <li><strong>Cohesion (SRP)</strong> keeps related change in one place.</li>
+          <li><strong>Stable abstractions (OCP, ISP)</strong> stop change from crossing boundaries.</li>
+          <li><strong>Substitutability (LSP)</strong> makes those boundaries trustworthy.</li>
+          <li><strong>Dependency direction (DIP)</strong> makes volatile details depend on stable policy, not the reverse.</li>
+          <li>In compiled languages this was literal build time and deployment granularity; today it maps to test isolation, independent deployability, and team autonomy.</li>
+        </ul>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The non-obvious choice is DIP's <strong>inverted ownership</strong>. The obvious alternative — the domain calls a <code>StripeClient</code> interface published by the infrastructure layer — still makes the domain depend on the infrastructure package.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 250" role="img" aria-labelledby="dipTitle dipDesc" width="560" style="max-width:100%">
+            <title id="dipTitle">Layering with interfaces versus dependency inversion</title>
+            <desc id="dipDesc">Left: the interface lives in the infrastructure package, so the domain points down at infrastructure and cannot build without it. Right: the domain owns the PaymentGateway interface and the infrastructure StripeGateway points up at the domain.</desc>
+            <defs>
+              <marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--danger)"/></marker>
+              <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+            </defs>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- Left panel: layering with interfaces -->
+              <text x="140" y="22" fill="var(--text-muted)" text-anchor="middle">Layering: interface lives in infra</text>
+              <rect x="20" y="40" width="240" height="50" rx="8" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="140" y="70" fill="var(--text)" text-anchor="middle">domain: OrderService</text>
+              <line x1="140" y1="90" x2="140" y2="138" stroke="var(--danger)" stroke-width="2" marker-end="url(#arrD)"/>
+              <rect x="20" y="140" width="240" height="70" rx="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="140" y="167" fill="var(--text)" text-anchor="middle">infra: «StripeClient» interface</text>
+              <text x="140" y="192" fill="var(--text-muted)" text-anchor="middle">+ StripeClient SDK code</text>
+              <text x="140" y="236" fill="var(--danger)" text-anchor="middle">domain can't build without infra</text>
+
+              <!-- Right panel: DIP -->
+              <text x="420" y="22" fill="var(--text-muted)" text-anchor="middle">DIP: domain owns the interface</text>
+              <rect x="300" y="40" width="240" height="70" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="420" y="67" fill="var(--text)" text-anchor="middle">domain: OrderService</text>
+              <text x="420" y="92" fill="var(--accent)" text-anchor="middle">+ «PaymentGateway»</text>
+              <line x1="420" y1="160" x2="420" y2="112" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrA)"/>
+              <rect x="300" y="160" width="240" height="50" rx="8" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="420" y="190" fill="var(--text)" text-anchor="middle">infra: StripeGateway</text>
+              <text x="420" y="236" fill="var(--accent)" text-anchor="middle">volatile code depends on stable code</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Moving the interface into the domain puts the stable, valuable code at the bottom of the dependency graph. An infrastructure API change no longer forces a domain change.</figcaption>
+        </figure>
+
+        <ul>
+          <li><strong>OCP made a similar pivot.</strong> Meyer's original OCP used implementation inheritance — extend a class, override behavior — which produced deep, fragile hierarchies (the
+            <span class="term">fragile base class problem</span>
+            <span class="term__gloss">a change in a parent class silently breaks its subclasses</span>).
+            Martin's polymorphic OCP extends via <em>interfaces</em> and composition, trading some code reuse for decoupling.</li>
+          <li><strong>LSP's prominence has the same root.</strong> Once inheritance was the extension tool, a formal rule was needed to say when inheritance is safe.</li>
+          <li><strong>The OO framing is historical.</strong> C++ and Java in the 1990s had no cheaper abstraction. With first-class functions, a <code>Callable[[Order, Decimal], None]</code> parameter satisfies OCP and DIP without a class hierarchy. Martin argues in <em>Functional Design</em> (2023) that the principles still hold in functional code, with different mechanics.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026, SOLID is <strong>stable but contested</strong>.</p>
+        <ul>
+          <li>It remains the default vocabulary of code review, interviews, and framework docs — Spring, ASP.NET Core, and NestJS all assume DIP-shaped code.</li>
+          <li>Critiques like Dan North's CUPID and the "avoid hasty abstractions" movement push back on the interface-everywhere style that SOLID-by-rule produces.</li>
+          <li><strong>Modular monoliths:</strong> SRP/ISP/DIP at module boundaries decide whether a later service extraction is cheap.</li>
+          <li><strong>AI-assisted coding:</strong> generated code tends toward either god classes or needless abstraction, so judging seams is worth more than typing them.</li>
+        </ul>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify in practice</p>
+            <ul>
+              <li>How many interfaces in a real codebase have exactly one implementation, and would deleting them cost anything beyond test fakes?</li>
+              <li>Can you name the actors for your largest class from git history (who commits, which tickets)? Does that match an SRP split?</li>
+              <li>Does a shared contract-test suite actually catch LSP violations, or do implementations diverge on error handling and edge inputs?</li>
+              <li>When a new requirement arrives, does it land along the axis your OCP abstraction anticipated, or cut across it?</li>
+              <li>Does an architecture test (ArchUnit, NetArchTest, <code>import-linter</code>) catch a domain-to-infrastructure import introduced in a PR?</li>
+              <li>Where does replacing an interface with a plain function parameter reduce code without losing testability?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

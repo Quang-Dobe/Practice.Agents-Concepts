@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SOLID Principles · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">SOLID Principles</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">SOLID Principles</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/solid-principles/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">SOLID Principles</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">SOLID is not about making code work. It is about making code <strong>survive change</strong>: a new requirement should mean editing a small piece in one place, not surgery across twenty files.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <ul>
+              <li>Five principles, collected by Robert C. Martin ("Uncle Bob") and later packed into an acronym by Michael Feathers.</li>
+              <li>Every principle is a different angle on one idea: manage
+                <span class="term">dependencies</span>
+                <span class="term__gloss">what one piece of code must know about another to work</span>
+                so a change in one part does not ripple into others.</li>
+              <li>If you have ever made a "one-line fix" that broke three unrelated features, you have felt the problem SOLID addresses.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of the electrical system in a house. Each letter maps to one piece of it.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    CORE(("Manage dependencies"))
+    CORE --- S["S · one breaker per area"]
+    CORE --- O["O · plug in, don't rewire"]
+    CORE --- L["L · any plug behaves like an appliance"]
+    CORE --- I["I · two-prong socket, not 50 pins"]
+    CORE --- D["D · lamp depends on the outlet standard"]
+          </pre>
+          <figcaption class="diagram__caption">Five house-wiring pictures, one shared goal: a change in one room never takes down another.</figcaption>
+        </figure>
+
+        <ul>
+          <li><strong>S — Single Responsibility.</strong> Each circuit breaker covers one area. When the kitchen trips, the bedroom lights stay on. In code, a class answers to one <span class="term">actor</span> <span class="term__gloss">the group of people whose requests make it change</span>, so the accountant's rule change never touches the code the warehouse depends on.</li>
+          <li><strong>O — Open/Closed.</strong> You add a new appliance by plugging it into an outlet, not by opening the wall and rewiring. Add behavior (a new payment method) by writing new code, not by editing working code.</li>
+          <li><strong>L — Liskov Substitution.</strong> Anything with a standard plug must behave like a normal appliance. A "lamp" that shorts the whole house breaks the promise. A subclass must honor the parent's <span class="term">contract</span> <span class="term__gloss">its promised inputs, outputs, and guarantees</span>, or callers break in ways they cannot predict.</li>
+          <li><strong>I — Interface Segregation.</strong> A toaster plugs into a two-prong socket, not a 50-pin industrial connector. Don't force a client to depend on methods it never calls.</li>
+          <li><strong>D — Dependency Inversion.</strong> Your lamp depends on the outlet standard, not on a specific power plant. The utility also conforms to that standard. Both sides depend on the agreed contract, so you can swap the power source without touching the lamp. In code, business logic depends on an interface such as <code>PaymentGateway</code>, not on <code>StripeClient</code> directly.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    OS["OrderService (high level)"] --> PG(["«PaymentGateway» (the outlet)"])
+    SG["StripeGateway (low level)"] --> PG
+          </pre>
+          <figcaption class="diagram__caption">Both arrows point at the outlet. The outlet is the whole trick: four of the five principles are about putting a good one in the right place.</figcaption>
+        </figure>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a law.</strong> SOLID is a set of <span class="term">heuristics</span> <span class="term__gloss">rules of thumb that usually help, not guarantees</span>. Applied blindly, it produces its own mess.</li>
+              <li><strong>Not Dependency Injection.</strong> DI is a <em>technique</em> (pass dependencies in from outside). DIP is the <em>principle</em> that says which direction dependencies should point.</li>
+              <li><strong>Not "one method per class."</strong> SRP is about reasons to change (who asks for changes), not line counts.</li>
+              <li><strong>Not design patterns.</strong> Strategy or Adapter are concrete recipes. SOLID is the reasoning behind many of them.</li>
+              <li><strong>Not OOP-only in spirit.</strong> The vocabulary is class-based, but the ideas carry over to modules, services, and functions.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>A class keeps changing for unrelated reasons, and each change causes merge conflicts between teams.</li>
+              <li>Every new variant (a report format, a shipping carrier) means another <code>if/else</code> branch in the same function.</li>
+              <li>Unit testing a class needs a real database, network, or clock because it creates them internally.</li>
+              <li>A subclass overrides a method to throw <code>NotImplementedException</code>, and callers type-check to avoid it.</li>
+              <li>You are designing the boundary between business rules and infrastructure in a codebase expected to live for years.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Throwaway scripts, spikes, and prototypes — the change you are guarding against will never come.</li>
+              <li>There is one implementation and no real prospect of a second. An interface with one implementer is often just <span class="term" data-gloss="an extra hop between caller and the real code">indirection</span>.</li>
+              <li>It is early in a design, before you know which parts will vary. Guessing wrong puts the outlets in the wrong walls.</li>
+              <li>The principle becomes the goal. Ten tiny classes to print a greeting cost more to read than one plain function.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Coupling</dt><dd>How much one piece of code must know about another in order to work.</dd></div>
+          <div><dt>Cohesion</dt><dd>How closely the contents of one module belong together.</dd></div>
+          <div><dt>Abstraction</dt><dd>An interface or base type that describes <em>what</em> without committing to <em>how</em>.</dd></div>
+          <div><dt>Actor</dt><dd>The person or group whose requests cause a module to change. SRP's unit of "responsibility."</dd></div>
+          <div><dt>Contract</dt><dd>The promises a type makes: its inputs, outputs, and guarantees. LSP is about keeping them.</dd></div>
+          <div><dt>High-level vs low-level module</dt><dd>Business rules versus the plumbing (databases, HTTP, files) they use.</dd></div>
+          <div><dt>Dependency Injection</dt><dd>Handing a class its collaborators instead of letting it create them.</dd></div>
+          <div><dt>Extension point</dt><dd>A deliberate spot where new behavior plugs in without editing existing code.</dd></div>
+        </dl>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

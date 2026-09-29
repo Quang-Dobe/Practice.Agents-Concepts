@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SOLID Principles · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">SOLID Principles</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">SOLID Principles</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/solid-principles/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">SOLID Principles</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Most arguments about SOLID are really arguments about <strong>where the seams go</strong>, not whether the principles are true. You'll meet it in three places:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">The SaaS backend</div><p>On ASP.NET Core, Spring, or NestJS, SOLID lives at the seam between business rules and the database, payment provider, email service, and clock. The DI container in <code>Program.cs</code> or your <code>@Configuration</code> classes shows every DIP decision the team made. "Why does this handler take six interfaces in its constructor?" is a SOLID question.</p></div>
+          <div class="card"><div class="card__title">Code review</div><p>As vocabulary, not a checklist. "This class is doing too much" means SRP. "Why is there an <code>IUserService</code> with one implementation?" is pushback on DIP applied by rule. "This subclass throws on <code>Save()</code>" is LSP.</p></div>
+          <div class="card"><div class="card__title">The monolith being split</div><p>Whether extracting the billing module takes two weeks or two quarters depends almost entirely on whether billing's dependencies already point inward through narrow, domain-owned interfaces.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Put interfaces at I/O boundaries, not around every class</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Create an abstraction where code crosses a process boundary or touches something nondeterministic: database, HTTP client, message bus, file system, clock, random, environment.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Those make tests slow and flaky, and they are what you actually swap (a new payment provider, an in-memory fake). Pure domain classes have no such cost; wrapping them doubles file count and makes "Go to definition" land on an interface.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Generating <code>IFooService</code> for every <code>FooService</code> because the template or linter expects it.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Wait for the second variant before building the extension point</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Write the concrete thing first. Extract a <code>PaymentGateway</code> interface when the second provider is real (signed contract, scheduled ticket), and shape it from both implementations.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An interface designed from one implementation encodes its quirks. When PayPal arrives, the "abstraction" returns Stripe-specific fields and every caller changes anyway — the wrong-seam failure.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Speculative OCP for "future flexibility" nobody has asked for.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Find SRP seams in git history, not in your head</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run <code>git log --format='%an' -- path/to/File.cs | sort | uniq -c</code> and read the ticket prefixes. Commits from finance, fulfilment, and marketing tickets mean three actors — a candidate to split along those lines.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Actor-based splits cut merge conflicts and cross-team regressions, the production cost SRP targets. Splits based on "this feels big" yield many small classes that still change together.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Splitting by line count or by method, which yields cohesion-free fragments.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Let the domain own its ports</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Place <code>PaymentGateway</code> in the domain/application project and implement it in infrastructure. Return domain types (<code>ChargeResult</code>), never SDK types (<code>Stripe.Charge</code>). A
+              <span class="term">port</span>
+              <span class="term__gloss">an interface the domain defines for something it needs from the outside world</span>
+              belongs to its consumer.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>If the interface lives next to the SDK, upgrading the SDK forces a domain rebuild and redeploy, and the domain still cannot compile without infrastructure. This is the difference between DIP and "layering with interfaces."</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>An <code>Infrastructure.Contracts</code> package that the domain references.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Enforce dependency direction with an architecture test</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Add one
+              <span class="term">architecture test</span>
+              <span class="term__gloss">a unit test that fails the build when a forbidden import appears</span>
+              that fails when the domain imports infrastructure: NetArchTest or ArchUnitNET in .NET, ArchUnit in Java, <code>import-linter</code> in Python, <code>dependency-cruiser</code> or Nx module boundaries in TypeScript.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>DIP erodes one convenient <code>using</code> at a time, usually under deadline. Nobody notices in review; the test catches it in CI. Without it, a "clean architecture" repo is typically violated within months.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Relying on folder names and a wiki page to hold the boundary.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Run one contract-test suite against every implementation</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Write an abstract test class for <code>PaymentGateway</code> (declined card, zero amount, idempotent retry, timeout behavior) and inherit it for the real adapter, the sandbox adapter, and the in-memory fake.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>LSP violations in production look like "works in tests, fails in prod," because the fake accepts inputs or never raises errors the real adapter does. A shared suite forces the fake to be honest.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hand-written mocks per test that encode whatever the author assumed the real service does.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Wire everything in one composition root</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Construct concrete classes only at startup — the
+              <span class="term">composition root</span>
+              <span class="term__gloss">the single place (Program.cs, main, a DI module) where concrete objects are created and wired</span>.
+              Classes receive dependencies through constructors.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Hidden <code>container.Resolve&lt;T&gt;()</code> calls or <code>new SqlConnection()</code> deep in a handler make dependencies invisible, break testability, and turn missing registrations into runtime errors on the first request down that path instead of at startup.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Injecting <code>IServiceProvider</code> into business classes.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Validate container lifetimes at startup</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Keep ASP.NET Core's <code>ValidateScopes</code> and <code>ValidateOnBuild</code> on (enabled by default in the Development environment) and add a startup test that resolves every registered root in CI.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>DIP-heavy code moves wiring errors from compile time to run time. The classic incident is a
+              <span class="term">captive dependency</span>
+              <span class="term__gloss">a short-lived service trapped inside a longer-lived one</span>:
+              a scoped <code>DbContext</code> injected into a singleton shares one context across concurrent requests and throws threading exceptions under load.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Discovering a missing or mis-scoped registration from a production 500.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Prefer a function parameter over a one-method interface</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In Python, TypeScript, Kotlin, or C#, accept <code>Callable[[], datetime]</code>, <code>() =&gt; Date</code>, or <code>Func&lt;DateTime&gt;</code> when the dependency is a single operation.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>You get the OCP/DIP benefit (swappable, testable) without an interface file, an implementing class, and a container registration. Less ceremony means new engineers actually follow the pattern.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>An <code>IClock</code> + <code>SystemClock</code> + registration trio in a codebase that already passes lambdas everywhere else. (In .NET 8+, <code>TimeProvider</code> exists for exactly this.)</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Split interfaces by consumer, not by implementer</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>When checkout needs <code>Charge</code> and the back-office tool needs <code>Refund</code> and <code>ListDisputes</code>, define <code>IPaymentCharger</code> and <code>IPaymentAdmin</code>. One adapter class can implement both.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Consumers of the narrow interface do not rebuild or redeploy when admin signatures change, and their fakes are two lines instead of forty stubbed methods.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A 40-method <code>IRepository&lt;T&gt;</code> shared across every service in a NuGet or npm package.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    CO["Checkout"] --> C(["IPaymentCharger: Charge"])
+    BO["Back-office tool"] --> A(["IPaymentAdmin: Refund, ListDisputes"])
+    SA["StripeAdapter"] -. "implements" .-> C
+    SA -. "implements" .-> A
+          </pre>
+          <figcaption class="diagram__caption">Practice 10: two consumer-shaped interfaces, one adapter. Checkout never rebuilds when admin signatures change.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Interface mirroring</p>
+            <p>Every class has an identically named interface with one implementer, generated by habit. It doubles navigation cost and fakes decoupling while every signature change still touches both files. Keep interfaces only at the boundaries in practice #1 and delete the rest; mocking frameworks can mock concrete classes if that was the only reason.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The generic repository over an ORM</p>
+            <p><code>IRepository&lt;T&gt;</code> with <code>GetAll</code>, <code>Find(Expression&lt;...&gt;)</code>, <code>Add</code>, <code>Update</code> wrapped around Entity Framework or Hibernate. It leaks <code>IQueryable</code> (so it still depends on the ORM), hides the ORM's useful features, and invites N+1 queries. Define intent-named ports instead (<code>IOrderReader.GetOpenOrdersFor(customerId)</code>).</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Refused bequest for reuse</p>
+            <p><code>ReadOnlyDocumentStore : DocumentStore</code> overrides <code>Save()</code> to throw <code>NotSupportedException</code>. Callers holding a <code>DocumentStore</code> crash at runtime, and someone adds <code>if (store is ReadOnlyDocumentStore)</code>. Use composition, or split into <code>IDocumentReader</code> and <code>IDocumentWriter</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Test-induced interfaces on pure logic</p>
+            <p>Extracting <code>IPriceCalculator</code> so a handler's test can mock it. The test now verifies a mock was called, not that prices are correct, and passes while production computes wrong totals. Use the real pure class in tests; fake only I/O.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Strategy for a two-branch <code>if</code></p>
+            <p>A <code>switch</code> on three stable shipping types becomes an interface, three classes, a factory, and a registry. It is now closed for new <em>operations</em> (adding <code>EstimateCO2</code> edits every class) and nobody asked for new types. Keep the <code>switch</code> or pattern match until variants actually multiply.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Service locator in disguise</p>
+            <p>Handlers take <code>IServiceProvider</code> or a static <code>Locator.Get&lt;T&gt;()</code>. Dependencies vanish from constructors, reviewers can't see what a class touches, and tests fail with "service not registered." Constructor-inject what the class needs; a ten-item list is an SRP signal, not a reason to hide it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Onion architecture for a CRUD app</p>
+            <p>Four projects (Domain, Application, Infrastructure, Api) for an admin tool with no rules beyond validation. Every feature touches four folders and a mapper. Start with vertical slices and extract a domain layer when real rules appear.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Payments, mid-size e-commerce</div>
+            <p>Checkout depends on a domain-owned <code>PaymentGateway</code>; Stripe, Adyen, and a regional provider implement it and pass a shared contract suite. <em>Lesson:</em> the axis that actually varied was <strong>failure semantics</strong> (sync decline vs async webhook confirmation), not the provider. The interface was redesigned around a <code>PaymentAttempt</code> state machine because v1 assumed <code>charge()</code> returned a final answer.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Modular monolith, service extraction</div>
+            <p>A logistics company's <code>Notifications</code> module was called directly from twelve places. They added a domain-owned <code>INotifier</code> port and an architecture test banning direct imports, then extracted the module six months later by swapping one adapter. <em>Lesson:</em> the test did most of the work — the interface alone had been bypassed in three places before it existed.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Plugin host in developer tooling</div>
+            <p>An internal build tool exposes a <code>Step</code> interface; teams ship steps as packages, and the host never changes for a new step. <em>Lesson:</em> public extension interfaces are almost impossible to change later, so it was kept to two methods plus a versioned options bag. ISP at a public boundary is a compatibility strategy.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Legacy god service, B2B SaaS</div>
+            <p>A 6,000-line <code>AccountService</code> edited by billing, identity, and provisioning caused weekly merge conflicts and regressions. Git history named three actors; the split followed them, with a thin facade for old callers. <em>Lesson:</em> not one new interface was added. SRP was satisfied by moving code; DIP only where new modules touched the database.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Direction:</strong> does an architecture test fail CI when domain or application code imports infrastructure, ORM, or SDK namespaces?</li>
+              <li><strong>Port signatures:</strong> does every port return domain types only, with no SDK or ORM type anywhere?</li>
+              <li><strong>Contract tests:</strong> does each port with multiple implementations (including the test fake) run a shared suite?</li>
+              <li><strong>Fail at startup:</strong> does the app fail at startup, not on first request, when a registration is missing or a scoped service is captured by a singleton?</li>
+              <li><strong>Composition root:</strong> is there one, with no <code>IServiceProvider</code> or locator calls inside business classes?</li>
+              <li><strong>New interfaces:</strong> for each one in this PR — is there a second implementation today, or does it wrap I/O? If neither, why does it exist?</li>
+              <li><strong>Largest file:</strong> is it edited by more than one team? Is there a ticket to split it by actor?</li>
+              <li><strong>Shared libraries:</strong> are interfaces narrow enough that a signature change does not force redeploys of unrelated consumers?</li>
+              <li><strong>Onboarding:</strong> can a new engineer find, in the README or <code>Program.cs</code>, where dependencies are wired and which layer may reference which?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Two starting points.</span> Small teams start with no seams: controllers call the ORM and the Stripe SDK directly — fine until the first second provider or the first test suite that needs a database. Template-following teams start at the opposite extreme: Clean Architecture folders and an interface for every class from day one, before anyone knows what varies.</li>
+          <li><span class="steps__title">The same painful moment.</span> Usually when the product finds its shape and a second team joins. The seam-less codebase has a god service with several actors and no tests that run without infrastructure. The over-abstracted one has a hundred single-implementer interfaces, and the change that arrives (multi-currency, multi-tenant) cuts across all of them.</li>
+          <li><span class="steps__title">The shared migration.</span> Find the real actors and axes of change from history, then add or delete abstractions to match. Deleting is harder politically, because it looks like undoing "good design."</li>
+          <li><span class="steps__title">Maturity.</span> Fewer interfaces than the template, more than the naive version: ports at every I/O boundary, narrow consumer-specific interfaces at module boundaries, architecture tests guarding direction, plain classes or functions everywhere else. SOLID stops being a review argument and becomes a property enforced by CI — the point where it pays for itself.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    N["No seams: controllers call ORM + SDK"] --> M{"Product finds its shape, second team joins"}
+    T["Template: interface for every class"] --> M
+    M --> R["Find real actors + axes of change from history"]
+    R --> F["Mature: ports at I/O, narrow module interfaces, CI-enforced direction"]
+          </pre>
+          <figcaption class="diagram__caption">Both extremes converge on the same fix: add or delete abstractions until they match the real axes of change.</figcaption>
+        </figure>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://blog.cleancoder.com/uncle-bob/2014/05/08/SingleReponsibilityPrinciple.html" rel="noopener">Robert C. Martin, "The Single Responsibility Principle" (2014)</a> — the author's own correction of the "one thing" misreading; settles most SRP review arguments.</li>
+          <li><a href="https://blog.ploeh.dk/2011/07/28/CompositionRoot/" rel="noopener">Mark Seemann, "Composition Root"</a> and <a href="https://blog.ploeh.dk/2010/02/03/ServiceLocatorisanAnti-Pattern/" rel="noopener">"Service Locator is an Anti-Pattern"</a> — the clearest writing on making DIP work day to day; his book <em>Dependency Injection Principles, Practices, and Patterns</em> expands both.</li>
+          <li><a href="https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction" rel="noopener">Sandi Metz, "The Wrong Abstraction"</a> — why premature OCP costs more than duplication, and how to back out of a bad abstraction.</li>
+          <li><a href="https://dannorth.net/cupid-for-joyful-coding/" rel="noopener">Dan North, "CUPID — for joyful coding"</a> — the strongest current critique of SOLID-as-rules; read it to argue both sides in review.</li>
+          <li><a href="https://dl.acm.org/doi/10.1145/197320.197383" rel="noopener">Liskov &amp; Wing, "A Behavioral Notion of Subtyping" (1994)</a> — the precise LSP rules behind practice #6's contract tests.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/solid-principles/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
