@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server-Sent Events · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Server-Sent Events</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Server-Sent Events</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/server-sent-events/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Server-Sent Events</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Plain HTTP is ask-and-answer: the client asks, the server answers once, and the exchange is over. Live scores, build logs, notifications, and an LLM writing tokens one at a time don't fit that shape.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>SSE makes the smallest possible change to HTTP. The server answers with <code>Content-Type: text/event-stream</code> and then simply doesn't finish the response. Browsers ship a built-in client, <code>EventSource</code>, that:</p>
+            <ul>
+              <li>parses the stream,</li>
+              <li>fires one JavaScript event per message,</li>
+              <li>reconnects on its own if the connection drops.</li>
+            </ul>
+            <p>You get
+              <span class="term">server push</span>
+              <span class="term__gloss">the server sends data the moment it has it, without the client asking again</span>
+              without leaving HTTP.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of a <strong>radio station versus a phone call</strong>.</p>
+        <ul>
+          <li><strong>Normal HTTP is a phone call</strong> to a help desk. You ask, they answer, you hang up. To learn whether anything changed, you call again. That is
+            <span class="term">polling</span>
+            <span class="term__gloss">asking the server for updates on a timer, whether or not anything changed</span>.</li>
+          <li><strong>SSE is tuning a radio.</strong> You pick a station once (open the request). From then on the station broadcasts and you listen.</li>
+          <li><strong>You can't talk back through the radio.</strong> To say something, use a different channel, such as a normal <code>POST</code>.</li>
+          <li><strong>If the signal cuts out, the radio retunes itself</strong> to the same station.</li>
+          <li><strong>A good station numbers its bulletins</strong> ("this was bulletin 42"). When you come back you say "I last heard 42" and get only what you missed.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph Poll["Polling: a phone call every time"]
+        direction TB
+        P1["Client asks: anything new?"] --> P2["Server answers once"]
+        P2 --> P3["Hang up, wait, call again"]
+        P3 --> P1
+    end
+    subgraph Radio["SSE: tune the radio once"]
+        direction TB
+        R1["Client opens one GET"] --> R2["Server keeps the response open"]
+        R2 --> R3["Event, event, event"]
+        R3 -->|"signal lost"| R4["Retune: I last heard id 42"]
+        R4 --> R2
+    end
+          </pre>
+          <figcaption class="diagram__caption">Polling pays a full request for every check. SSE pays for one request, then only for events that actually happen, and resumes from the last numbered bulletin after a drop.</figcaption>
+        </figure>
+
+        <h3>What one event looks like on the wire</h3>
+        <p>Each broadcast is a few plain-text lines, then a blank line:</p>
+        <pre><code>id: 42
+event: price-update
+data: {"symbol":"ACME","price":101.5}
+</code></pre>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 250" role="img" aria-labelledby="wireTitle wireDesc" width="560" style="max-width:100%">
+            <title id="wireTitle">Anatomy of one SSE event</title>
+            <desc id="wireDesc">Three field lines, id, event and data, followed by a blank line. The blank line tells the browser to dispatch one event named price-update with last event ID 42.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="10" y="14" width="340" height="164" rx="8" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+              <g style="font-family: var(--font-mono)" font-size="12">
+                <text x="24" y="44" fill="var(--accent)">id: 42</text>
+                <text x="24" y="80" fill="var(--accent)">event: price-update</text>
+                <text x="24" y="116" fill="var(--accent)">data: {"symbol":"ACME","price":101.5}</text>
+                <text x="24" y="152" fill="var(--text-faint)">(empty line)</text>
+              </g>
+              <line x1="350" y1="40" x2="366" y2="40" stroke="var(--border)"/>
+              <line x1="350" y1="76" x2="366" y2="76" stroke="var(--border)"/>
+              <line x1="350" y1="112" x2="366" y2="112" stroke="var(--border)"/>
+              <line x1="350" y1="148" x2="366" y2="148" stroke="var(--border)"/>
+              <text x="372" y="44" fill="var(--text-muted)" font-size="12">cursor the browser keeps</text>
+              <text x="372" y="80" fill="var(--text-muted)" font-size="12">which listener fires</text>
+              <text x="372" y="116" fill="var(--text-muted)" font-size="12">the payload (text only)</text>
+              <text x="372" y="152" fill="var(--danger)" font-size="12">blank line = dispatch</text>
+              <line x1="180" y1="180" x2="180" y2="200" stroke="var(--accent)" stroke-width="2"/>
+              <polygon points="174,198 186,198 180,206" fill="var(--accent)"/>
+              <rect x="10" y="208" width="540" height="34" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="280" y="230" fill="var(--text)" text-anchor="middle" font-size="12">one event: type price-update, lastEventId "42", data = the JSON string</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Field lines fill buffers; only the blank line turns them into one JavaScript event.</figcaption>
+        </figure>
+
+        <p>The browser side is a few lines:</p>
+        <pre><code>const source = new EventSource("/stream");
+source.addEventListener("price-update", (e) =&gt; render(JSON.parse(e.data)));</code></pre>
+
+        <p>Because it's still HTTP, proxies, load balancers, cookies, and auth middleware mostly work as usual. The main exception is
+          <span class="term">response buffering</span>
+          <span class="term__gloss">a proxy or server holding output until it has "enough", so events arrive late or all at once</span>,
+          which the Detail page covers.</p>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not WebSockets.</strong> WebSockets are a separate two-way protocol, carry binary frames, and start with a connection upgrade. SSE is one-way, text-only, plain HTTP.</li>
+              <li><strong>Not long polling.</strong> Long polling holds a request until <em>one</em> message arrives, then the client asks again. SSE keeps one response open for <em>many</em> messages.</li>
+              <li><strong>Not Web Push.</strong> Web Push wakes a service worker through the browser vendor's push service even when your page is closed. SSE only works while the page holds the connection.</li>
+              <li><strong>Not a message queue.</strong> SSE has no persistence, acks, or delivery guarantees on its own. Replay after a reconnect only works if your server stores events and implements it.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Streaming LLM output token by token. Most major model APIs stream this way.</li>
+              <li>Live dashboards, tickers, and progress bars: the server talks, the client watches.</li>
+              <li>Notification feeds, activity streams, and live CI build logs.</li>
+              <li>Any push feature where you'd rather not run WebSocket infrastructure, and client → server can stay normal HTTP requests.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Chat, multiplayer games, collaborative editing: frequent messages both ways point to WebSockets (or WebTransport).</li>
+              <li>Binary payloads such as audio or video frames. SSE is UTF-8 text, so binary must be
+                <span class="term">base64</span>
+                <span class="term__gloss">a way to write binary bytes as plain text characters</span>-encoded.</li>
+              <li>Notifying users whose tab is closed. Use Web Push.</li>
+              <li>Many SSE streams per tab over HTTP/1.1. Browsers allow about 6 connections per origin and each open stream holds one. Serve over HTTP/2 or HTTP/3.</li>
+              <li>You need custom request headers from the browser. Native <code>EventSource</code> only does <code>GET</code> and can't set headers like <code>Authorization</code>; use cookies or a <code>fetch</code>-based client instead.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt><code>text/event-stream</code></dt><dd>The response content type that marks a response as an SSE stream.</dd></div>
+          <div><dt><code>EventSource</code></dt><dd>The browser's built-in SSE client.</dd></div>
+          <div><dt>Event</dt><dd>One message: field lines ended by a blank line.</dd></div>
+          <div><dt><code>data:</code></dt><dd>The payload field. Several <code>data:</code> lines in one event are joined with newlines.</dd></div>
+          <div><dt><code>event:</code></dt><dd>Optional event name, so clients can listen per type instead of to everything.</dd></div>
+          <div><dt><code>id:</code></dt><dd>Optional event ID. The browser remembers the last one it received.</dd></div>
+          <div><dt><code>Last-Event-ID</code></dt><dd>The request header the browser sends on reconnect so the server can resume.</dd></div>
+          <div><dt><code>retry:</code></dt><dd>The server's instruction for how many milliseconds to wait before reconnecting.</dd></div>
+          <div><dt>Comment / heartbeat</dt><dd>A line starting with <code>:</code>, which clients ignore. Servers send them now and then so idle proxies don't kill the connection.</dd></div>
+        </dl>
+
+        <p>Next up: the exact wire format and parsing rules, the reconnect-and-resume lifecycle, how proxies and buffering break streams, how SSE compares to WebSockets and long polling under load, and how to serve it from .NET.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

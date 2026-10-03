@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server-Sent Events · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Server-Sent Events</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Server-Sent Events</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/server-sent-events/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Server-Sent Events</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>SSE is two things paired together: a wire format, <code>text/event-stream</code>, and a client processing model, the <code>EventSource</code> interface.</p>
+        <ul>
+          <li><strong>Where it's defined.</strong> Both live in the WHATWG HTML Living Standard, section "Server-sent events". The W3C published a standalone Server-Sent Events Recommendation on 3 February 2015. That one is now marked superseded; the WHATWG text is the normative one.</li>
+          <li><strong>Direction.</strong> One-way, server to client.</li>
+          <li><strong>Carrier.</strong> The body of a single, long-lived HTTP <code>GET</code> response.</li>
+          <li><strong>Framing.</strong> UTF-8 and line-oriented.</li>
+          <li><strong>Reconnect.</strong> The client owns it. The server can supply a
+            <span class="term">resume cursor</span>
+            <span class="term__gloss">the <code>id</code> value; the client echoes it back so the server knows where to continue</span>.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt><code>text/event-stream</code></dt><dd>Always UTF-8: the spec says "there is no way to specify another character encoding". A leading BOM is stripped. Lines may end in CRLF, LF, or a bare CR.</dd></div>
+          <div><dt>Line grammar</dt><dd>A line starting with <code>:</code> is a comment. A line containing <code>:</code> splits into field name and value, and one leading space is removed from the value. A line with no colon is a field name with an empty value. Unknown field names are ignored, which keeps the format forward-compatible.</dd></div>
+          <div><dt><code>data</code></dt><dd>Appends its value plus an LF to the data buffer.</dd></div>
+          <div><dt><code>event</code></dt><dd>Sets the event type.</dd></div>
+          <div><dt><code>id</code></dt><dd>Sets the last-event-ID buffer, unless the value contains U+0000 NULL; then the field is ignored.</dd></div>
+          <div><dt><code>retry</code></dt><dd>Sets the reconnection time in milliseconds, but only if the value is all ASCII digits.</dd></div>
+          <div><dt>Dispatch on blank line</dt><dd>A blank line ends the event. The trailing LF is stripped from the data buffer. Empty buffer → nothing is dispatched. Otherwise a <code>MessageEvent</code> fires with type <code>message</code>, or the <code>event</code> value if one was set.</dd></div>
+          <div><dt>Sticky last event ID</dt><dd>The ID buffer is <em>not</em> cleared between events. An event without an <code>id:</code> line inherits the previous ID. An empty <code>id:</code> line resets it.</dd></div>
+          <div><dt><code>EventSource</code> interface</dt><dd><code>url</code>, <code>withCredentials</code> (false by default), <code>readyState</code> (<code>CONNECTING = 0</code>, <code>OPEN = 1</code>, <code>CLOSED = 2</code>), the <code>open</code> / <code>message</code> / <code>error</code> events, and <code>close()</code>.</dd></div>
+          <div><dt><code>Last-Event-ID</code> header</dt><dd>On reconnect, the browser sends it with the stored ID if that ID is non-empty.</dd></div>
+          <div><dt>Reconnection time</dt><dd>The spec leaves the default to the browser ("probably in the region of a few seconds"). Chromium and WebKit hard-code <code>defaultReconnectDelay = 3000</code> ms in <code>EventSource.cpp</code>.</dd></div>
+        </dl>
+
+        <h3>Where it sits among push techniques</h3>
+        <p>SSE belongs to the <strong>server-push</strong> family that replaced the old "Comet" hacks. All of them work around one limit: an HTTP server cannot start a message on its own.</p>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Technique</th><th scope="col">Direction</th><th scope="col">Transport</th><th scope="col">Reconnect / resume</th><th scope="col">Binary</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Short polling</td><td>pull</td><td>new request per interval</td><td>n/a</td><td>yes</td></tr>
+              <tr><td>Long polling</td><td>pull, one message per request</td><td>new request per message</td><td>app-defined</td><td>yes</td></tr>
+              <tr><td><strong>SSE</strong></td><td>server to client</td><td>one HTTP response</td><td>built in (<code>retry</code>, <code>Last-Event-ID</code>)</td><td>no (UTF-8 only)</td></tr>
+              <tr><td>WebSocket (RFC 6455)</td><td>both</td><td>HTTP Upgrade, then own framing</td><td>app-defined</td><td>yes</td></tr>
+              <tr><td>WebTransport</td><td>both, multi-stream, datagrams</td><td>HTTP/3 / QUIC</td><td>app-defined</td><td>yes</td></tr>
+              <tr><td>Web Push (RFC 8030)</td><td>server to service worker</td><td>vendor push service</td><td>vendor-managed</td><td>encrypted payload</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>SSE is an application-layer (L7) convention on top of HTTP. It has no transport of its own. What it rides on depends on the HTTP version:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">HTTP/1.1</div><p>The body is usually sent
+            <span class="term">chunked</span>
+            <span class="term__gloss"><code>Transfer-Encoding: chunked</code>: the body goes out in pieces with no total length up front</span>.
+            Each flush becomes one or more chunks. The stream holds the whole TCP connection.</p></div>
+          <div class="card"><div class="card__title">HTTP/2 (RFC 9113)</div><p>A sequence of DATA frames on one stream of a
+            <span class="term">multiplexed</span>
+            <span class="term__gloss">many independent request streams sharing one TCP connection</span>
+            connection.</p></div>
+          <div class="card"><div class="card__title">HTTP/3</div><p>One QUIC stream, so a lost packet on another stream does not stall it.</p></div>
+        </div>
+
+        <p>On the server, an SSE endpoint is ordinary handler code that <strong>writes and flushes without returning</strong>. Every hop between client and origin has to pass bytes through as they arrive. That one requirement causes most production incidents.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    K["Kestrel handler: write + flush, never return"] --> M["Compression middleware (gzip / brotli holds bytes)"]
+    M --> RP["Reverse proxy (nginx: proxy_buffering on, read timeout 60 s)"]
+    RP --> LB["Load balancer (AWS ALB idle timeout 60 s)"]
+    LB --> CDN["CDN / WAF (Cloudflare read timeout 100 s)"]
+    CDN --> B["Browser EventSource"]
+          </pre>
+          <figcaption class="diagram__caption">Events flow down a chain of intermediaries. Any hop that buffers or times out an idle connection breaks the stream, even when the origin code is correct.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">LLM APIs</div><p>OpenAI Chat Completions streams data-only events and ends with <code>data: [DONE]</code>. The Anthropic Messages API uses named events: <code>message_start</code>, <code>content_block_start</code>, <code>content_block_delta</code>, <code>content_block_stop</code>, <code>message_delta</code>, <code>message_stop</code>, plus <code>ping</code> and <code>error</code>.</p></div>
+          <div class="card"><div class="card__title">Model Context Protocol</div><p>Streamable HTTP answers a <code>POST</code> with either JSON or a <code>text/event-stream</code> response scoped to that request.</p></div>
+          <div class="card"><div class="card__title">Mercure</div><p>A pub/sub hub protocol built on SSE with JWS authorization, published as an IETF Internet-Draft (draft-dunglas-mercure).</p></div>
+          <div class="card"><div class="card__title">Dashboards, CI logs, notifications</div><p>Classic one-way fan-out with low write rates.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Serving from .NET</div>
+            <ul>
+              <li><code>TypedResults.ServerSentEvents(IAsyncEnumerable&lt;T&gt;)</code> is new in ASP.NET Core 10; works in Minimal APIs and controllers.</li>
+              <li><code>SseItem&lt;T&gt;</code> carries <code>Data</code>, <code>EventType</code>, <code>EventId</code>, <code>ReconnectionInterval</code>.</li>
+              <li><code>SseFormatter</code> (.NET 10) handles field serialization.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">Serving from other stacks</div>
+            <ul>
+              <li>Spring: <code>SseEmitter</code>.</li>
+              <li>Python: <code>sse-starlette</code>.</li>
+              <li>Node: write to <code>res</code> and flush.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">Consuming outside the browser</div>
+            <ul>
+              <li>.NET: <code>SseParser</code> in <code>System.Net.ServerSentEvents</code> (first shipped with .NET 9; also targets <code>netstandard2.0</code>).</li>
+              <li>Node: undici's spec-compliant <code>EventSource</code>, global behind <code>--experimental-eventsource</code> (status depends on the Node version).</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">Browser clients beyond <code>EventSource</code></div>
+            <ul>
+              <li><code>@microsoft/fetch-event-source</code>: adds <code>POST</code>, custom headers, and custom retry on top of <code>fetch</code>.</li>
+              <li><code>eventsource-parser</code>: a parser alone, for when you bring your own transport.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">Multi-node fan-out</div>
+            <p>Redis Pub/Sub, Redis Streams (which add replay), NATS, or Kafka sit behind the SSE nodes. A Mercure hub can take over the job entirely.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Debugging</div>
+            <p><code>curl -N</code> turns off curl's output buffering. Chrome DevTools shows an "EventStream" tab for <code>EventSource</code> requests.</p>
+          </div>
+        </div>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Why the MVP targets .NET 10</p>
+            <p>The demo in the code folder builds for <code>net10.0</code> because <code>TypedResults.ServerSentEvents</code> and <code>SseItem&lt;T&gt;</code> only exist from .NET 10. They are not in .NET 8 or 9.</p>
+          </div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <ul>
+              <li><strong>2004.</strong> Ian Hickson starts specifying SSE in the WHATWG "Web Applications 1.0" draft.</li>
+              <li><strong>September 2006.</strong> Opera 9 ships a prototype as an <code>&lt;event-source&gt;</code> <em>element</em>. Feedback pushes a redesign into a script object modelled on <code>XMLHttpRequest</code>.</li>
+              <li><strong>2010–2011.</strong> Safari, Chrome, and Firefox ship <code>EventSource</code>.</li>
+              <li><strong>December 2011.</strong> WebSocket (RFC 6455) arrives at almost the same time and takes most of the attention.</li>
+              <li><strong>2020.</strong> Internet Explorer never shipped it; Microsoft support arrives with Chromium-based Edge 79.</li>
+            </ul>
+            <p>Before SSE, push meant <strong>Comet</strong>: long polling, "forever iframe" streaming, XHR streaming with home-made framing, or Flash sockets. Every team reinvented framing, parsing, and reconnect logic.</p>
+            <p>SSE's revival had two causes: HTTP/2 (2015) removed its biggest practical limit, the HTTP/1.1 connection pool; and from around 2023, LLM APIs needed to stream tokens one way, which is exactly SSE's shape.</p>
+          </div>
+        </div>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Data flows mostly server to client, and client actions fit normal <code>POST</code>/<code>PUT</code> requests.</li>
+              <li>Payloads are text or JSON.</li>
+              <li>You want push to pass through existing HTTP infrastructure (auth middleware, cookies, CORS, HTTP/2, observability) with no protocol upgrade.</li>
+              <li>Clients can tolerate reconnect gaps, or you can keep a replay log keyed by event ID.</li>
+              <li>You serve over HTTP/2 or HTTP/3, or each client needs only one stream.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Both directions are chatty and latency-sensitive (games, collaborative cursors). A <code>POST</code> per upstream message adds a request per message. Use WebSocket or WebTransport.</li>
+              <li>Payloads are binary. Base64 inflates them by about 33% and costs CPU.</li>
+              <li>You need guaranteed delivery with acknowledgements. SSE has no ack channel, so you'd be building a message broker by hand.</li>
+              <li>Delivery must reach users whose page is closed. Use Web Push.</li>
+              <li>Your platform cuts long responses short (serverless hard execution limits, gateways with fixed response timeouts). Per-request SSE (the MCP model) still works there; long-lived subscription streams do not.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>One connection from construction to termination:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Construct.</span> <code>new EventSource(url, { withCredentials })</code> sets <code>readyState = CONNECTING</code> and sends a <code>GET</code> with <code>Accept: text/event-stream</code> and cache mode <code>no-store</code>. Cross-origin requests follow CORS; <code>withCredentials: true</code> maps to credentials mode <code>include</code>.</li>
+          <li><span class="steps__title">Validate the response.</span> Status not <code>200</code>, or <code>Content-Type</code> not <code>text/event-stream</code> → the browser <em>fails the connection</em>: <code>readyState = CLOSED</code>, an <code>error</code> event fires, and it does <strong>not</strong> reconnect. <code>204 No Content</code> is the usual way for a server to say "stop retrying". <code>301</code> and <code>307</code> redirects are followed.</li>
+          <li><span class="steps__title">Open.</span> <code>readyState = OPEN</code> and <code>open</code> fires.</li>
+          <li><span class="steps__title">Parse incrementally.</span> Bytes are decoded as UTF-8 and split into lines. Lines fill the data, event-type, and ID buffers. A blank line dispatches a <code>MessageEvent</code> with <code>data</code>, <code>origin</code>, and <code>lastEventId</code> filled in.</li>
+          <li><span class="steps__title">Server writes and flushes.</span> Each event is serialized and <em>flushed</em>. Without the flush it sits in the server or proxy buffer. The server may mix in <code>:</code> comment lines as heartbeats; the spec suggests one about every 15 seconds for old proxies.</li>
+          <li><span class="steps__title">Drop.</span> On a network error or a clean server close, <code>readyState</code> goes back to <code>CONNECTING</code> and <code>error</code> fires. The browser waits the reconnection time (the <code>retry</code> value, or the default); the spec allows exponential backoff after failed attempts. Then it re-sends the <code>GET</code> with <code>Last-Event-ID</code>.</li>
+          <li><span class="steps__title">Resume.</span> The server reads <code>Last-Event-ID</code>, replays everything after it from a
+            <span class="term">durable log</span>
+            <span class="term__gloss">an ordered event store that outlives a single connection: a ring buffer, Redis Stream, or Kafka offset</span>,
+            then continues live. Without such a log the header is useless.</li>
+          <li><span class="steps__title">Terminate.</span> The client calls <code>close()</code>, or the server answers a reconnect with <code>204</code> or any non-200 status.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    [*] --> CONNECTING: new EventSource(url)
+    CONNECTING --> OPEN: 200 + text/event-stream
+    CONNECTING --> CLOSED: non-200, wrong type, or 204
+    OPEN --> OPEN: blank line dispatches an event
+    OPEN --> CONNECTING: drop or EOF, wait retry ms, resend with Last-Event-ID
+    OPEN --> CLOSED: close()
+    CLOSED --> [*]
+          </pre>
+          <figcaption class="diagram__caption">The <code>readyState</code> machine. A drop loops back to CONNECTING and retries on its own; a bad response or <code>close()</code> ends in CLOSED for good.</figcaption>
+        </figure>
+
+        <h3>Parsing a multi-line payload</h3>
+        <pre><code>id: 7
+event: log
+data: line one
+data: line two
+
+: heartbeat
+</code></pre>
+        <ul>
+          <li>Dispatches <strong>one</strong> <code>log</code> event.</li>
+          <li><code>data === "line one\nline two"</code> (the two <code>data:</code> lines are joined with a newline).</li>
+          <li><code>lastEventId === "7"</code>.</li>
+          <li>The comment line dispatches nothing.</li>
+        </ul>
+
+        <h3>Server cost model</h3>
+        <ul>
+          <li><strong>Idle client cost.</strong> In async servers such as Kestrel or Node: one socket, a small buffer, and a subscription entry. It does <em>not</em> hold a thread.</li>
+          <li><strong>Fan-out across instances.</strong> It needs a
+            <span class="term">backplane</span>
+            <span class="term__gloss">a shared message bus every server node subscribes to, so any node can deliver any event</span>,
+            because the client that needs event N may sit on a different node from the one that produced it.</li>
+          <li><strong>HTTP/2 stream cap.</strong> Kestrel caps streams per connection with <code>Http2Limits.MaxStreamsPerConnection</code>, default 100. RFC 9113 recommends advertising no fewer than 100 concurrent streams.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gained</th><th scope="col">Given up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Plain HTTP response, no Upgrade</td><td>Works through HTTP auth, CORS, HTTP/2/3, and standard proxies; debuggable with <code>curl</code></td><td>Every buffering intermediary is a hazard; no protocol-level ping</td></tr>
+              <tr><td>UTF-8 text framing</td><td>Human-readable; trivial to write and parse</td><td>No binary; base64 overhead; per-event field overhead</td></tr>
+              <tr><td>One-way only</td><td>Simple server model; upstream reuses normal REST</td><td>Request/response correlation across channels is your problem</td></tr>
+              <tr><td>Client-owned reconnect</td><td>Free resilience in browsers; stateless server can resume via cursor</td><td>Synchronized reconnect storms; replay needs a log you build</td></tr>
+              <tr><td><code>EventSource</code> is <code>GET</code>-only, no custom headers</td><td>Safe to auto-replay (idempotent request)</td><td>Bearer tokens go in cookies or query strings, or you switch to a <code>fetch</code>-based client and lose built-in reconnect</td></tr>
+              <tr><td>Long-lived connection</td><td>Latency about one network hop, no polling waste</td><td>Connections pin to nodes; scale-out does not rebalance existing clients; deploys drop everyone at once</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Events arrive in one burst at the end</p>
+            <p>Cause: response buffering. nginx <code>proxy_buffering</code> is on by default; compression middleware and missing <code>Flush</code> calls do the same. Fix: <code>X-Accel-Buffering: no</code> or <code>proxy_buffering off</code>, and exclude <code>text/event-stream</code> from gzip/brotli.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">The stream dies at exactly 60 or 100 seconds</p>
+            <p>Cause: idle timeouts. nginx <code>proxy_read_timeout</code> defaults to 60 s, AWS ALB idle timeout to 60 s, Cloudflare's proxy read timeout to 100 s. Send heartbeats well inside the smallest one.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">The seventh tab hangs forever</p>
+            <p>Cause: the HTTP/1.1 limit of about 6 connections per origin, across all tabs. Chrome and Firefox marked this "Won't fix" (Eric Lawrence's write-up).</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">CPU spikes right after a deploy</p>
+            <p>Cause: every client reconnects after the same fixed delay (3 s in Chromium). Spread restarts out, and vary <code>retry</code> per client to add jitter.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Gaps after reconnect</p>
+            <p>Cause: the server emits <code>id:</code> but has no replay log, or emits no <code>id:</code> at all.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Injected or truncated events</p>
+            <p>Cause: user text containing <code>\n</code> was written into a single <code>data:</code> line. The server must split on newlines and emit one <code>data:</code> line per piece.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Server memory grows with churn</p>
+            <p>Cause: the handler ignores client disconnect (<code>HttpContext.RequestAborted</code> / <code>CancellationToken</code>), leaving zombie subscriptions.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>onmessage</code> never fires</p>
+            <p>Cause: the server sets <code>event: foo</code>. Named events only reach <code>addEventListener("foo", …)</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">401 loop or silent stop</p>
+            <p>Cause: the auth token expired. A non-200 response fails the connection permanently, so the app must notice <code>CLOSED</code> and rebuild the <code>EventSource</code>.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>HTTP is client-initiated. Without push, keeping data fresh means polling, and polling has two costs that don't depend on whether anything changed:</p>
+        <ul>
+          <li><strong>Staleness.</strong> With poll interval T, data is on average T/2 old when the client sees it.</li>
+          <li><strong>Load.</strong> N clients generate N/T requests per second, changes or not.</li>
+          <li><strong>Long polling</strong> cuts the waste but still pays a full request round-trip per message, and every team reinvented its framing.</li>
+          <li><strong>SSE</strong> makes push cost scale with events actually sent, at roughly one-way network latency, while staying inside HTTP's auth, routing, and caching rules.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 240" role="img" aria-labelledby="pushTitle pushDesc" width="560" style="max-width:100%">
+            <title id="pushTitle">Polling versus push timeline</title>
+            <desc id="pushDesc">Top lane: the client polls every T; an event that happens between polls waits until the next poll, T/2 on average, and every poll costs a request. Bottom lane: one SSE request is opened once and the event is delivered after about one network hop.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="24" fill="var(--text-muted)">Polling every T</text>
+              <line x1="20" y1="70" x2="540" y2="70" stroke="var(--border)"/>
+              <g fill="var(--text-muted)">
+                <rect x="58"  y="56" width="4" height="28"/>
+                <rect x="158" y="56" width="4" height="28"/>
+                <rect x="258" y="56" width="4" height="28"/>
+                <rect x="358" y="56" width="4" height="28"/>
+                <rect x="458" y="56" width="4" height="28"/>
+              </g>
+              <text x="160" y="48" fill="var(--text-faint)" font-size="11" text-anchor="middle">poll</text>
+              <text x="260" y="48" fill="var(--text-faint)" font-size="11" text-anchor="middle">poll</text>
+              <text x="360" y="48" fill="var(--text-faint)" font-size="11" text-anchor="middle">poll</text>
+              <circle cx="190" cy="70" r="7" fill="var(--danger)"/>
+              <text x="190" y="104" fill="var(--danger)" font-size="12" text-anchor="middle">event</text>
+              <line x1="190" y1="90" x2="258" y2="90" stroke="var(--danger)" stroke-dasharray="4 3"/>
+              <text x="276" y="104" fill="var(--text-muted)" font-size="12">stale until next poll (T/2 on average)</text>
+              <text x="20" y="126" fill="var(--text-faint)" font-size="12">N clients → N/T requests per second, even when nothing changed</text>
+
+              <text x="10" y="160" fill="var(--text-muted)">SSE push</text>
+              <line x1="20" y1="196" x2="540" y2="196" stroke="var(--accent)" stroke-width="3"/>
+              <rect x="58" y="182" width="4" height="28" fill="var(--accent)"/>
+              <text x="64" y="178" fill="var(--accent)" font-size="11">one GET, held open</text>
+              <circle cx="190" cy="196" r="7" fill="var(--danger)"/>
+              <polygon points="200,190 214,196 200,202" fill="var(--accent)"/>
+              <text x="220" y="200" fill="var(--text)" font-size="12">delivered after ~one network hop</text>
+              <text x="20" y="232" fill="var(--text-faint)" font-size="12">cost grows with events sent, not with time</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Polling pays per check and still delivers late. Push pays one connection and delivers each event as it happens.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The design keeps the protocol small and standardizes only what teams kept reinventing: framing, parsing, and reconnect.</p>
+        <ul>
+          <li><strong>The alternative was WebSocket's approach.</strong> An Upgrade handshake, then a new binary framing layer with masking and its own ping/pong. That gains duplex and binary, but intermediaries must understand the Upgrade, and HTTP features (status codes, caching rules, HTTP/2 multiplexing) no longer apply. RFC 8441 later had to bolt WebSocket onto HTTP/2 separately. SSE bets that most push is one-way and the upstream direction is already solved by HTTP requests.</li>
+          <li><strong>Text over binary.</strong> Any server that can write and flush a string can emit SSE, and you can read the stream in a terminal.</li>
+          <li><strong>Client-side reconnect with a server-supplied cursor.</strong> The server stays stateless about <em>connections</em> and only stateful about <em>events</em>: a log indexed by ID. That splits the work the way Kafka consumer offsets do.</li>
+          <li><strong><code>GET</code>-only.</strong> <em>Inference, not stated in the spec:</em> automatic reconnect means the browser re-sends the request without asking the app. That is only safe for an
+            <span class="term">idempotent</span>
+            <span class="term__gloss">safe to repeat: sending it twice has the same effect as once</span>
+            method, which would explain why the native API never grew <code>POST</code>. <code>fetch</code>-based clients add <code>POST</code> and accept that risk.</li>
+          <li><strong>A counter-example.</strong> MCP's 2026-07-28 revision removed its long-lived <code>GET</code> stream, protocol-level sessions, and <code>Last-Event-ID</code> resumability. It keeps SSE only as a per-request response stream. That shows what resumable long-lived streams cost to run behind load balancers and on serverless platforms.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, SSE is growing:</p>
+        <ul>
+          <li><strong>AI APIs.</strong> It is the de facto streaming transport for LLM APIs and agent protocols, so most engineers now consume it even if they never served it.</li>
+          <li><strong>HTTP/2 and HTTP/3.</strong> Both are the default at major CDNs and browsers, which removes the old connection-pool objection for most deployments.</li>
+          <li><strong>Platform support.</strong> .NET 10 made SSE a first-class result type, a sign it is now a mainstream backend primitive.</li>
+        </ul>
+        <p>WebSocket remains the answer for duplex traffic, and WebTransport is the long-term candidate for multi-stream binary. Neither has displaced SSE for one-way text push.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify in practice</p>
+            <ul>
+              <li>Does my exact proxy chain (CDN → load balancer → nginx or YARP → Kestrel) deliver each event immediately? Measure with <code>curl -N</code> and timestamps at each hop.</li>
+              <li>What reconnect delay and backoff does each target browser actually apply after repeated failures, and does a server-sent <code>retry:</code> override the backoff?</li>
+              <li>What does <code>TypedResults.ServerSentEvents</code> do about heartbeats and flushing? Do I still need my own <code>:</code> comments to survive a 60 s idle timeout?</li>
+              <li>How much replay history (time window or event count) covers realistic reconnect gaps, and what do I send when <code>Last-Event-ID</code> is older than the log?</li>
+              <li>How many concurrent SSE connections can one Kestrel instance hold before memory or file-descriptor limits bite, and how does that change between HTTP/1.1 and HTTP/2?</li>
+              <li>How do I authenticate the stream: cookies with <code>withCredentials</code>, a short-lived token in the query string (which ends up in access logs), or a <code>fetch</code>-based client with an <code>Authorization</code> header?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

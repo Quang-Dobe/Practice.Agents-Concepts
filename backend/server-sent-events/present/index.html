@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server-Sent Events — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Server-Sent Events</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Server-Sent Events</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/server-sent-events/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>backend</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Server-Sent Events</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">backend</span>
+            <span class="badge">server push</span>
+            <span class="badge">HTTP streaming</span>
+            <span class="badge">.NET 10</span>
+          </div>
+          <h1 class="hero__title">Server-Sent Events</h1>
+          <p class="hero__tagline">The client opens one ordinary HTTP request and the server never finishes the response, pushing small text events down it whenever something new happens.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">3 s</div><div class="stat__label">Chromium / WebKit default reconnect delay</div></div>
+          <div class="stat"><div class="stat__num">~6</div><div class="stat__label">connections per origin on HTTP/1.1, shared by all tabs</div></div>
+          <div class="stat"><div class="stat__num">60 s</div><div class="stat__label">nginx and AWS ALB default idle timeout</div></div>
+          <div class="stat"><div class="stat__num">15 s</div><div class="stat__label">heartbeat interval the spec suggests</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED): one stream, a drop, and a resume -->
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant B as Browser (EventSource)
+    participant S as Server
+    B->>S: GET /stream, Accept text/event-stream
+    S-->>B: 200 OK, Content-Type text/event-stream
+    S-->>B: id 41, event price-update, data JSON
+    S-->>B: id 42, event price-update, data JSON
+    Note over B,S: connection drops (network blip or deploy)
+    B->>B: readyState back to CONNECTING, wait retry ms
+    B->>S: GET /stream, Last-Event-ID 42
+    S-->>B: replay id 43 and 44 from the log
+    S-->>B: live events continue
+          </pre>
+          <figcaption class="diagram__caption">The whole idea in one picture: one long GET response carries many events, and after a drop the browser reconnects on its own and asks to resume after the last ID it saw.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the radio-versus-phone-call mental model, the wire format, and what SSE is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: parsing rules, the reconnect-and-resume lifecycle, proxies and buffering, the push-technique landscape, and serving it from .NET 10.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Eleven best practices with the Do/Why/Avoid triad, six anti-patterns, the Shopify and LinkedIn case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already use <code>EventSource</code>? Jump to Detail for the parsing and reconnect rules, or Practice for the proxy, heartbeat, and replay rules that decide whether it survives production.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

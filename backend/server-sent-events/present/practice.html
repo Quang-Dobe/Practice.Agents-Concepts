@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server-Sent Events · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-backend" data-category="backend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Server-Sent Events</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Server-Sent Events</h1>
+        <span class="pill pill--category">backend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/server-sent-events/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Server-Sent Events</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Three settings cover almost every SSE stream you'll run in production:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">AI product backend</div><p>Your API calls an LLM provider, receives its SSE stream, and relays tokens to the browser through a second SSE stream of your own. That relay owns three expensive things at once: a provider bill, a long-lived connection, and the user's patience.</p></div>
+          <div class="card"><div class="card__title">The "live" corner of a SaaS app</div><p>Notification bells, job progress bars, CI log tailing, admin dashboards. SSE is a thin layer between a message bus (Redis, Kafka, NATS) and the browser. Most problems come from the proxies in between, not the code.</p></div>
+          <div class="card"><div class="card__title">High fan-out broadcast</div><p>Sports scores, flash-sale counters, status pages: one event goes to tens of thousands of open connections. Here SSE stops being an endpoint and becomes its own tier, with its own capacity planning.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Prove streaming through the real proxy chain, not localhost</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Add a smoke test that runs <code>curl -N</code> against staging through the CDN, load balancer, and reverse proxy, and asserts the first event arrives within a second. Send <code>X-Accel-Buffering: no</code>, and exclude <code>text/event-stream</code> from gzip/brotli at every hop.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Localhost has no buffering proxy, so the "every event arrives in one burst at the end" bug only shows up after deploy (see Detail → Common failure modes).</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming "it streams in Kestrel" means it streams for users.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Heartbeat well inside the smallest idle timeout</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Send a <code>:</code> comment roughly every 15 s. If your framework helper can't emit comments, send a named <code>ping</code> event instead. Anthropic's Messages API does exactly that.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>nginx <code>proxy_read_timeout</code> and AWS ALB both default to 60 s, and Cloudflare cuts at 100 s. Without a heartbeat, quiet streams die on schedule and reconnect in lockstep.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Raising every timeout to an hour instead. One hop you forgot will still cut the stream.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Tie every subscription to cancellation, including shutdown</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Link <code>HttpContext.RequestAborted</code> with <code>IHostApplicationLifetime.ApplicationStopping</code>, and unsubscribe in a <code>finally</code> block.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Ignore disconnect → zombie subscriptions and memory that grows with churn. Ignore shutdown → every pod blocks for the full <code>HostOptions.ShutdownTimeout</code> (30 s by default) on each deploy, then Kubernetes kills it hard.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A <code>while (true)</code> loop that only exits when a write throws.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Give each client a bounded queue and a slow-consumer policy</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Put a <code>Channel.CreateBounded&lt;T&gt;</code> between the bus and each connection. When it fills, drop stale updates (<code>DropOldest</code>) or close the stream and let the client resume by ID.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>One client on a bad mobile link otherwise buffers unbounded events in your process. Multiply that by a few thousand and the node runs out of memory.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Writing straight from the bus callback to the socket, so a slow client stalls the publisher.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Make <code>id:</code> a real cursor into a log, and define the "too old" case</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use IDs from a durable, ordered log (Redis Stream entry IDs, Kafka offsets). On reconnect, replay after <code>Last-Event-ID</code>. If that ID has aged out, send a <code>reset</code> event telling the client to refetch a
+              <span class="term">snapshot</span>
+              <span class="term__gloss">the full current state, fetched by a normal request, that later events apply on top of</span>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without a log, <code>id:</code> promises a resume that silently drops events. Without a reset path, a client back from a laptop sleep shows stale state forever.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A per-process counter as the ID. It restarts at 1 on every deploy and means nothing on another node.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Add a backplane the day you run a second instance</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Publish events to Redis Pub/Sub, NATS, or Kafka, and have every SSE node subscribe to it.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>With an in-memory subscriber list behind a load balancer, about half your users stop getting events the moment you scale to two pods.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>
+              <span class="term">Sticky sessions</span>
+              <span class="term__gloss">the load balancer pins each client to the same server</span>
+              as the fix. They pin connections but don't route events produced on another node.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    P["Producers (API writes, jobs, LLM relay)"] --> L[("Ordered log: Redis Stream or Kafka")]
+    L --> N1["SSE node 1"]
+    L --> N2["SSE node 2"]
+    N1 --> Q1["Bounded queue per client (DropOldest)"]
+    N2 --> Q2["Bounded queue per client (DropOldest)"]
+    Q1 --> X["Proxies: no buffering, no gzip, heartbeat every ~15 s"]
+    Q2 --> X
+    X --> B["Browsers: one EventSource per tab, over HTTP/2"]
+    B -.->|"reconnect with Last-Event-ID, any node"| N2
+          </pre>
+          <figcaption class="diagram__caption">Practices 2 to 7 in one picture: a shared ordered log makes any node able to serve any client and replay from its cursor; bounded queues isolate slow clients.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">One multiplexed stream per tab, over HTTP/2</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Open a single <code>EventSource</code> per tab that carries all topics, and route events with <code>event:</code> names. Serve browsers over HTTP/2 or HTTP/3.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>On HTTP/1.1, the ~6-connections-per-origin limit is shared across tabs, so the seventh tab hangs. Even on HTTP/2, nginx usually speaks HTTP/1.1 upstream, so each stream is still one upstream TCP connection.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>One <code>EventSource</code> per widget.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Authenticate the connection, then authorize every event</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use cookies with <code>withCredentials</code>, or a short-lived (~60 s) single-use ticket in the query string that you exchange at connect time. Filter
+              <span class="term">fan-out</span>
+              <span class="term__gloss">copying one event to many subscribers</span>
+              by tenant and user before writing each event. Cap open streams per user.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A long-lived bearer token in the URL ends up in access logs. A topic-wide broadcast that skips per-event checks leaks one tenant's data to another.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Checking auth only at connect and then trusting a <code>?channel=</code> parameter supplied by the client.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Let a formatter write the wire format</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>TypedResults.ServerSentEvents</code> / <code>SseFormatter</code> (.NET 10) or your stack's equivalent, and JSON-serialize payloads, which escapes newlines.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A raw <code>\n</code> in user text written into one <code>data:</code> line ends the event early. That lets an attacker inject fake <code>event:</code>/<code>id:</code> lines.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>$"data: {message}\n\n"</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Handle the permanent-failure path on the client</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Watch for <code>readyState === CLOSED</code>, which follows a non-200 response such as an expired-auth 401. Refresh credentials, then recreate the <code>EventSource</code> with
+              <span class="term">jittered</span>
+              <span class="term__gloss">randomly varied, so clients don't all retry at the same instant</span>
+              backoff, and pass the last seen ID as a query parameter.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The browser auto-retries only network drops. After a 401 the stream stops for good and the UI looks frozen with no error shown.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Treating every <code>error</code> event as fatal. It also fires on each normal reconnect.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    E["error event fires"] --> S{"readyState?"}
+    S -->|"CONNECTING (0)"| W["Do nothing: the browser retries and sends Last-Event-ID"]
+    S -->|"CLOSED (2)"| F["Refresh credentials"]
+    F --> J["Wait a jittered backoff"]
+    J --> N["Create a new EventSource, last seen ID in the query string"]
+          </pre>
+          <figcaption class="diagram__caption">The client rule from practice 10: an <code>error</code> during CONNECTING is a normal reconnect; only CLOSED needs the app to step in.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Size per-node capacity with a load test, not a guess</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Load-test with a non-browser client (Shopify used <code>okhttp-eventsource</code>) and record connections per pod at your memory and CPU ceiling. Check file-descriptor limits, <code>net.core.somaxconn</code>, and proxy
+              <span class="term">ephemeral ports</span>
+              <span class="term__gloss">the short-lived local ports an outgoing connection borrows; one per open upstream connection</span>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The limits are usually in the OS, not in SSE. Linux's default port range (32768–60999) gives one proxy about 28K concurrent connections to one upstream IP:port.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Autoscaling on CPU alone. Idle SSE connections use memory and descriptors, not CPU.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The static subscriber list</p>
+            <p>A <code>static ConcurrentDictionary</code> of open responses that the publish endpoint loops over. Works perfectly with one instance, silently loses events with two. Add a backplane from the first deploy with more than one replica.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The "helpful" reconnect wrapper</p>
+            <p><code>onerror = () =&gt; { es.close(); es = new EventSource(url); }</code>. It throws away the browser's <code>Last-Event-ID</code>, skips its retry delay, and turns a blip into a reconnect storm. Let the browser reconnect on its own, and rebuild only on <code>CLOSED</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">IDs without memory</p>
+            <p>The server emits <code>id:</code> because a tutorial did, but keeps no log. Reconnects look healthy in dashboards while users miss events. Back the IDs with a log, or omit them so nobody assumes resume works.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Orphaned upstream generation</p>
+            <p>An LLM relay that keeps reading from the provider after the browser disconnects. You pay for every token nobody reads; on a busy chat product that's a visible share of the bill. Propagate cancellation upstream, unless you deliberately chose resumable generation (see the LLM pattern below).</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">SSE on the API pods</p>
+            <p>Stream endpoints share pods with an API you deploy 20 times a day. Every deploy disconnects every user at once, and they all hit the new pods together. Move streams to a separate, rarely deployed tier, or drain pods gradually with jittered <code>retry:</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Fat broadcast, thin authorization</p>
+            <p>Pushing full records to a topic channel because "everyone on this page can see it anyway". The first shared dashboard across tenants leaks data. Filter per subscriber, or send thin events ("order 123 changed") that make the client refetch through normal authorization.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">LLM chat relay</div>
+            <p>A backend turns provider SSE events into its own simpler stream. Two camps on disconnects:</p>
+            <ul>
+              <li><strong>Cancel-on-disconnect</strong> aborts the upstream call to save tokens.</li>
+              <li><strong>Resumable generation</strong> (Vercel AI SDK with the Redis-backed <code>resumable-stream</code>) keeps generating into Redis so a reload can reattach. The AI SDK docs warn that client aborts are then only disconnects and must not cancel generation.</li>
+            </ul>
+            <p>Tie-breaker is task length: seconds → cancel; minute-long agent runs → resume. <em>Lesson:</em> decide up front, because a separate "stop" endpoint and the resume mode interact in non-obvious ways.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Shopify BFCM Live Map</div>
+            <p>Replaced clients polling a mailbox at least every 10 s. Flink writes to Kafka; a Go SSE server behind nginx pushes each update as it arrives. Clients sent JWTs through an <code>EventSource</code> polyfill, because native <code>EventSource</code> can't set headers. <em>Lesson:</em> the SSE tier stayed stateless and scaled horizontally because Kafka was the log; per-pod capacity came from a load-test client, not estimates.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">LinkedIn instant messaging</div>
+            <p>Chose SSE over WebSockets for compatibility and reached 100K persistent connections per node. Every wall was outside the protocol:</p>
+            <ul>
+              <li><code>somaxconn</code> at 128,</li>
+              <li>a 30K file-descriptor limit (raised to 200K),</li>
+              <li>roughly 20 KB of TLS state per connection, pushing the heap to 16 GB.</li>
+            </ul>
+            <p><em>Lesson:</em> SSE capacity planning is kernel and memory tuning.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Enterprise B2B behind corporate proxies</div>
+            <p>One customer's legacy proxy held the chunked stream until it closed. Logins took 20 minutes while server metrics were all green. Fix: the client acknowledges receipt; if no ack arrives within seconds, the server closes the stream, which forces the proxy to flush. <em>Lesson:</em> you can't see client-side buffering from the server. Measure time-to-first-event on the client.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Dashboards:</strong> open connections per node, connection opens per second, and a <strong>connection-duration histogram</strong>? A spike at exactly 60 s or 100 s points to an intermediary timeout.</li>
+              <li><strong>Latency:</strong> is publish-to-render measured, with a server timestamp in the payload and the delta reported by the client?</li>
+              <li><strong>Heartbeat:</strong> is the interval shorter than the smallest idle timeout in the chain, and is that chain written down?</li>
+              <li><strong>Smoke test:</strong> does staging fail when any hop starts buffering or compressing <code>text/event-stream</code>?</li>
+              <li><strong>Pod killed mid-stream:</strong> tested? Do clients resume on another node with no gaps and no duplicates?</li>
+              <li><strong>Too-old cursor:</strong> when <code>Last-Event-ID</code> is older than retention, does the client get a reset/snapshot rather than silence?</li>
+              <li><strong>Security:</strong> tokens kept out of long-lived URLs, authorization checked per event, streams per user capped?</li>
+              <li><strong>Cost:</strong> does a client disconnect cancel upstream work (LLM calls, DB cursors)? Are SSE endpoints kept off duration-billed serverless runtimes?</li>
+              <li><strong>Onboarding:</strong> does the README say "one <code>EventSource</code> per tab, named events, never recreate it on <code>error</code>"?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">One endpoint, in-memory subscribers.</span> Often added for a single feature like a progress bar. It works, so a second feature reuses it.</li>
+          <li><span class="steps__title">Second replica → Redis Pub/Sub backplane.</span> Scaling to two replicas makes half the users miss events; the first painful fix is a Pub/Sub backplane. Pub/Sub is fire-and-forget, so reconnect gaps remain.</li>
+          <li><span class="steps__title">Redis Streams or Kafka.</span> Now <code>id:</code> finally means something. This retrofit is the expensive migration: every producer must write to one ordered log, every client must handle a <code>reset</code> event, and old clients that cached counter-based IDs send cursors that no longer mean anything. Teams that design IDs and snapshot-plus-delta from day one skip this rewrite.</li>
+          <li><span class="steps__title">Its own tier.</span> At larger scale, streaming splits into a dedicated SSE gateway with its own deploy schedule, autoscaling on connection count, and kernel tuning, or moves to a hub such as Mercure or a managed push service. The trigger is usually deploy pain: once a routine API deploy disconnects every user, separate infrastructure pays for itself.</li>
+        </ol>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Run the MVP</p>
+            <ul>
+              <li><strong>Needs .NET SDK 10.0+.</strong> The projects target <code>net10.0</code> because <code>SseItem&lt;T&gt;</code> and <code>TypedResults.ServerSentEvents</code> don't exist in .NET 8 or 9.</li>
+              <li><strong>Run:</strong> <code>dotnet run --project Api</code>, then <code>curl -N http://localhost:5199/prices</code> in a second terminal.</li>
+              <li><strong>What it shows:</strong> a tick every 200 ms, IDs that are log sequence numbers, gap-free resume via <code>Last-Event-ID</code>, and a <code>reset</code> event when the cursor is older than the 5-tick replay log.</li>
+              <li><strong>Hygiene built in:</strong> cancellation from <code>RequestAborted</code> + <code>ApplicationStopping</code>, a bounded <code>DropOldest</code> queue (64 items) per client, and <code>retry: 1000</code> sent once per connection.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://html.spec.whatwg.org/multipage/server-sent-events.html" rel="noopener">WHATWG HTML — Server-sent events</a> — the normative parsing and reconnect rules. Read it once to settle every "what does the browser do when…" argument.</li>
+          <li><a href="https://textslashplain.com/2019/12/04/the-pitfalls-of-eventsource-over-http-1-1/" rel="noopener">Eric Lawrence — The Pitfalls of EventSource over HTTP/1.1</a> — why the connection limit is permanent, from a former browser engineer.</li>
+          <li><a href="https://www.linkedin.com/blog/engineering/archive/instant-messaging-at-linkedin-scaling-to-hundreds-of-thousands-" rel="noopener">LinkedIn — Instant Messaging: Scaling to Hundreds of Thousands of Persistent Connections on One Machine</a> — the best concrete list of OS-level limits you will hit.</li>
+          <li><a href="https://shopify.engineering/server-sent-events-data-streaming" rel="noopener">Shopify — Using Server Sent Events to Simplify Real-time Streaming at Scale</a> — the Kafka-backed SSE tier, load testing, and auth through a polyfill.</li>
+          <li><a href="https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-resume-streams" rel="noopener">Vercel AI SDK — Chatbot Resume Streams</a> — the resumable-generation design and its trade-off with abort.</li>
+          <li><a href="https://learn.microsoft.com/en-us/aspnet/core/release-notes/aspnetcore-10.0" rel="noopener">ASP.NET Core 10 release notes</a> — <code>TypedResults.ServerSentEvents</code> and <code>SseItem&lt;T&gt;</code>, the .NET-native serving path.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/backend/server-sent-events/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
