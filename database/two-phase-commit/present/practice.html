@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two-Phase Commit · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Two-Phase Commit</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Two-Phase Commit</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/two-phase-commit/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Two-Phase Commit</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Most engineers meet 2PC without knowing it. You'll run into it in three places:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Inside a distributed database</div><p>Citus, Vitess, CockroachDB, or Spanner: an <code>UPDATE</code> touches two shards and the engine quietly runs prepare and commit. You notice only when multi-shard commit latency jumps, or an alert fires on a <code>pg_prepared_xacts</code> row that is three hours old.</p></div>
+          <div class="card"><div class="card__title">Enterprise Java / .NET tier</div><p>A Spring Boot service reads from IBM MQ, writes to Oracle, and acks the message in one JTA transaction run by Atomikos or Narayana. A .NET service opens two SQL connections in one <code>TransactionScope</code> and escalates to MSDTC. Here 2PC is a library plus a log file on disk — and the log file is the part that bites.</p></div>
+          <div class="card"><div class="card__title">Hand-rolled “intent then commit”</div><p>Write a pending marker, write the record, flip the marker. These are 2PC in disguise and inherit all of its recovery duties.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Let the database run 2PC for you when you can</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Prefer a distributed SQL engine (CockroachDB, Spanner, YugabyteDB, Citus, Vitess) over application-level XA across separate databases.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>These engines replicate the coordinator's state with Raft or Paxos, so one node crash does not leave in-doubt branches. They ship their own recovery loop. With XA, you own the coordinator's uptime and its log.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Stitching two independent Postgres instances together with a TM library because “it's just one more datasource.”</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Design the schema so 2PC is the slow path</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Co-locate data that is written together on one participant. In Citus, distribute every tenant-scoped table by <code>tenant_id</code> so a tenant's writes hit one worker and commit locally.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A single-participant transaction skips both phases. If 80% of your writes are cross-shard, every one pays ≥ 2 round trips and 2n + 1 fsyncs, and lock hold time on hot rows grows to match.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Picking a shard key for read fan-out and finding out later that every write is a distributed transaction.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Put the coordinator log on durable storage with a stable identity</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run XA coordinators as a Kubernetes StatefulSet with one PersistentVolume per pod, or use a TM that stores its log in a replicated database.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>If a pod is rescheduled and its log disappears, every branch it prepared stays
+              <span class="term">in-doubt</span>
+              <span class="term__gloss">voted YES, still waiting for the decision, locks held</span>
+              forever. Nobody else knows whether that GID committed.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A Deployment with <code>emptyDir</code> for <code>tmlog/</code>, which works perfectly until the first node drain.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Give every TM instance a unique, stable node identifier</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set Narayana's <code>node-identifier</code> or Atomikos's <code>com.atomikos.icatch.tm_unique_name</code> per instance (for example, the StatefulSet pod name), and keep it stable across restarts.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Recovery scans <code>xa_recover</code> on every RM and claims branches whose XID matches its
+              <span class="term">node ID</span>
+              <span class="term__gloss">the TM's name, stamped into every XID it creates</span>.
+              Two instances sharing an ID roll back each other's in-flight branches. An ID that changes on restart orphans the old branches.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving the default identifier on every replica because the first deployment only had one.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Size <code>max_prepared_transactions</code> on purpose</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>On Postgres participants, set it to at least <code>max_connections</code> (the official recommendation). Keep it at <code>0</code> on every database that should never see 2PC. Set standbys equal to or higher than the primary.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Too low and <code>PREPARE TRANSACTION</code> fails under load. A standby set lower than the primary refuses queries. <code>0</code> on “non-2PC” databases makes accidental 2PC fail loudly. Changing it needs a restart, so get it right before launch.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Bumping it to 100 on every database “just in case.”</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Alert on in-doubt age, not just count</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Page when any branch has been prepared longer than a few minutes: <code>SELECT gid, prepared FROM pg_prepared_xacts WHERE prepared &lt; now() - interval '5 minutes'</code>. Run the <code>XA RECOVER</code> equivalent on MySQL.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An orphaned prepared transaction holds locks and pins the
+              <span class="term">vacuum horizon</span>
+              <span class="term__gloss">the oldest transaction Postgres must keep dead rows around for</span>.
+              Dead tuples pile up, tables bloat, and in the worst case Postgres stops accepting writes to prevent XID wraparound. That incident shows up days after the cause.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Monitoring only “TM is up,” which stays green while branches rot.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Keep the transaction short and remote-call-free</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Do the expensive reads and computation before opening the distributed transaction. Inside it, only write.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Locks are held for execute time + prepare RTT + 2 fsyncs + commit RTT. An HTTP call or a slow query inside the scope multiplies that. A hot row then caps throughput at roughly 1 / (lock hold time).</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Calling a pricing service between the debit and the credit “because it's all one unit of work.”</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Make heuristic resolution a runbook, not a reflex</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Before running <code>ROLLBACK PREPARED</code> or <code>COMMIT PREPARED</code> by hand, look up the GID in the coordinator's log. If a COMMIT record exists, commit. Otherwise abort. Record who did it.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A DBA who rolls back a branch the coordinator already committed creates a
+              <span class="term">heuristic mixed outcome</span>
+              <span class="term__gloss">some branches committed, others rolled back — atomicity broken</span>:
+              money left one account and never arrived in the other. Nothing detects it automatically.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>“It's been stuck for an hour, just roll it back.”</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    A["Stuck row in pg_prepared_xacts"] --> B["Look up the GID in the coordinator's log"]
+    B --> C{"COMMIT record exists?"}
+    C -- "yes" --> D["COMMIT PREPARED 'gid'"]
+    C -- "no" --> E["ROLLBACK PREPARED 'gid'"]
+    D --> F["Record who did it"]
+    E --> F
+          </pre>
+          <figcaption class="diagram__caption">The heuristic-resolution runbook. The coordinator's log decides, never the age of the row. No COMMIT record means presumed abort.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Encode traceability into the GID</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Build GIDs from TM node ID + timestamp + sequence, kept under Postgres's 200-byte limit, and log them with the business request ID.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>At 3 a.m., the on-call engineer looking at <code>pg_prepared_xacts</code> needs to know which service, which pod, and which request produced the row. A UUID with no context gives them nothing.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Random opaque GIDs, or GIDs reused across TM restarts.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Kill the coordinator in a test environment before production does</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run a chaos test that <code>kill -9</code>s the coordinator between prepare and commit, then assert that every participant converges to the same outcome within the recovery interval.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Recovery code runs only during failures, so it is the least-exercised path in the system. Misconfigured node IDs, missing log volumes, and RM credentials missing from the recovery module only show up here.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Treating “commit works on the happy path” as proof that 2PC works.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Distributed monolith via XA</p>
+            <p>Service A enlists Service B's database in its global transaction. B's locks now depend on A's coordinator uptime, and B's on-call gets paged for A's outages. Give each service its own database and use the transactional outbox or a Saga across the boundary.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The janitor cron</p>
+            <p>A script runs <code>ROLLBACK PREPARED</code> on anything in <code>pg_prepared_xacts</code> older than N minutes. It “fixes” the vacuum alerts and silently breaks atomicity whenever the coordinator had already decided COMMIT. Fix the coordinator's recovery instead, and escalate stuck branches to a human with the coordinator log in hand.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">“Prepare” over HTTP</p>
+            <p>A team adds <code>/reserve</code> and <code>/confirm</code> endpoints and calls it 2PC. The reservation expires on a timer, so the participant can abort on its own after voting yes — exactly what the prepared state forbids. This is
+              <span class="term">Try-Confirm-Cancel</span>
+              <span class="term__gloss">a Saga variant: reserve, then confirm or cancel</span>.
+              Design it with compensations and idempotency, not 2PC guarantees.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Assuming 2PC gives a global snapshot</p>
+            <p>Phase 2 does not land on every participant at the same instant. A reader that queries A, then B, can see A's commit and not yet B's. If readers need a consistent cross-node view, you need a database with global timestamps (Spanner, CockroachDB), not plain XA.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Retrying an unknown outcome as if it failed</p>
+            <p>The client times out after the commit point, assumes failure, and re-runs the transfer. The first attempt commits during recovery, and the money moves twice. Attach an idempotency key to the business operation so the retry is a no-op.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Silent escalation</p>
+            <p>In .NET, a second connection inside <code>TransactionScope</code> escalates to MSDTC. Since .NET 7 this throws unless <code>TransactionManager.ImplicitDistributedTransactions = true</code>. Teams flip the flag to make the exception go away and gain a Windows-only distributed transaction they never designed for. Treat the exception as a design-review trigger.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Multi-tenant SaaS on Citus</div>
+            <p>A B2B product with thousands of tenants distributes tables by <code>tenant_id</code>. Normal requests commit on one worker. Cross-tenant admin jobs and reference-table updates go through 2PC; the coordinator records each prepared branch in <code>pg_dist_transaction</code> and a background process resolves leftovers. <em>Lesson:</em> the share of multi-shard transactions is a schema-design metric. Track it per endpoint — one new cross-tenant feature can turn the fast path into the slow path.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Bank message processing on JTA</div>
+            <p>A payments service reads from IBM MQ, writes to Oracle, and acks the message in one XA transaction, so a crash never loses or double-applies a payment instruction. It ran fine on VMs for a decade. <em>Lesson:</em> the move to Kubernetes is where it breaks. Scaling a StatefulSet down removes a pod whose log still holds in-doubt branches. The WildFly operator refuses to terminate the pod (marking it <code>SCALING_DOWN_RECOVERY_DIRTY</code>) until recovery drains it. Without an equivalent, scale-down is a data-integrity event.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Global ledger on CockroachDB or Spanner</div>
+            <p>A fintech keeps accounts in a multi-region cluster; every transfer touching two ranges runs the engine's 2PC variant over consensus groups. <em>Lesson:</em> latency is set by geography, not CPU. The commit pays a consensus round in the region holding the transaction record or coordinator leader, so pinning leaseholders or leaders near the writers beats any query tuning. Parallel Commits cuts this to one consensus round, but contention still surfaces as <code>40001</code> retry errors, so clients need a retry loop.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Hand-rolled 2PC at Uber's LedgerStore</div>
+            <p>For strongly consistent indexes, LedgerStore writes an index <em>intent</em>, then the record, then commits the intent asynchronously, so the index never points at a record that does not exist. <em>Lesson:</em> build 2PC yourself and you own recovery. A record write that fails after the intent write leaves an intent that must be rolled back, or unused intents pile up. Plan the sweeper before shipping the write path.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Age alert:</strong> is there an alert on the age of the oldest prepared branch (<code>pg_prepared_xacts.prepared</code>, <code>XA RECOVER</code>), and does it page someone?</li>
+              <li><strong>TM log:</strong> is it on a persistent, backed-up volume, and has someone restored it on a fresh pod and watched recovery complete?</li>
+              <li><strong>Node IDs:</strong> does every TM instance have a unique node ID that survives restarts, and does the recovery module have credentials for every RM?</li>
+              <li><strong>Sizing:</strong> is <code>max_prepared_transactions</code> ≥ <code>max_connections</code> on 2PC participants, <code>0</code> everywhere else, and ≥ primary on standbys?</li>
+              <li><strong>Chaos test:</strong> has a <code>kill -9</code> between prepare and commit been run in staging, with all participants converging to the same outcome?</li>
+              <li><strong>Runbook:</strong> is there a written heuristic-resolution runbook that requires checking the coordinator log before any manual <code>COMMIT PREPARED</code> / <code>ROLLBACK PREPARED</code>?</li>
+              <li><strong>Metrics:</strong> are p99 commit latency and lock wait time tracked separately for single- and multi-participant transactions?</li>
+              <li><strong>Idempotency:</strong> do business operations that can time out after the commit point carry an idempotency key?</li>
+              <li><strong>Cost:</strong> in a multi-region database, are multi-region writes priced into the latency budget and the cross-region transfer bill?</li>
+              <li><strong>Onboarding:</strong> does a new engineer know which code paths open a distributed transaction, and that a stuck prepared transaction is never fixed by a blind rollback?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">One database, local transactions.</span> Then a second store arrives (a broker, a second shard), and the first dual-write bug appears: the database committed and the message never went out.</li>
+          <li><span class="steps__title">The quick fix: XA.</span> Through <code>TransactionScope</code> or JTA. On long-lived VMs with local disks, this can run quietly for years.</li>
+          <li><span class="steps__title">The painful migration point: the platform shift.</span> Containers break what XA relies on — stable host identity, a disk that outlives the process, and deliberate scale-down. Around the same time the org splits into teams, and the shared global transaction couples their deploys and on-call.</li>
+          <li><span class="steps__title">Two ways out.</span> Some teams replace cross-boundary XA with the transactional outbox plus idempotent consumers and accept eventual consistency. Others move the data that must be atomic into a distributed SQL engine with a replicated coordinator.</li>
+          <li><span class="steps__title">Mature state.</span> Application code rarely talks to a TM directly. 2PC still runs on every multi-shard commit, but inside the database. The team's job is to keep most transactions single-shard and watch the in-doubt dashboard.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["One database, local transactions"] --> B["Second store arrives: first dual-write bug"]
+    B --> C["Quick fix: XA via TransactionScope or JTA"]
+    C --> D["Platform shift to containers, org splits into teams"]
+    D --> E["Transactional outbox + idempotent consumers"]
+    D --> F["Distributed SQL with a replicated coordinator"]
+          </pre>
+          <figcaption class="diagram__caption">The usual path. The fork happens at the platform shift: give up atomicity across the boundary, or move the atomic data into an engine that runs 2PC for you.</figcaption>
+        </figure>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.postgresql.org/docs/current/sql-prepare-transaction.html" rel="noopener">PostgreSQL: <code>PREPARE TRANSACTION</code></a> — short, and states plainly that the feature is for transaction managers only and why long-lived prepared transactions hurt <code>VACUUM</code>.</li>
+          <li><a href="https://arxiv.org/abs/cs/0408036" rel="noopener">Gray &amp; Lamport, <em>Consensus on Transaction Commit</em></a> — classic 2PC as Paxos Commit with zero fault tolerance, which explains why every modern engine replicates the coordinator.</li>
+          <li><a href="https://www.cockroachlabs.com/blog/parallel-commits/" rel="noopener">CockroachDB: Parallel Commits</a> — a production redesign of the commit path that halves consensus latency, with clear reasoning about the recovery cases.</li>
+          <li><a href="https://www.uber.com/us/en/blog/how-ledgerstore-supports-trillions-of-indexes/" rel="noopener">Uber: How LedgerStore Supports Trillions of Indexes</a> — a 2PC-style intent protocol at very large scale, including the cleanup it requires.</li>
+          <li><a href="https://www.citusdata.com/blog/2017/11/22/how-citus-executes-distributed-transactions/" rel="noopener">Citus: How Citus Executes Distributed Transactions</a> — how a Postgres extension drives <code>PREPARE TRANSACTION</code> across workers, plus distributed deadlock detection.</li>
+          <li><a href="https://docs.wildfly.org/wildfly-proposals/transactions/WFLY-17742_SupportTransactionsDuringGracefulShutdown.html" rel="noopener">WildFly proposal: transactions during graceful shutdown</a> — what XA needs from a container platform at shutdown and scale-down.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/two-phase-commit/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

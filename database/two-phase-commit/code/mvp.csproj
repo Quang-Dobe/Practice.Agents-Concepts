@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- One flat console app, like database/mvcc and database/lsm-tree.
+       The lesson is the protocol (votes, forced log writes, recovery),
+       not the layering, so there are no Clean Architecture projects here.
+       Zero NuGet packages: the "databases" are simulated with append-only log files. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Lets the demo run on a newer runtime if only .NET 9/10 is installed. -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+</Project>

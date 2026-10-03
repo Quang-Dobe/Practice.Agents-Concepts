@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two-Phase Commit — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Two-Phase Commit</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Two-Phase Commit</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/two-phase-commit/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>database</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Two-Phase Commit</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">database</span>
+            <span class="badge">distributed transactions</span>
+            <span class="badge">atomic commit</span>
+            <span class="badge">XA</span>
+          </div>
+          <h1 class="hero__title">Two-Phase Commit</h1>
+          <p class="hero__tagline">A protocol that lets one transaction span several databases and makes them all commit or all roll back, by first asking everyone “can you commit?” and only then telling everyone “commit.”</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">2</div><div class="stat__label">round trips per commit: prepare, then decide</div></div>
+          <div class="stat"><div class="stat__num">2n + 1</div><div class="stat__label">forced disk writes with <em>n</em> participants</div></div>
+          <div class="stat"><div class="stat__num">1991</div><div class="stat__label">X/Open standardizes the XA interface</div></div>
+          <div class="stat"><div class="stat__num">0</div><div class="stat__label">Postgres default <code>max_prepared_transactions</code> (2PC off)</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM (REQUIRED): the two phases -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    S([Distributed transaction]) --> P["Phase 1: coordinator sends PREPARE to every participant"]
+    P --> W["Each participant forces PREPARED to disk, keeps its locks, votes"]
+    W --> V{"Every vote YES?"}
+    V -- "yes" --> CP["Coordinator forces COMMIT record = commit point"]
+    CP --> C2["Phase 2: COMMIT to all, locks released"]
+    V -- "any NO or timeout" --> AB["Phase 2: ABORT to all, roll back"]
+          </pre>
+          <figcaption class="diagram__caption">The whole protocol in one shape: a unanimous vote, one durable decision in the coordinator's log, then everyone follows it.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the wedding-ceremony mental model, the blocking problem, and what 2PC is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: the exact message flow and log forces, what recovery does at each crash point, the trade-off table, and why the coordinator gets replicated.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Ten best practices with the Do/Why/Avoid triad, anti-patterns like the janitor cron, real case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail for the crash-point table, or Practice for the runbooks. The code folder holds a ~105-line C# console demo (.NET 8+, no database server) of presumed abort with one coordinator and two simulated databases.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

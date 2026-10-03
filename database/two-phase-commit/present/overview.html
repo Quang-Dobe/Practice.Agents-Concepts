@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two-Phase Commit · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Two-Phase Commit</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Two-Phase Commit</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/two-phase-commit/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Two-Phase Commit</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">One database gives you atomicity for free: the whole transaction lands, or none of it does. Once one business operation touches two systems, that guarantee is gone.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <ul>
+              <li><strong>The problem.</strong> You debit an account in Postgres A and credit one in Postgres B. A commits, B crashes, and the money disappears.</li>
+              <li><strong>The fix.</strong> 2PC adds a
+                <span class="term">coordinator</span>
+                <span class="term__gloss">the node that runs the vote and records the final decision</span>
+                that runs a vote <em>before</em> anyone commits for real.</li>
+              <li><strong>Its place.</strong> It is the classic answer to atomic commit across nodes.</li>
+              <li><strong>Its weakness.</strong> If the coordinator dies at the wrong moment, everyone else is stuck waiting.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of a wedding ceremony. The officiant (the coordinator) does not declare anyone married right away.</p>
+        <ul>
+          <li>First the officiant asks each partner: “Do you take this person?”</li>
+          <li>Each partner, a
+            <span class="term">participant</span>
+            <span class="term__gloss">a database or broker that does the work and votes</span>,
+            thinks it over and answers “I do” or “I don't.”</li>
+          <li>Once a partner says “I do,” they have given up the right to leave. They are bound to whatever the officiant says next.</li>
+        </ul>
+
+        <h3>The two phases</h3>
+        <ul>
+          <li><strong>Phase 1 — prepare / vote.</strong> The officiant asks everyone. Each participant does the work, writes it durably to disk, holds its locks, and votes.</li>
+          <li><strong>Phase 2 — commit / abort.</strong> If every answer was “I do,” the officiant says “I now pronounce you married” and everyone commits. If even one said “I don't,” the ceremony is off and everyone rolls back.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Coordinator
+    participant A as DB A
+    participant B as DB B
+    C->>A: PREPARE
+    C->>B: PREPARE
+    A-->>C: YES
+    B-->>C: YES
+    Note over C: writes COMMIT to its own log
+    C->>A: COMMIT
+    C->>B: COMMIT
+          </pre>
+          <figcaption class="diagram__caption">The happy path. Nobody commits until every participant has voted YES and the coordinator has logged the decision.</figcaption>
+        </figure>
+
+        <h3>The weak spot: blocking</h3>
+        <p>Both partners said “I do,” and the officiant faints before saying the final line.</p>
+        <ul>
+          <li>The partners can't walk away: the other one might already have heard “pronounced.”</li>
+          <li>They can't assume they're married either.</li>
+          <li>So they stand there, holding their locks, until the officiant wakes up.</li>
+        </ul>
+        <p>That is the
+          <span class="term">blocking problem</span>
+          <span class="term__gloss">participants stuck in-doubt because the coordinator is unreachable</span>,
+          and it explains most of 2PC's reputation.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant C as Coordinator
+    participant A as DB A
+    participant B as DB B
+    C->>A: PREPARE
+    C->>B: PREPARE
+    A-->>C: YES
+    B-->>C: YES
+    Note over C: crashes before sending the decision
+    Note over A,B: in-doubt: locks held, cannot commit or abort alone
+    C->>A: decision, only after the coordinator recovers
+    C->>B: decision, only after the coordinator recovers
+          </pre>
+          <figcaption class="diagram__caption">Once a participant votes YES it waits for the coordinator, however long that takes. Its locks stay held the whole time.</figcaption>
+        </figure>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not consensus (Paxos, Raft).</strong> Consensus needs a <em>majority</em> to agree on a value. 2PC needs <em>every</em> participant to vote yes, and one failure can stall it.</li>
+              <li><strong>Not a Saga.</strong> A Saga commits each step locally and undoes mistakes later with compensating actions. 2PC commits nothing until all participants agree.</li>
+              <li><strong>Not two-phase locking (2PL).</strong> 2PL is a concurrency-control rule <em>inside</em> one database. Similar names, different ideas.</li>
+              <li><strong>Not three-phase commit (3PC).</strong> 3PC adds a phase to reduce blocking and is rarely used in practice.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You need one atomic write across two or more relational databases you control, such as a sharded Postgres cluster.</li>
+              <li>You commit to a database and a message broker together, and both support <span class="term" data-gloss="the X/Open standard API for 2PC">XA</span>.</li>
+              <li>You are building a distributed database. Google Spanner and CockroachDB run commit protocols in the 2PC family underneath.</li>
+              <li>Participants are few, share a fast, reliable network, and correctness matters more than latency.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Participants are independent microservices owned by different teams. Locks held across services couple their availability.</li>
+              <li>A participant is a third-party HTTP API. It can't “prepare” and then wait for your decision.</li>
+              <li>You need high throughput or low latency. Every transaction pays at least two network round trips plus forced disk writes, and holds locks the whole time.</li>
+              <li>Eventual consistency is fine. The outbox pattern or a Saga is simpler and more available.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Coordinator (transaction manager)</dt><dd>The node that runs the vote and records the final decision.</dd></div>
+          <div><dt>Participant (resource manager)</dt><dd>A database or broker that does the work and votes.</dd></div>
+          <div><dt>Prepare / vote</dt><dd>Phase 1: a participant persists its work and promises it can commit.</dd></div>
+          <div><dt>Prepared (in-doubt) transaction</dt><dd>One that voted yes and is still waiting for the decision. It holds locks until then.</dd></div>
+          <div><dt>Commit point</dt><dd>The moment the coordinator durably logs “COMMIT.” After this, the outcome can't change.</dd></div>
+          <div><dt>Blocking</dt><dd>Participants stuck in-doubt because the coordinator is unreachable.</dd></div>
+          <div><dt>XA</dt><dd>The X/Open standard API for 2PC, used by JDBC drivers, MySQL, and message brokers.</dd></div>
+          <div><dt><code>PREPARE TRANSACTION</code></dt><dd>PostgreSQL's native 2PC command, later followed by <code>COMMIT PREPARED</code> or <code>ROLLBACK PREPARED</code>. Off by default (<code>max_prepared_transactions = 0</code>).</dd></div>
+        </dl>
+
+        <p>Next up: the exact message flow and log writes, what happens at each possible crash point, how real systems recover in-doubt transactions, and why so many teams pick Sagas instead.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

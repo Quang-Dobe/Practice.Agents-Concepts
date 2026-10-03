@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two-Phase Commit · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Two-Phase Commit</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Two-Phase Commit</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/two-phase-commit/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Two-Phase Commit</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Two-phase commit is an
+          <span class="term">atomic commitment protocol</span>
+          <span class="term__gloss">a way for independent resource managers to all reach the same commit-or-abort outcome</span>
+          for one distributed transaction, under a crash-recovery failure model.</p>
+        <ul>
+          <li><strong>Safety: guaranteed.</strong> No two participants ever reach different outcomes, and a commit happens only if every participant voted yes.</li>
+          <li><strong>Liveness: not guaranteed.</strong> If the coordinator fails after participants voted yes, they block until it recovers.</li>
+          <li><strong>Formally,</strong> 2PC is consensus on a binary value (commit / abort) where the “proposal” needs unanimity, and the coordinator is a single, unreplicated decider.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Coordinator / Transaction Manager (TM)</dt><dd>Drives the protocol and owns the <strong>decision log</strong>. Its durable write of the COMMIT record is the commit point for the whole transaction.</dd></div>
+          <div><dt>Participants / Resource Managers (RM)</dt><dd>Databases, brokers, or queues that do the work locally and vote. Examples: PostgreSQL, MySQL/InnoDB, IBM MQ, Kafka (as a participant via KIP-939).</dd></div>
+          <div><dt>Global transaction ID (GTRID / XID / GID)</dt><dd>The name that ties together the local branches on each RM. PostgreSQL limits a GID to under 200 bytes.</dd></div>
+          <div><dt>Prepared state</dt><dd>A YES-voter force-writes its redo/undo and its “prepared” record to stable storage, keeps its locks, and <strong>gives up the right to abort on its own</strong>. This state survives restarts.</dd></div>
+          <div><dt>Write-ahead logs on both sides</dt><dd>Recovery depends entirely on what was force-written (fsync'd) before each message was sent.</dd></div>
+          <div><dt>Recovery protocol</dt><dd>After a crash the coordinator re-drives phase 2 from its log, and participants ask “what happened to XID x?” XA exposes this as <code>xa_recover</code>; PostgreSQL as the <code>pg_prepared_xacts</code> view.</dd></div>
+          <div><dt>X/Open XA specification (1991)</dt><dd>The standard TM↔RM interface: <code>xa_start</code>, <code>xa_end</code>, <code>xa_prepare</code>, <code>xa_commit</code>, <code>xa_rollback</code>, <code>xa_recover</code>, <code>xa_forget</code>. Java exposes it through JTA / Jakarta Transactions (<code>XAResource</code>). MySQL exposes it as SQL (<code>XA START … XA PREPARE … XA COMMIT</code>).</dd></div>
+        </dl>
+
+        <h3>Where it sits in the bigger picture</h3>
+        <ul>
+          <li><strong>Atomic commitment family:</strong> 2PC, three-phase commit (3PC, Skeen 1981), and Paxos Commit (Gray &amp; Lamport, 2004/2006).</li>
+          <li><strong>Next to, but distinct from, consensus</strong> (Paxos, Raft): those replicate one value across replicas and need only a majority.</li>
+          <li><strong>Distinct from application-level alternatives</strong> such as Sagas and the transactional outbox, which give up atomic visibility in exchange for availability.</li>
+          <li><strong>Modern distributed SQL combines both families:</strong> 2PC runs <em>across</em> shards, and each shard is a consensus group.</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>2PC lives at the <strong>transaction / storage layer</strong>, in one of two places:</p>
+        <ul>
+          <li><strong>Inside a distributed database.</strong> The engine runs it across shards or ranges. The application issues <code>COMMIT</code> and never sees the protocol.</li>
+          <li><strong>In the application tier, across separate databases.</strong> A TM library (Narayana, Atomikos) or an OS service (MSDTC) is the coordinator. The RMs are separate database or broker processes reached over the network through XA-capable drivers.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph IN["Inside a distributed database"]
+      direction LR
+      A1["Application issues COMMIT"] --> E["Engine runs 2PC across shards or ranges"]
+      E --> S1[("Shard 1")]
+      E --> S2[("Shard 2")]
+    end
+    subgraph OUT["In the application tier"]
+      direction LR
+      A2["Application"] --> TM["TM: Narayana, Atomikos, or MSDTC"]
+      TM -- XA --> R1[("Database: PostgreSQL, MySQL, Oracle")]
+      TM -- XA --> R2[("Broker: IBM MQ, ActiveMQ Artemis")]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Two homes for the same protocol. Inside the engine you get it for free; in the application tier you own the coordinator and its log.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Google Spanner</div><p>Transactions touching more than one Paxos group run 2PC across the group leaders; one is the “coordinator leader.” Commit timestamps come from TrueTime, followed by a commit wait.</p></div>
+          <div class="card"><div class="card__title">CockroachDB</div><p>A 2PC-derived protocol with a transaction record and write intents. Since v19.2, <strong>Parallel Commits</strong> marks the record <code>STAGING</code> so a commit costs one round of consensus instead of two.</p></div>
+          <div class="card"><div class="card__title">Citus (PostgreSQL extension)</div><p>Multi-node writes issue <code>PREPARE TRANSACTION</code> / <code>COMMIT PREPARED</code> to the workers. Recovery records live in <code>pg_dist_transaction</code>.</p></div>
+          <div class="card"><div class="card__title">Vitess</div><p><code>transaction_mode=TWOPC</code> gives atomic cross-shard commits. Redesigned and reintroduced as experimental in v21 (October 2024).</p></div>
+          <div class="card"><div class="card__title">Java EE / Jakarta EE, Spring + JTA</div><p>XA across a database and a JMS broker.</p></div>
+          <div class="card"><div class="card__title">.NET <code>System.Transactions</code></div><p><code>TransactionScope</code> escalates from the Lightweight Transaction Manager to MSDTC when a second durable resource enlists. .NET 7 restored this on <strong>Windows only</strong>.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Native database 2PC:</strong> PostgreSQL <code>PREPARE TRANSACTION</code> / <code>COMMIT PREPARED</code> / <code>ROLLBACK PREPARED</code> (gated by <code>max_prepared_transactions</code>, default <code>0</code>). MySQL/InnoDB <code>XA</code> statements with <code>XA RECOVER</code>. SQL Server and Oracle through MSDTC or XA.</li>
+          <li><strong>Standalone transaction managers:</strong> Narayana (JBoss/WildFly, Quarkus), Atomikos (embedded in Spring Boot apps), MSDTC (Windows). Bitronix is historical and unmaintained.</li>
+          <li><strong>Broker participation:</strong> IBM MQ and ActiveMQ/Artemis support XA. Kafka has used its own internal 2PC-style protocol for exactly-once transactions since 0.11. <strong>KIP-939</strong> (accepted, targeted at 4.1) lets Kafka act as a <em>participant</em> under an external coordinator — check client and broker versions before relying on it.</li>
+          <li><strong>Formal references:</strong> Gray, <em>Notes on Data Base Operating Systems</em> (1978). Mohan, Lindsay and Obermarck, <em>Transaction Management in the R* Distributed DBMS</em>, ACM TODS 11(4), 1986 — defines presumed abort and presumed commit. <a href="https://arxiv.org/abs/cs/0408036" rel="noopener">Gray &amp; Lamport, <em>Consensus on Transaction Commit</em></a>.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <ul>
+              <li><strong>Mid-1970s:</strong> IBM's IMS and System R make atomic, durable transactions on one machine routine.</li>
+              <li><strong>Then distributed databases (SDD-1, R*)</strong> break that guarantee: a transaction can commit at one site and fail at another.</li>
+              <li><strong>1976 / 1978:</strong> Lampson and Sturgis (Xerox PARC, 1976) and Gray (1978) describe the protocol now called 2PC.</li>
+              <li><strong>1986:</strong> R* refines it with presumed abort and presumed commit to cut log forces and messages.</li>
+              <li><strong>1991:</strong> X/Open standardizes the TM↔RM API as XA, so mixed databases and TP monitors (CICS, Tuxedo, Encina) can interoperate.</li>
+              <li><strong>Before 2PC:</strong> manual reconciliation, batch jobs, and “commit and hope.”</li>
+            </ul>
+          </div>
+        </div>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You need <strong>atomic visibility</strong>: no reader may ever see one side committed and the other not.</li>
+              <li>Every participant is a <strong>system you operate</strong> that can actually prepare: databases and XA-capable brokers, not HTTP APIs.</li>
+              <li>The participant count is <strong>small (2 to a handful)</strong> on a low-latency network, usually one datacenter or region.</li>
+              <li>The coordinator's log can be <strong>durable and highly available</strong>: a persistent volume, a replicated store, or a database engine that does it internally.</li>
+              <li>Your distributed database already runs 2PC internally — you get it with no extra work.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Participants are <strong>microservices owned by other teams</strong>. A prepared transaction in their database holds their locks hostage to your coordinator's uptime.</li>
+              <li>Any participant is a <strong>third-party SaaS or HTTP endpoint</strong>. These have no prepare / commit split.</li>
+              <li>You run on <strong>ephemeral compute</strong> (stateless pods, serverless) with no durable home for the TM log. A lost log means permanently in-doubt transactions.</li>
+              <li>The workload is <strong>write-hot or latency-critical</strong>. Locks are held across at least one network round trip plus two fsyncs, which caps throughput on contended rows.</li>
+              <li><strong>Eventual consistency is acceptable.</strong> Outbox plus idempotent consumers, or a Saga with compensations, removes the coordinator altogether.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>The classic protocol with
+          <span class="term">presumed abort</span>
+          <span class="term__gloss">if no decision record exists, the answer is ABORT — so aborts cost no forced write</span>,
+          the variant most XA implementations use.
+          “<span class="term">Force</span>
+          <span class="term__gloss">fsync to disk before continuing</span>”
+          marks every write that must hit disk before the next message goes out.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Execute.</span> The application does its work on each RM under one XID. Each RM takes locks and writes uncommitted changes as usual.</li>
+          <li><span class="steps__title">Prepare request.</span> The coordinator sends <code>PREPARE(xid)</code> to every participant. Under presumed abort it writes nothing yet.</li>
+          <li><span class="steps__title">Participant vote.</span>
+            <ul>
+              <li><strong>Can commit:</strong> force a <code>PREPARED</code> record (with enough redo/undo to finish either way), keep locks, reply <code>YES</code>.</li>
+              <li><strong>Can't:</strong> abort locally, reply <code>NO</code>, and forget the transaction.</li>
+              <li><strong>Only read data:</strong> reply <code>READ-ONLY</code>, release locks, drop out of phase 2.</li>
+            </ul>
+          </li>
+          <li><span class="steps__title">Decision.</span> All YES → the coordinator <strong>forces</strong> a <code>COMMIT(xid, participants)</code> record. <strong>This fsync is the commit point.</strong> Any NO or a timeout → abort, with no forced write.</li>
+          <li><span class="steps__title">Phase 2.</span> The coordinator sends <code>COMMIT</code> or <code>ABORT</code> to every YES-voter.</li>
+          <li><span class="steps__title">Participant completion.</span> The participant forces a <code>COMMIT</code> record, releases its locks, and sends an <code>ACK</code>. Under presumed abort, ABORT needs no ACK.</li>
+          <li><span class="steps__title">Forget.</span> After all ACKs, the coordinator writes a non-forced <code>END</code> record and can garbage-collect the transaction.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant App as Application
+    participant C as Coordinator (TM)
+    participant A as DB A (RM)
+    participant B as DB B (RM)
+    App->>A: execute work under XID
+    App->>B: execute work under XID
+    App->>C: commit XID
+    C->>A: PREPARE(xid)
+    C->>B: PREPARE(xid)
+    A->>A: force PREPARED, keep locks
+    A-->>C: YES
+    B->>B: force PREPARED, keep locks
+    B-->>C: YES
+    Note over C: force COMMIT(xid, participants) = commit point
+    C-->>App: committed
+    C->>A: COMMIT
+    C->>B: COMMIT
+    A->>A: force COMMIT, release locks
+    A-->>C: ACK
+    B->>B: force COMMIT, release locks
+    B-->>C: ACK
+    Note over C: write END (not forced), forget xid
+          </pre>
+          <figcaption class="diagram__caption">The commit case under presumed abort. The app hears “committed” right after the commit point, but each participant's locks stay held until its COMMIT arrives.</figcaption>
+        </figure>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">What one commit costs, with <em>n</em> participants</p>
+            <ul>
+              <li><strong>4n messages:</strong> prepare, vote, decision, ack.</li>
+              <li><strong>2 round trips.</strong></li>
+              <li><strong>2n + 1 forced writes:</strong> n prepares, 1 decision, n commits.</li>
+              <li>Example, n = 2: 8 messages and 5 fsyncs.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>The participant state machine</h3>
+        <figure class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+    state "PREPARED (in-doubt, locks held)" as PREPARED
+    [*] --> ACTIVE
+    ACTIVE --> ABORTED: vote NO or timeout
+    ACTIVE --> PREPARED: force PREPARED, vote YES
+    PREPARED --> COMMITTED: coordinator says COMMIT
+    PREPARED --> ABORTED: coordinator says ABORT, or no COMMIT record
+    COMMITTED --> [*]
+    ABORTED --> [*]
+          </pre>
+          <figcaption class="diagram__caption">Once in PREPARED, a participant can only leave by hearing the coordinator's decision. “No COMMIT record” means presumed abort.</figcaption>
+        </figure>
+
+        <h3>What recovery does at each crash point</h3>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Crash point</th><th scope="col">Recovery outcome</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Participant crashes before forcing PREPARED</td><td>It restarts with no record of the transaction and aborts. The coordinator times out and aborts.</td></tr>
+              <tr><td>Participant crashes after PREPARED</td><td>It restarts <em>in-doubt</em>. Its locks are reacquired and it asks the coordinator for the outcome.</td></tr>
+              <tr><td>Coordinator crashes before forcing COMMIT</td><td>On restart there is no decision record, so presumed abort applies. Participants that ask are told ABORT.</td></tr>
+              <tr><td>Coordinator crashes after forcing COMMIT</td><td>On restart it re-sends COMMIT until every participant ACKs.</td></tr>
+              <tr><td>Coordinator's log is lost permanently</td><td>Prepared participants are stuck forever. Only an operator
+                <span class="term">heuristic</span>
+                <span class="term__gloss">a manual commit or rollback made without the coordinator's decision</span>
+                decision clears them, and it can break atomicity.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>Presumed commit</strong> is the mirror image:</p>
+        <ul>
+          <li>The coordinator forces a “collecting” record listing the participants <em>before</em> prepare.</li>
+          <li>Commits then need no ACKs; aborts do.</li>
+          <li>Cheaper when commits dominate, but it costs an extra forced write up front.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gain</th><th scope="col">Cost</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Unanimous vote (vs majority)</td><td>Every RM agrees on the outcome — true atomicity.</td><td>Any single RM can veto or stall the transaction, so availability is the product of the participants' availabilities.</td></tr>
+              <tr><td>Single unreplicated coordinator</td><td>Simple; only one decision record to force.</td><td>Blocking: a coordinator crash after votes leaves participants in-doubt. Paxos Commit / Spanner replicate the coordinator to remove this.</td></tr>
+              <tr><td>Prepared state holds locks</td><td>Participants can honor a commit decision no matter when it arrives.</td><td>Lock hold time grows by ≥ 1 RTT + 2 fsyncs. Contention and deadlocks rise with participant count.</td></tr>
+              <tr><td>Presumed abort vs presumed commit</td><td>PA: aborts and read-only branches are nearly free. PC: commits skip ACKs.</td><td>PA: commits still need ACKs. PC: an extra forced write before every transaction.</td></tr>
+              <tr><td>Synchronous phase 2</td><td>Each participant shows the committed data as soon as the client gets success.</td><td>Higher commit latency. Async phase 2 returns sooner, but readers on a lagging participant can briefly see pre-commit state.</td></tr>
+              <tr><td>Heuristic completion (XA)</td><td>An operator can unblock a stuck RM.</td><td>Atomicity is no longer guaranteed: <code>XA_HEURMIX</code> / <code>XA_HEURHAZ</code> outcomes and manual cleanup.</td></tr>
+              <tr><td>2PC vs Saga</td><td>Atomic, isolated, no compensation logic.</td><td>Sagas need no locks across services and tolerate participant outages, but expose intermediate states and need hand-written compensations.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Orphaned prepared transactions in PostgreSQL</p>
+            <p>The TM crashed or lost its log, so rows in <code>pg_prepared_xacts</code> never resolve. They hold locks, block <code>VACUUM</code> from removing dead tuples, and in the extreme push toward XID-wraparound shutdown.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>max_prepared_transactions</code> left at 0, or below <code>max_connections</code></p>
+            <p><code>PREPARE TRANSACTION</code> errors out, or concurrent 2PC traffic fails under load.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Coordinator on ephemeral storage</p>
+            <p>The pod is rescheduled and its TM log vanishes. In-doubt branches pile up on every RM, and nobody can resolve them.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Heuristic mixed outcome</p>
+            <p>A DBA manually commits a branch on one RM while the coordinator decides abort. The data now diverges.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Lock amplification under contention</p>
+            <p>A hot row is held across a cross-AZ round trip, so throughput collapses to roughly 1 / (lock hold time) per row.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">MySQL XA crash bugs on older versions</p>
+            <ul>
+              <li><strong>Before 8.0.30:</strong> a crash during <code>XA PREPARE</code> / <code>XA COMMIT</code> could leave the binary log and InnoDB disagreeing, because prepare was not atomic between the server and the engine.</li>
+              <li><strong>Before 5.7.7:</strong> prepared XA transactions were rolled back on client disconnect.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Timeouts treated as aborts after a YES vote</p>
+            <p>A participant or broker that auto-aborts a prepared branch (Kafka before KIP-939) breaks atomicity silently.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">GID collisions or reuse</p>
+            <p>The TM reuses identifiers across restarts, and recovery commits or rolls back the wrong branch.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <ul>
+          <li><strong>One machine:</strong> a local transaction gets atomicity from one write-ahead log. One fsync of one commit record decides everything.</li>
+          <li><strong>Many machines:</strong> there is no single log, and the machines crash independently.</li>
+          <li><strong>2PC rebuilds the single decision point.</strong> Every participant first reaches a state where it can go <em>either way</em> (prepared). Then the outcome is recorded in exactly one durable place: the coordinator's log.</li>
+          <li><strong>The principles at stake:</strong> atomicity under partial failure, and the fact that a message cannot be un-sent. A participant that commits before it knows everyone else can commit cannot take that commit back.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 250" role="img" aria-labelledby="whyTitle whyDesc" width="640" style="max-width:100%">
+            <title id="whyTitle">Commit-and-hope versus a single decision point</title>
+            <desc id="whyDesc">Left: without 2PC, DB A commits a debit of 100 while DB B crashes before the credit, so 100 disappears and A cannot undo its commit. Right: with 2PC, both databases sit in PREPARED and can go either way until the single COMMIT record in the coordinator's log decides.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- LEFT PANEL -->
+              <text x="20" y="26" fill="var(--text)" font-size="14">Without 2PC: commit, then hope</text>
+              <rect x="20" y="50" width="125" height="64" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="82" y="74" fill="var(--accent)" text-anchor="middle">DB A</text>
+              <text x="82" y="94" fill="var(--text-muted)" font-size="11" text-anchor="middle">debit −100</text>
+              <text x="82" y="108" fill="var(--text-muted)" font-size="11" text-anchor="middle">COMMITTED</text>
+              <rect x="165" y="50" width="125" height="64" rx="8" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="227" y="74" fill="var(--danger)" text-anchor="middle">DB B</text>
+              <text x="227" y="94" fill="var(--text-muted)" font-size="11" text-anchor="middle">crashed before</text>
+              <text x="227" y="108" fill="var(--text-muted)" font-size="11" text-anchor="middle">credit +100</text>
+              <text x="20" y="148" fill="var(--text-muted)" font-size="12">A cannot un-commit:</text>
+              <text x="20" y="166" fill="var(--text-muted)" font-size="12">a message cannot be un-sent.</text>
+              <text x="20" y="200" fill="var(--danger)" font-size="14">Result: 100 disappears</text>
+
+              <line x1="318" y1="16" x2="318" y2="236" stroke="var(--border)"/>
+
+              <!-- RIGHT PANEL -->
+              <text x="340" y="26" fill="var(--text)" font-size="14">With 2PC: one decision point</text>
+              <rect x="412" y="44" width="140" height="44" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="482" y="63" fill="var(--accent)" text-anchor="middle" font-size="12">Coordinator log</text>
+              <text x="482" y="80" fill="var(--text)" text-anchor="middle" font-size="12">COMMIT xid</text>
+              <line x1="460" y1="88" x2="407" y2="122" stroke="var(--text-faint)"/>
+              <line x1="504" y1="88" x2="557" y2="122" stroke="var(--text-faint)"/>
+              <rect x="345" y="122" width="125" height="56" rx="8" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="407" y="145" fill="var(--info)" text-anchor="middle">DB A</text>
+              <text x="407" y="165" fill="var(--text-muted)" font-size="11" text-anchor="middle">PREPARED</text>
+              <rect x="495" y="122" width="125" height="56" rx="8" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="557" y="145" fill="var(--info)" text-anchor="middle">DB B</text>
+              <text x="557" y="165" fill="var(--text-muted)" font-size="11" text-anchor="middle">PREPARED</text>
+              <text x="340" y="206" fill="var(--text-muted)" font-size="12">Both can go either way until the log decides.</text>
+              <text x="340" y="226" fill="var(--text-muted)" font-size="12">After a crash, recovery reads that one log.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The failure 2PC prevents. Commit-and-hope leaves a half-done transfer; 2PC holds everyone in a reversible state until one durable record settles it.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The non-obvious part is the <strong>prepared state</strong>: a participant voluntarily gives up its right to abort on its own. Without that promise the coordinator's decision would only be advice — a participant could still abort later — and atomic commit would be impossible.</p>
+        <p>Alternatives, and why they lost:</p>
+        <ul>
+          <li><strong>One phase (“commit everywhere, then fix up”).</strong> One fewer round trip, but no atomicity. This is the status quo 2PC replaced. Sagas formalize it with compensations.</li>
+          <li><strong>Three-phase commit.</strong> Adds a pre-commit phase so surviving participants can finish without the coordinator. It is non-blocking only if the network is synchronous with bounded delays. Under a network partition, two halves can reach different decisions. It costs an extra round trip and gives up safety in exactly the failures that matter, so production systems rarely use it.</li>
+          <li><strong>Replicate the coordinator (Paxos Commit).</strong> Gray and Lamport show classic 2PC is Paxos Commit with F = 0. With 2F + 1 coordinators it tolerates F failures, keeps the same stable-storage write delay, and spends more messages. Spanner takes this route (each participant and the coordinator are Paxos groups); CockroachDB, YugabyteDB and TiDB do the same with Raft.</li>
+        </ul>
+        <p>So the modern answer to “2PC blocks” is not a different commit protocol. It is a coordinator that cannot disappear.</p>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, 2PC is <strong>moving downward, not dying</strong>:</p>
+        <ul>
+          <li><strong>Losing ground:</strong> application-level XA across mixed systems, replaced by Sagas and the transactional outbox in microservices. It couples availability across team boundaries and does not fit stateless, container-based deployment.</li>
+          <li><strong>Gaining ground:</strong> the core of every distributed SQL engine (Spanner, CockroachDB, YugabyteDB, TiDB, Citus, Vitess), with consensus-replicated coordinators and latency tricks such as Parallel Commits.</li>
+          <li><strong>Coming back:</strong> streaming systems as participants. Kafka's KIP-939 targets the long-standing “write to the database and Kafka atomically” dual-write problem.</li>
+        </ul>
+        <p>If you work with any of these systems, 2PC explains their commit latency, their lock behavior, and their recovery tooling.</p>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify in practice</p>
+            <ul>
+              <li>In PostgreSQL, what does <code>pg_prepared_xacts</code> show after you <code>kill -9</code> the coordinator between <code>PREPARE TRANSACTION</code> and <code>COMMIT PREPARED</code>? How long do locks stay held, and does <code>VACUUM</code> visibly stall?</li>
+              <li>What is the measured commit latency of 2PC versus a local commit on the same hardware — closer to 1 RTT or 2, given that <code>synchronous_commit</code> changes fsync behavior?</li>
+              <li>Does a prepared transaction survive failover to a physical streaming replica, and who resolves it after promotion?</li>
+              <li>How does your TM (Narayana, Atomikos, MSDTC) store its log, and what happens when that log's volume is lost?</li>
+              <li>Under contention on one hot row, how does throughput degrade as you add a second and third participant?</li>
+              <li>If you use Kafka, does your client/broker version actually ship KIP-939's <code>prepareTransaction()</code> / <code>completeTransaction()</code> APIs, and what timeout behavior applies in 2PC mode?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
