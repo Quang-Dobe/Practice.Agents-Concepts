@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autoscaling · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Autoscaling</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Autoscaling</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/autoscaling/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Autoscaling</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Autoscaling is a <strong>closed-loop feedback controller</strong> for compute capacity.</p>
+        <ul>
+          <li>It resizes a workload either by <strong>replica count</strong> (horizontal) or by <strong>per-replica resources</strong> (vertical).</li>
+          <li>Its goal: keep an observed metric near a <strong>setpoint</strong>, inside operator-set bounds <code>[min, max]</code>.</li>
+          <li>In control terms: the <em>plant</em> is your fleet, the <em>sensor</em> is a metrics pipeline, and the <em>actuator</em> is a provisioning API (launch VM, create pod, patch resources).</li>
+          <li>The system has a lot of
+            <span class="term">dead time</span>
+            <span class="term__gloss">the delay between asking for capacity and that capacity serving traffic</span>:
+            capacity requested now is useful only after boot, image pull, and readiness.</li>
+          <li>Scope: cloud VM groups and Kubernetes workloads, not storage auto-growth.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Scaling target</dt><dd>The thing being resized: an AWS Auto Scaling Group, Azure Virtual Machine Scale Set, GCP Managed Instance Group, or a Kubernetes <code>Deployment</code> / <code>StatefulSet</code> via its <code>/scale</code> subresource.</dd></div>
+          <div><dt>Metric source</dt><dd>Where the signal comes from: CloudWatch, Azure Monitor, Cloud Monitoring, or the Kubernetes aggregated APIs <code>metrics.k8s.io</code> (usually metrics-server), <code>custom.metrics.k8s.io</code>, and <code>external.metrics.k8s.io</code>.</dd></div>
+          <div><dt>Policy</dt><dd>The control law. Target tracking (hold metric at X), step/threshold rules (if metric &gt; X add N), scheduled (cron-like), or predictive (forecast-driven).</dd></div>
+          <div><dt>Bounds</dt><dd><code>min</code>, <code>max</code>, and the current <code>desired</code> count. Bounds are the only hard guarantee you get. Everything else is best effort.</dd></div>
+          <div><dt>Damping</dt><dd>Cooldowns, warmup periods, stabilization windows, and tolerance bands. They stop oscillation in a system with lag.</dd></div>
+          <div><dt>Lifecycle hooks</dt><dd>ASG lifecycle hooks, Kubernetes <code>preStop</code>, <code>terminationGracePeriodSeconds</code>, PodDisruptionBudgets. They make adding and removing capacity safe.</dd></div>
+          <div><dt>Layered controllers (Kubernetes)</dt><dd>Pod-level (HPA, VPA, KEDA) and node-level (Cluster Autoscaler, Karpenter) controllers that cooperate <em>only</em> through the scheduler's "Pending pod" signal.</dd></div>
+        </dl>
+
+        <h3>Its neighbours</h3>
+        <p>Autoscaling sits in the <strong>elasticity / capacity management</strong> family:</p>
+        <ul>
+          <li><strong>Capacity planning</strong>: offline and human-driven.</li>
+          <li><strong>Load balancing</strong>: spreads load across the capacity you already have.</li>
+          <li><strong>Admission control / load shedding</strong>: rejects work when capacity runs out.</li>
+          <li><strong>Serverless</strong> (AWS Lambda, Cloud Run, Azure Container Apps): autoscaling with the knobs hidden. Per-request or per-concurrency scaling, including to zero.</li>
+          <li><strong>Rate limiting</strong> (closest sibling): caps demand instead of growing supply.</li>
+          <li><strong>Queue-based load leveling</strong> (closest sibling): absorbs bursts in a buffer so the consumer fleet can scale more slowly.</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Autoscaling is an <strong>infrastructure control-plane</strong> concern. It sits <em>outside</em> the request path: no request ever passes through an autoscaler.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">On VMs</div><p>A regional cloud-provider service that calls the compute API.</p></div>
+          <div class="card"><div class="card__title">Kubernetes HPA</div><p>Runs inside <code>kube-controller-manager</code>.</p></div>
+          <div class="card"><div class="card__title">VPA and KEDA</div><p>Run as in-cluster operators.</p></div>
+          <div class="card"><div class="card__title">Cluster Autoscaler / Karpenter</div><p>In-cluster controllers that call the cloud provider's node APIs.</p></div>
+        </div>
+        <p>Your app takes part only by exposing honest metrics, starting fast, having correct readiness probes, and shutting down gracefully.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph RP["Request path"]
+      U["Users"] --> LB["Load balancer"] --> W["Pods / VMs"]
+    end
+    subgraph CP["Control plane: outside the request path"]
+      MS["Metrics: CloudWatch, Azure Monitor, metrics-server, adapters"] --> PL["Pod layer: HPA, VPA, KEDA"]
+      PL -. "Pending pods" .-> NL["Node layer: Cluster Autoscaler, Karpenter"]
+    end
+    W -. "metrics" .-> MS
+    PL -- "replica count via /scale" --> W
+    NL -- "cloud node APIs" --> N["New nodes / VMs"]
+    N --> W
+          </pre>
+          <figcaption class="diagram__caption">Traffic never flows through the autoscaler. It reads metrics on the side and writes a number; in Kubernetes the pod layer and node layer meet only through Pending pods.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <ul>
+          <li><strong>EC2 Auto Scaling groups</strong> behind an Application Load Balancer, with target tracking on <code>ASGAverageCPUUtilization</code> or <code>ALBRequestCountPerTarget</code>.</li>
+          <li><strong>Kubernetes HPA</strong> on stateless API Deployments. The most common autoscaler in container platforms.</li>
+          <li><strong>KEDA</strong> on queue consumers (SQS, Kafka, RabbitMQ, Azure Service Bus). Azure Container Apps uses KEDA scale rules as its native scaling model.</li>
+          <li><strong>Karpenter</strong> on EKS (including EKS Auto Mode) and on AKS through Node Auto Provisioning.</li>
+          <li><strong>Knative / Cloud Run</strong> for request-concurrency scaling with scale-to-zero.</li>
+          <li><strong>AWS Application Auto Scaling</strong> for non-EC2 targets: ECS services, DynamoDB capacity, Lambda provisioned concurrency.</li>
+        </ul>
+
+        <h3>Ecosystem and tooling</h3>
+        <dl class="vocab">
+          <div><dt>VM-level autoscalers</dt><dd>AWS EC2 Auto Scaling, Azure Monitor autoscale for VMSS, GCP MIG autoscaler.</dd></div>
+          <div><dt>Pod replica count</dt><dd>HPA (<code>autoscaling/v2</code>, GA since Kubernetes 1.23), KEDA (CNCF graduated project), Knative Pod Autoscaler (KPA).</dd></div>
+          <div><dt>Pod right-sizing</dt><dd>VPA (from the <code>kubernetes/autoscaler</code> repo), in-place resize via the <code>/resize</code> subresource.</dd></div>
+          <div><dt>Node provisioning</dt><dd>Cluster Autoscaler (node-group based), Karpenter (group-less, <code>NodePool</code> + provider-specific node class), GKE node auto-provisioning.</dd></div>
+          <div><dt>Metrics plumbing</dt><dd>metrics-server, Prometheus Adapter, KEDA's metrics adapter, cloud-native monitoring services.</dd></div>
+          <div><dt>Proactive capacity</dt><dd>EC2 predictive scaling and warm pools, Azure predictive autoscale, GCP predictive autoscaling, scheduled actions on all three.</dd></div>
+        </dl>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <ul>
+              <li><strong>Before elastic clouds:</strong> capacity was a buying problem. You bought servers for forecast peak plus headroom, and they sat idle most of the day.</li>
+              <li><strong>May 17, 2009:</strong> AWS ships Auto Scaling, CloudWatch, and Elastic Load Balancing <em>together</em>. The bundle is the lesson: autoscaling needs a sensor (metrics) and a way to make new instances useful at once (a load balancer), or it is pointless.</li>
+              <li><strong>Kubernetes HPA</strong> arrived early in the project's life. <code>autoscaling/v2</code> went GA in <strong>1.23</strong>, adding multiple metrics and the <code>behavior</code> block.</li>
+              <li><strong>April 2021:</strong> AWS warm pools. <strong>May 2021:</strong> native predictive scaling. Both fight dead time.</li>
+              <li><strong>November 2021:</strong> Karpenter appears; <a href="https://aws.amazon.com/blogs/containers/announcing-karpenter-1-0" rel="noopener">1.0 in August 2024</a>. It was built because node-group-based Cluster Autoscaler was slow and rigid about instance types.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Peak-to-trough load ratio is large (roughly 2x or more) and recurs, so fixed peak provisioning wastes real money.</li>
+              <li>The workload is stateless or its state lives elsewhere, so a new replica is useful the moment it passes readiness.</li>
+              <li>Replica startup is well below the time load takes to ramp, so capacity arrives before the spike is over.</li>
+              <li>You have a metric that tracks demand roughly linearly per replica: requests per target, queue lag per consumer, concurrency.</li>
+              <li>Workers drain a queue, where backlog and latency tolerance make reactive scaling safe.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The workload is stateful with expensive rebalancing (database primaries, Kafka brokers, Elasticsearch data nodes). Each scale event is a data migration.</li>
+              <li>Load is flat. A fixed fleet plus reserved or committed-use pricing is cheaper and has fewer moving parts.</li>
+              <li>Spikes are shorter than provisioning dead time. Use over-provisioning, warm pools, or scheduled scaling instead.</li>
+              <li>The bottleneck is a shared downstream (DB connections, a licensed API). Scaling callers amplifies contention.</li>
+              <li>Each replica carries a large fixed overhead (JVM warmup, model load onto a GPU). Scale churn costs more than it saves unless the cycles are long.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+
+        <h3>1 · The Kubernetes HPA control loop</h3>
+        <p>Every <strong>15 s</strong> (<code>--horizontal-pod-autoscaler-sync-period</code>) the controller runs these steps (<a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/" rel="noopener">docs</a>):</p>
+        <ol class="steps">
+          <li><span class="steps__title">Fetch per-pod metrics.</span> CPU utilization is measured <em>relative to the container's resource request</em>. No request means no CPU-based scaling.</li>
+          <li><span class="steps__title">Exclude unready pods.</span> Skip pods that are not ready, still initializing (<code>--horizontal-pod-autoscaler-cpu-initialization-period</code>, default <strong>5 min</strong>; <code>--horizontal-pod-autoscaler-initial-readiness-delay</code>, default <strong>30 s</strong>), or missing metrics.</li>
+          <li><span class="steps__title">Compute the proportional answer.</span> <code>desiredReplicas = ceil(currentReplicas × currentMetric / targetMetric)</code>. Example: 4 replicas at 90% CPU with a 60% target gives <code>ceil(4 × 1.5) = 6</code>.</li>
+          <li><span class="steps__title">Check the tolerance band.</span> Skip the change if the ratio sits inside the
+            <span class="term">tolerance band</span>
+            <span class="term__gloss">a dead zone around the target where small wobbles are ignored</span>
+            (default 0.1, so 0.9–1.1). Per-HPA <code>tolerance</code> in <code>behavior.scaleUp</code>/<code>scaleDown</code>: alpha in 1.33, beta in 1.35, <a href="https://www.kubernetes.dev/resources/keps/4951/" rel="noopener">GA in 1.37</a>.</li>
+          <li><span class="steps__title">Re-run conservatively for excluded pods.</span> Scaling up: missing pods count as 0% usage. Scaling down: they count as 100%. This dampens the move in either direction.</li>
+          <li><span class="steps__title">Take the max across metrics.</span> With several metrics, compute one recommendation per metric and take the <strong>maximum</strong>.</li>
+          <li><span class="steps__title">Apply <code>behavior</code>.</span> Default scale-up: 0 s window, allows the larger of +100% or +4 pods per 15 s. Default scale-down: a <strong>300 s</strong>
+            <span class="term">stabilization window</span>
+            <span class="term__gloss">a look-back period; the HPA uses the highest recommendation seen in it</span>
+            (the highest recommendation in the last 5 min), and up to −100% per 15 s.</li>
+          <li><span class="steps__title">Clamp and write.</span> Clamp to <code>[minReplicas, maxReplicas]</code> and write the result to <code>/scale</code>.</li>
+        </ol>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 230" role="img" aria-labelledby="hpaTitle hpaDesc" width="560" style="max-width:100%">
+            <title id="hpaTitle">HPA proportional formula, worked example</title>
+            <desc id="hpaDesc">Four pods each at 90 percent CPU against a 60 percent target give a ratio of 1.5, outside the 0.9 to 1.1 tolerance band. The HPA computes ceil of 4 times 1.5 equals 6, and six pods then each run at 60 percent.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+              <!-- left group: 4 pods at 90% -->
+              <text x="20" y="22" fill="var(--text-muted)">Before: 4 pods at 90%</text>
+              <line x1="20" y1="170" x2="190" y2="170" stroke="var(--border)"/>
+              <rect x="24"  y="62" width="32" height="108" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <rect x="66"  y="62" width="32" height="108" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <rect x="108" y="62" width="32" height="108" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <rect x="150" y="62" width="32" height="108" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="103" y="54" fill="var(--danger)" text-anchor="middle">90% each</text>
+              <!-- middle: math -->
+              <text x="275" y="80" fill="var(--text)" text-anchor="middle" font-size="13">ratio = 90 / 60 = 1.5</text>
+              <text x="275" y="100" fill="var(--text-faint)" text-anchor="middle">outside 0.9–1.1 → act</text>
+              <text x="275" y="124" fill="var(--accent)" text-anchor="middle" font-size="13">ceil(4 × 1.5) = 6</text>
+              <line x1="215" y1="140" x2="330" y2="140" stroke="var(--accent)" stroke-width="2"/>
+              <path d="M330,134 L342,140 L330,146 Z" fill="var(--accent)"/>
+              <!-- right group: 6 pods at 60% -->
+              <text x="352" y="22" fill="var(--text-muted)">After: 6 pods at 60%</text>
+              <line x1="352" y1="170" x2="548" y2="170" stroke="var(--border)"/>
+              <rect x="356" y="98" width="26" height="72" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="388" y="98" width="26" height="72" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="420" y="98" width="26" height="72" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="452" y="98" width="26" height="72" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="484" y="98" width="26" height="72" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="516" y="98" width="26" height="72" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <!-- target line across both groups -->
+              <line x1="20" y1="98" x2="190" y2="98" stroke="var(--info)" stroke-dasharray="5 4"/>
+              <line x1="352" y1="98" x2="548" y2="98" stroke="var(--info)" stroke-dasharray="5 4"/>
+              <text x="450" y="90" fill="var(--info)" text-anchor="middle">target 60%</text>
+              <text x="20" y="200" fill="var(--text-faint)">Same total work, spread over more pods. Bar height = CPU as a share of the request.</text>
+              <text x="20" y="218" fill="var(--text-faint)">Then: clamp to [minReplicas, maxReplicas] and write to /scale.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The proportional rule in one picture: the correction grows with fleet size, and nothing happens inside the 0.9–1.1 band.</figcaption>
+        </figure>
+
+        <h3>2 · Pod scaling and node scaling stack up</h3>
+        <p>HPA only changes a number. The scheduler then tries to place the new pods. If they stay <code>Pending</code> for lack of room, the node layer reacts:</p>
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant MS as metrics-server
+    participant H as HPA
+    participant D as Deployment
+    participant S as Scheduler
+    participant N as Cluster Autoscaler or Karpenter
+    participant C as Cloud API
+    participant LB as Load balancer
+    Note over MS: load rises, scraped every 60s by default, often set to 15s
+    MS->>H: per-pod metrics (HPA tick, 15s or less)
+    H->>D: replicas up via /scale
+    D->>S: new pods to place
+    S->>S: no room, pods stay Pending
+    N->>S: scan every 10s, find Pending pods
+    N->>C: CA simulates on node-group templates, Karpenter bin-packs onto a chosen instance type
+    C-->>S: VM boots, kubelet joins
+    S->>D: pod placed, image pulled, pod Ready
+    D->>LB: endpoint added, traffic flows
+          </pre>
+          <figcaption class="diagram__caption">Total reaction time is the sum of every lag on this path. A pod-only scale-up can finish in seconds; one that needs a new node commonly takes minutes.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>Cluster Autoscaler defaults</strong> (<a href="https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md" rel="noopener">FAQ</a>): scans every <strong>10 s</strong>; a node becomes a scale-down candidate below <strong>50%</strong> requested utilization for <strong>10 min</strong>; there is a <strong>10 min</strong> delay after a scale-up before any scale-down.</li>
+          <li><strong>Karpenter</strong> drops node groups for direct instance selection and
+            <span class="term">consolidation</span>
+            <span class="term__gloss">replacing or deleting under-used nodes to pack pods tighter</span>.
+            Its disruption budgets default to <strong>10%</strong> of nodes at a time.</li>
+        </ul>
+
+        <h3>3 · VM autoscalers</h3>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">AWS EC2 Auto Scaling</div>
+            <ul>
+              <li>Target tracking creates two CloudWatch alarms for you.</li>
+              <li>Commonly reported: 3 consecutive 1-minute breaches to scale out, 15 to scale in. Same up-fast/down-slow asymmetry.</li>
+              <li>New instances stay out of the group metric until the <strong>default instance warmup</strong> expires.</li>
+              <li>Legacy <strong>default cooldown = 300 s</strong>, applies only to simple scaling policies (<a href="https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-scaling-cooldowns.html" rel="noopener">docs</a>).</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">GCP Managed Instance Groups</div>
+            <ul>
+              <li><strong>60 s</strong> default initialization period.</li>
+              <li><strong>10 min</strong> scale-in stabilization period that sizes for the <em>peak</em> load in that window.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">Azure Monitor autoscale</div>
+            <ul>
+              <li>Threshold rules with per-rule cooldowns (<strong>5 min</strong> in Microsoft's examples).</li>
+              <li>Before a scale-in, checks whether it would immediately trigger a scale-out.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>4 · Event-driven and scale-to-zero</h3>
+        <ul>
+          <li><strong>KEDA</strong> polls each trigger every <strong>30 s</strong> by default. It handles the 0↔1 step itself and hands 1↔N to an HPA it generates. Its <code>cooldownPeriod</code> (default <strong>300 s</strong>) applies only to the final drop to zero.</li>
+          <li><strong>Core HPA scale-to-zero</strong> (<code>HPAScaleToZero</code>, object/external metrics only): alpha from 1.16, <a href="https://kubernetes.io/blog/2026/09/02/kubernetes-v1-37-hpa-scale-to-zero-beta/" rel="noopener">beta and on by default in 1.37</a>.</li>
+          <li><strong>Knative KPA</strong> scales on in-flight concurrency (target <strong>100 per pod</strong> by default). It averages over a <strong>60 s</strong> stable window and switches to a <strong>6 s</strong>
+            <span class="term">panic window</span>
+            <span class="term__gloss">a short look-back used to react fast to a sudden burst</span>
+            when the short-window load hits <strong>200%</strong> of target.</li>
+        </ul>
+
+        <h3>5 · Vertical</h3>
+        <ul>
+          <li>VPA's recommender builds histograms of observed usage and proposes requests.</li>
+          <li>Historically the updater <em>evicted</em> pods to apply new values.</li>
+          <li>In-place pod resize went <a href="https://kubernetes.io/blog/2025/12/19/kubernetes-v1-35-in-place-pod-resize-ga/" rel="noopener">GA in Kubernetes 1.35</a>.</li>
+          <li>VPA's <code>InPlaceOrRecreate</code> mode patches <code>/resize</code> first and evicts only when the node lacks room.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Horizontal over vertical</td><td>No restart, fault isolation, effectively unbounded ceiling</td><td>Requires statelessness. Per-replica fixed overhead multiplies</td></tr>
+              <tr><td>Utilization metric (CPU) over demand metric (RPS, queue lag)</td><td>Zero setup, always available</td><td>Indirect. CPU saturates late for I/O-bound services and lies under throttling</td></tr>
+              <tr><td>Low target (e.g. 50%) over high (e.g. 80%)</td><td>Headroom that absorbs the spike while new capacity boots</td><td>You pay for roughly 30% more idle capacity all the time</td></tr>
+              <tr><td>Fast scale-up, slow scale-in (the default everywhere)</td><td>Under-provisioning, which is the expensive error, is short</td><td>Paying for capacity for 5–15 min after the peak</td></tr>
+              <tr><td>Reactive over predictive</td><td>No training data needed, handles novel spikes</td><td>Always one dead-time behind the curve</td></tr>
+              <tr><td>Predictive / scheduled</td><td>Capacity ready before the ramp</td><td>Needs ≥7–14 days of cyclical history. Wrong on anomalies</td></tr>
+              <tr><td>Node groups (CA) over group-less (Karpenter)</td><td>Predictable instance types, simpler quota and governance</td><td>Slower, worse bin-packing, one group per shape</td></tr>
+              <tr><td>Scale to zero</td><td>Zero idle cost, important for GPUs</td><td>Cold-start latency on the first request</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Flapping</p>
+            <p>Replica count swings every few minutes. Cause: scale-in raises per-replica load past the scale-out threshold. The band between thresholds, or the stabilization window, is too narrow.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">HPA does nothing</p>
+            <p><code>&lt;unknown&gt;/60%</code> in <code>kubectl get hpa</code>. Cause: containers lack CPU requests, or metrics-server / the adapter is not installed.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Spike outruns capacity</p>
+            <p>5xx errors for minutes, then recovery once the incident is over. Cause: the spike is shorter than boot time plus metric lag. No headroom or warm pool.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Pods Pending forever</p>
+            <ul>
+              <li><code>maxReplicas</code> above what node <code>max</code> or cloud quota allows.</li>
+              <li>Instance-type stockout.</li>
+              <li>Node selectors that no node group satisfies.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Dropped requests on scale-in</p>
+            <p>Cause: no <code>preStop</code> delay or connection draining, so the pod dies before the LB stops routing to it. Or <code>terminationGracePeriodSeconds</code> (30 s default) is shorter than in-flight work.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Scale-out makes it worse</p>
+            <p>Cause: the shared database hits its connection ceiling. Every new replica opens another pool.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Nodes never scale in</p>
+            <p>Cause: pods with <code>emptyDir</code>/local storage, strict PDBs, or <code>safe-to-evict: "false"</code> pin the node. Cluster Autoscaler skips them.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">HPA and VPA fight</p>
+            <p>Cause: both act on CPU for the same workload. VPA raises requests, utilization drops, HPA scales in, and the cycle repeats.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Retry storm feedback</p>
+            <p>Cause: client retries inflate RPS during an outage. The autoscaler scales on self-made load and runs out of <code>max</code>.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Two first-principles costs pull in opposite directions:</p>
+        <ul>
+          <li><strong>Cost of idle capacity:</strong> linear in time × provisioned units.</li>
+          <li><strong>Cost of too little capacity:</strong> latency, errors, lost revenue. These grow non-linearly once queues form.</li>
+          <li><strong>Queueing theory makes the second one steep:</strong> as utilization nears 100%, wait time grows without bound. You cannot simply run hot.</li>
+          <li><strong>Static provisioning</strong> fixes one point on that curve for all hours. <strong>Autoscaling</strong> moves the operating point with demand.</li>
+        </ul>
+        <p>That turns capacity from a capital-planning decision into a runtime control problem. Elastic, per-second-billed cloud infrastructure made it possible.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 240" role="img" aria-labelledby="qTitle qDesc" width="560" style="max-width:100%">
+            <title id="qTitle">Wait time versus utilization</title>
+            <desc id="qDesc">A queueing curve stays nearly flat at low utilization and shoots up without bound as utilization approaches 100 percent. Low utilization means paying for idle capacity; high utilization means queues and errors. A shaded band from 50 to 80 percent marks typical autoscaling targets.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+              <!-- band 50%..80% -->
+              <rect x="275" y="20" width="135" height="170" fill="var(--accent-soft)" stroke="none"/>
+              <text x="342" y="36" fill="var(--accent)" text-anchor="middle">typical targets</text>
+              <text x="342" y="50" fill="var(--accent)" text-anchor="middle">50%–80%</text>
+              <!-- axes -->
+              <line x1="50" y1="190" x2="520" y2="190" stroke="var(--border)"/>
+              <line x1="50" y1="20" x2="50" y2="190" stroke="var(--border)"/>
+              <line x1="500" y1="20" x2="500" y2="190" stroke="var(--danger)" stroke-dasharray="4 4"/>
+              <text x="50"  y="206" fill="var(--text-faint)" text-anchor="middle">0%</text>
+              <text x="275" y="206" fill="var(--text-faint)" text-anchor="middle">50%</text>
+              <text x="410" y="206" fill="var(--text-faint)" text-anchor="middle">80%</text>
+              <text x="500" y="206" fill="var(--danger)" text-anchor="middle">100%</text>
+              <text x="285" y="228" fill="var(--text-muted)" text-anchor="middle">utilization per replica →</text>
+              <text x="44" y="16" fill="var(--text-muted)">wait time ↑</text>
+              <!-- curve ~ 1/(1-rho) -->
+              <polyline fill="none" stroke="var(--text)" stroke-width="2.2"
+                points="50,190 185,186.6 275,182 320,178 365,171 410,158 432,144.6 455,118 464,98 473,64 478,38 482,20"/>
+              <!-- regions -->
+              <text x="70" y="150" fill="var(--warn)">too cold: you pay</text>
+              <text x="70" y="164" fill="var(--warn)">for idle machines</text>
+              <text x="438" y="80" fill="var(--danger)" text-anchor="end">too hot: queues form,</text>
+              <text x="438" y="94" fill="var(--danger)" text-anchor="end">wait time explodes</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The failure autoscaling prevents: you can't run near 100% because wait time has no ceiling there, and you can't sit at a low fixed level because idle machines cost money all day.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <ul>
+          <li><strong>Proportional target tracking, not threshold steps or full PID.</strong>
+            <ul>
+              <li>Step rules ("if CPU &gt; 70% add 2") need hand-tuned step sizes per fleet size and oscillate easily.</li>
+              <li>A full PID controller has derivative terms that amplify noisy metrics, and integral windup during long boot dead time.</li>
+              <li>The proportional formula <code>ceil(n × actual/target)</code> scales the correction with fleet size. The tolerance band plus stabilization windows replace the damping a PID would give.</li>
+            </ul>
+            <p><em>This is an engineering reading of the design, not a quote from the Kubernetes or AWS docs.</em></p>
+          </li>
+          <li><strong>Asymmetric damping.</strong> Scale-up reacts at once; scale-in waits 5–15 minutes. The two errors are not equal: an under-provisioned minute gives user-visible errors, an over-provisioned minute costs cents. Scale-in also destroys state: in-flight requests, caches, warmed JITs.</li>
+          <li><strong>Separate pod and node controllers, not one global optimizer.</strong> Kubernetes splits "how many pods" from "how many machines" and links them only through the <code>Pending</code> state.
+            <ul>
+              <li>One joint controller could react faster and pack better, but it would couple every workload policy to every cloud's instance catalogue.</li>
+              <li>The split lets HPA, KEDA, and VPA evolve apart from Cluster Autoscaler or Karpenter, at the cost of stacked latency.</li>
+              <li>Karpenter narrows the gap by provisioning straight from pending-pod requirements instead of fixed node-group templates.</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <ul>
+          <li>In 2026 the cost pressure has moved to <strong>accelerated compute</strong>. An idle GPU node costs many times more per hour than an idle general-purpose VM, and LLM inference load is bursty.</li>
+          <li>Kubernetes responded within the last year: in-place pod resize GA (1.35, December 2025); per-HPA tolerance GA and HPA scale-to-zero beta-by-default (both 1.37, August 2026).</li>
+          <li>Karpenter-style group-less provisioning is now the managed default on EKS Auto Mode and AKS Node Auto Provisioning.</li>
+          <li>The field is <strong>changing, not stable</strong>. CPU-based HPA is giving way to demand signals (queue depth, concurrency, tokens in flight) and to combined predictive-plus-reactive policies.</li>
+        </ul>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify in practice</p>
+            <ul>
+              <li>What is the real end-to-end scale-out latency for <em>my</em> workload, from load step to new pod <code>Ready</code> and receiving traffic, with and without a new node? Which stage dominates?</li>
+              <li>Does my metric scale linearly with replicas? Double the load at fixed replicas and check whether <code>actual/target</code> predicts the needed count.</li>
+              <li>On scale-in, are any requests dropped? Load-test while forcing scale-down and inspect LB 5xx and client errors.</li>
+              <li>What does the default 300 s scale-down window cost per day for my traffic shape, and is a per-HPA <code>tolerance</code> or shorter window safe?</li>
+              <li>Which pods pin nodes and block Cluster Autoscaler / Karpenter scale-in (<code>emptyDir</code>, PDBs, annotations)?</li>
+              <li>If a dependency fails and clients retry, does the autoscaler run straight to <code>maxReplicas</code>, and what does that cost?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

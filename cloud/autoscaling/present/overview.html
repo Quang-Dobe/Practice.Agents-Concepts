@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autoscaling · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Autoscaling</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Autoscaling</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/autoscaling/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Autoscaling</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Traffic is never flat. It is quiet at 3 a.m., busy at 9 a.m., and it spikes when marketing sends an email. Provision for the peak and you pay for idle machines most of the day. Provision for the average and the site falls over at the peak.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Autoscaling closes that gap. It is a
+              <span class="term">control loop</span>
+              <span class="term__gloss">a program that measures, compares to a goal, acts, and repeats forever</span>:
+              a controller measures load every few seconds, compares it to a target you set ("keep average CPU near 60%"), and changes the number or size of instances to stay near that target.</p>
+            <p>The hard part is not the loop. It is choosing the right signal and stopping the loop from overreacting.</p>
+            <p><em>Scope:</em> cloud and Kubernetes compute scaling, not database storage auto-growth.</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a supermarket with a manager watching the checkout lines.</p>
+        <ul>
+          <li><strong>The signal</strong> is line length. The manager doesn't guess, they look.</li>
+          <li><strong>The target</strong> is the rule: "no more than three people per lane."</li>
+          <li><strong>
+            <span class="term">Scale out</span></strong>
+            <span class="term__gloss">add more copies of the thing doing the work</span>:
+            lines get long, so the manager calls staff from the back room to open more lanes.</li>
+          <li><strong>Scale in</strong>: it's quiet, so lanes close and staff go home (and stop being paid).</li>
+          <li><strong>Warm-up lag</strong> is the catch. A new cashier needs a couple of minutes to log in and count the drawer, so a sudden rush still hurts briefly.</li>
+          <li><strong>
+            <span class="term">Cooldown</span></strong>
+            <span class="term__gloss">a forced wait between scaling actions</span>
+            keeps the manager from opening and closing the same lane every 30 seconds just because the line wobbles between two and four people.</li>
+        </ul>
+        <p>That loop is autoscaling: <strong>measure → compare to target → adjust → wait → repeat.</strong></p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["Autoscaler"] -- "desired count" --> F["Instances / Pods"]
+    F -- "serve traffic" --> T(("Users"))
+    F -- "metric: CPU, queue depth, RPS" --> A
+    P["Your policy: target + min/max bounds + cooldown"] --> A
+          </pre>
+          <figcaption class="diagram__caption">The loop from the doc's sketch: the fleet reports a metric, the autoscaler compares it with your policy, and sends back a new desired count.</figcaption>
+        </figure>
+
+        <h3>Why bother: fixed fleet vs autoscaled fleet</h3>
+        <figure class="diagram">
+          <svg viewBox="0 0 560 240" role="img" aria-labelledby="dayTitle dayDesc" width="560" style="max-width:100%">
+            <title id="dayTitle">One day of traffic against two ways of provisioning</title>
+            <desc id="dayDesc">A traffic curve is low at 3 a.m., rises by 9 a.m., and spikes mid-afternoon after a marketing email. A flat line at the peak shows fixed provisioning with lots of idle capacity. A stepped line hugs the traffic curve to show autoscaled capacity, which briefly falls short during the spike because of warm-up lag.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+              <!-- axes -->
+              <line x1="40" y1="190" x2="540" y2="190" stroke="var(--border)"/>
+              <line x1="40" y1="20" x2="40" y2="190" stroke="var(--border)"/>
+              <text x="40" y="206" fill="var(--text-faint)" text-anchor="middle">0h</text>
+              <text x="102" y="206" fill="var(--text-faint)" text-anchor="middle">3am</text>
+              <text x="227" y="206" fill="var(--text-faint)" text-anchor="middle">9am</text>
+              <text x="365" y="206" fill="var(--text-faint)" text-anchor="middle">3pm</text>
+              <text x="540" y="206" fill="var(--text-faint)" text-anchor="middle">24h</text>
+              <!-- fixed peak line -->
+              <line x1="40" y1="38" x2="540" y2="38" stroke="var(--danger)" stroke-dasharray="6 4"/>
+              <text x="530" y="32" fill="var(--danger)" text-anchor="end">fixed fleet sized for the peak</text>
+              <!-- traffic curve -->
+              <path d="M40,170 C70,175 90,182 102,180 C150,176 190,100 227,82 C260,72 300,92 340,98 C352,100 358,46 365,45 C372,46 376,92 390,98 C420,110 470,150 540,166"
+                    fill="none" stroke="var(--text-muted)" stroke-width="2"/>
+              <!-- autoscaled stepped capacity -->
+              <path d="M40,160 H150 V140 H190 V100 H215 V70 H372 V40 H430 V85 H470 V120 H500 V150 H540"
+                    fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+              <!-- lag marker -->
+              <rect x="352" y="40" width="20" height="32" fill="var(--danger-soft)" stroke="none"/>
+              <text x="382" y="58" fill="var(--danger)">← warm-up lag: capacity</text>
+              <text x="396" y="72" fill="var(--danger)">is short for a moment</text>
+              <!-- idle label -->
+              <text x="48" y="62" fill="var(--text-faint)">idle capacity you pay for</text>
+              <text x="48" y="76" fill="var(--text-faint)">with a fixed fleet</text>
+              <!-- legend -->
+              <line x1="60" y1="226" x2="84" y2="226" stroke="var(--text-muted)" stroke-width="2"/>
+              <text x="90" y="230" fill="var(--text-muted)">traffic</text>
+              <line x1="160" y1="226" x2="184" y2="226" stroke="var(--accent)" stroke-width="2.5"/>
+              <text x="190" y="230" fill="var(--text-muted)">autoscaled capacity</text>
+              <line x1="330" y1="226" x2="354" y2="226" stroke="var(--danger)" stroke-dasharray="6 4"/>
+              <text x="360" y="230" fill="var(--text-muted)">fixed peak capacity</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A fixed fleet pays for the worst hour all day. Autoscaled capacity follows the curve, but it always lags a little behind a sudden spike.</figcaption>
+        </figure>
+
+        <h3>Horizontal vs vertical</h3>
+        <ul>
+          <li><strong>
+            <span class="term">Horizontal scaling</span></strong>
+            <span class="term__gloss">changing how many instances you run</span>
+            is hiring more cashiers (more copies).</li>
+          <li><strong>
+            <span class="term">Vertical scaling</span></strong>
+            <span class="term__gloss">changing how big each instance is</span>
+            is giving one cashier a faster scanner (a bigger machine).</li>
+          <li>Most cloud autoscaling is horizontal, because adding copies doesn't need a restart.</li>
+        </ul>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not load balancing.</strong> A load balancer spreads traffic across the instances you already have. Autoscaling decides how many instances exist.</li>
+              <li><strong>Not high availability by itself.</strong> Spreading replicas across zones protects you from a failure. Autoscaling only reacts to load, and only after a delay.</li>
+              <li><strong>Not instant.</strong> A new VM can take minutes to boot. A new pod can take seconds, or minutes if a new node has to come up first.</li>
+              <li><strong>Not a fix for a slow app.</strong> If one request holds a database lock, ten more replicas just wait on the same lock.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Traffic follows a daily or weekly pattern and you pay for peak capacity around the clock.</li>
+              <li>Workers pull from a queue (SQS, Kafka, RabbitMQ) and the backlog grows and shrinks.</li>
+              <li>You run stateless web or API services behind a load balancer.</li>
+              <li>Unpredictable spikes (a launch, a viral post) would otherwise mean someone gets paged to add servers by hand.</li>
+              <li>You run a Kubernetes cluster where pods come and go and the nodes underneath should follow them.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The system is stateful and a new node needs a large data rebalance (a primary database, a Kafka broker). That takes planning, not a reflex.</li>
+              <li>Load is flat and predictable, so a fixed fleet is simpler and just as cheap.</li>
+              <li>Startup time is longer than your spikes. The spike is over before capacity arrives, so pre-warm or schedule capacity instead.</li>
+              <li>A downstream dependency has a hard ceiling (a licensed API, a database connection limit). More callers just move the failure downstream.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Horizontal / vertical scaling</dt><dd>Horizontal changes the number of instances. Vertical changes the size of each one.</dd></div>
+          <div><dt>Target tracking</dt><dd>A policy that holds a metric near a set value, like a thermostat.</dd></div>
+          <div><dt>Min / max / desired capacity</dt><dd>The floor, the ceiling, and the count the autoscaler wants right now.</dd></div>
+          <div><dt>Cooldown / stabilization window</dt><dd>A wait period that prevents flapping: scaling up and down over and over.</dd></div>
+          <div><dt>Reactive vs predictive / scheduled</dt><dd>Reactive responds to current metrics. Predictive and scheduled scaling add capacity before an expected load.</dd></div>
+          <div><dt>Auto Scaling Group (ASG)</dt><dd>AWS's managed group of EC2 instances that scales as a unit.</dd></div>
+          <div><dt>HPA / VPA</dt><dd>Kubernetes Horizontal and Vertical Pod Autoscalers. HPA changes the replica count. VPA changes CPU and memory requests.</dd></div>
+          <div><dt>Cluster Autoscaler / Karpenter</dt><dd>Node-level autoscalers that add machines when pods can't be scheduled.</dd></div>
+          <div><dt>KEDA</dt><dd>A Kubernetes event-driven autoscaler that scales on outside signals like queue length and can scale down to zero.</dd></div>
+        </dl>
+
+        <p>Next, the Detail page covers how the HPA replica formula works, how pod scaling and node scaling stack on top of each other, why scale-in is the more dangerous direction, and how AWS, Azure, and GCP handle the same loop.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,11 +1,11 @@
-# Two-Phase Commit
+# Autoscaling
 
-Two-phase commit (2PC) is a protocol that lets one transaction span several databases or services and still land all-or-nothing. A coordinator first asks every participant "can you commit?", and only after everyone says yes does it tell them all to commit; if even one says no, everyone rolls back.
+Autoscaling is a control loop that watches a load signal, such as CPU, queue depth, or requests per second, and adds or removes compute capacity on its own. It measures load every few seconds, compares it to a target you set, like "keep average CPU near 60%", and changes the number or size of instances to stay near that target.
 
-A single database gives you atomicity for free, but once one business operation touches two systems, that guarantee is gone. If you debit an account in one Postgres database and credit another in a second one, and the first commits while the second crashes, money disappears. Engineers reach for 2PC when they need one atomic write across a small number of databases or brokers they control, on a fast and reliable network, and correctness matters more than latency. It costs at least two network round trips plus forced disk writes, and locks are held the whole time, so independent microservices and third-party APIs are usually better served by a Saga or the outbox pattern.
+It matters because traffic is never flat. If you provision for the peak, you pay for idle machines most of the day; if you provision for the average, the site falls over at the peak. Engineers reach for autoscaling when traffic follows a daily pattern, when workers pull from a queue whose backlog grows and shrinks, or when stateless services sit behind a load balancer. It is not a fix for a slow app, and it is not instant: new capacity takes seconds to minutes to arrive. Stateful systems and flat, predictable load usually do better without it.
 
-Think of a wedding ceremony. The officiant asks each partner "Do you take this person?", and once a partner says "I do" they can no longer walk away. Only when both have said yes does the officiant pronounce them married. The weak spot shows up if the officiant faints right before that final line: both partners are stuck waiting, unable to leave and unable to assume they are married. That is the blocking problem, and it explains most of 2PC's reputation.
+Picture a supermarket manager watching the checkout lines. Line length is the signal, and "no more than three people per lane" is the target. When lines grow, the manager opens more lanes; when it is quiet, lanes close and staff go home. A new cashier needs a couple of minutes to log in, so a sudden rush still hurts briefly, and a cooldown stops the manager from opening and closing the same lane every 30 seconds. That loop of measure, compare, adjust, wait, and repeat is autoscaling.
 
 ---
 
-Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/database/two-phase-commit/present/index.html
+Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/cloud/autoscaling/present/index.html

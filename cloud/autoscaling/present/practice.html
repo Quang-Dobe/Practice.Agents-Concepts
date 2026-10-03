@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autoscaling · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-cloud" data-category="cloud">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Autoscaling</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Autoscaling</h1>
+        <span class="pill pill--category">cloud</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/autoscaling/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Autoscaling</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Nobody looks at the autoscaler until launch day, or until the monthly bill arrives and someone asks why the cluster never shrinks at night. You'll meet it in four settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">SaaS API tier</div><p>The HPA (or ASG target-tracking policy) attached to the stateless API tier behind the load balancer.</p></div>
+          <div class="card"><div class="card__title">Background workers</div><p>Email sending, video transcoding, document ingestion. A KEDA
+            <span class="term">ScaledObject</span>
+            <span class="term__gloss">KEDA's config object that ties a workload to an outside trigger like a queue</span>
+            or SQS-backlog policy decides how many workers drain the queue. The easiest place to get it right: a backlog is an honest demand signal.</p></div>
+          <div class="card"><div class="card__title">Kubernetes platform team</div><p>The Cluster Autoscaler or Karpenter install every product team depends on without knowing it exists. Its tuning decides whether a pod scale-up takes 10 seconds or 4 minutes, and whether nodes ever get consolidated.</p></div>
+          <div class="card"><div class="card__title">GPU inference (2026)</div><p>The most expensive version of all this: an idle GPU node costs real money every hour.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Scale on the signal that actually saturates</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For I/O-bound APIs, scale on requests per target or in-flight concurrency. For workers, scale on queue backlog per replica. Use CPU only for services that are demonstrably CPU-bound.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>CPU <em>drops</em> when threads block on a slow network or database, so a CPU-driven autoscaler removes capacity in the middle of an incident (see Slack below).</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Defaulting to <code>averageUtilization: 70</code> on CPU because it is the example in the docs.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Derive the target from an SLO, not from intuition</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Compute it from your
+              <span class="term">SLO</span>
+              <span class="term__gloss">service-level objective: the latency or error budget you promise</span>.
+              AWS's SQS guidance: acceptable backlog per instance = acceptable latency / per-message processing time. A 10 s latency budget with 0.1 s per message gives a target of <strong>100 messages per instance</strong>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A target picked by feel is either too hot (queues form during dead time) or too cold (30% of the fleet idles forever), and nobody can explain which.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Copying 80% CPU from a blog post into a JVM service with a 90-second warmup.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Set requests on every container, including sidecars</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Give every container honest CPU and memory requests. Where sidecars distort the average, use <code>ContainerResource</code> metrics so the HPA reads only the app container.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>HPA utilization is measured against requests. If one container has no request, the HPA shows <code>&lt;unknown&gt;</code> and silently stops scaling.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Setting tiny requests "so the HPA scales eagerly". That overpacks nodes, because schedulers and node autoscalers plan by requests.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Let the autoscaler own the replica count</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Remove <code>spec.replicas</code> from the Deployment manifest once an HPA manages it, as the Kubernetes docs recommend. In GitOps, make sure the tool does not reassert a replica count.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every deploy otherwise resets the Deployment to the manifest value. Ten replicas at peak drop to three for a full HPA cycle in the middle of a rollout.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Leaving <code>replicas: 3</code> in the YAML "as a default".</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Size headroom to your measured dead time</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Measure load step → new pod <code>Ready</code> and receiving traffic, both with and without a new node. If traffic can grow 40% within that
+              <span class="term">dead time</span>
+              <span class="term__gloss">the gap between asking for capacity and that capacity serving traffic</span>,
+              the target has to leave roughly 40% headroom.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Reactive scaling always lags by one dead time. Headroom is the only thing that serves traffic during that lag.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Tuning targets without ever timing a cold scale-out that includes a new node.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Treat <code>maxReplicas</code> as a blast-radius limit tied to downstream capacity</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set the maximum so that <code>maxReplicas × connection pool size</code> stays under the database's <code>max_connections</code> minus headroom. Alert when the HPA sits at max.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>40 replicas × 20 connections is 800 connections, against a PostgreSQL default of 100. Scaling out turns a slow app into a database outage. During a retry storm, max is also your cost ceiling.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>maxReplicas: 1000</code> "so it never runs out".</p></div>
+        </article>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 190" role="img" aria-labelledby="connTitle connDesc" width="560" style="max-width:100%">
+            <title id="connTitle">Replica connections versus the database ceiling</title>
+            <desc id="connDesc">A short bar shows the PostgreSQL default max_connections of 100. A bar eight times longer shows 40 replicas times 20 pooled connections, or 800 connections, far past the ceiling.</desc>
+            <g font-family="var(--font-sans)" font-size="12">
+              <!-- scale: 1 connection = 0.6px, origin x=40 -->
+              <text x="40" y="24" fill="var(--text-muted)">PostgreSQL default max_connections</text>
+              <rect x="40" y="32" width="60" height="26" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="108" y="50" fill="var(--accent)">100</text>
+              <text x="40" y="88" fill="var(--text-muted)">40 replicas × 20 connections per pool</text>
+              <rect x="40" y="96" width="60" height="26" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <rect x="100" y="96" width="420" height="26" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="510" y="114" fill="var(--danger)" text-anchor="end">800: 700 over the limit</text>
+              <!-- ceiling -->
+              <line x1="100" y1="28" x2="100" y2="132" stroke="var(--danger)" stroke-dasharray="5 4"/>
+              <text x="100" y="146" fill="var(--danger)" text-anchor="middle">ceiling</text>
+              <text x="40" y="174" fill="var(--text-faint)">Rule: maxReplicas × pool size &lt; max_connections − headroom</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Why <code>maxReplicas</code> is a blast-radius limit: scaling the callers past the database's ceiling turns a slow app into a database outage.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Make scale-in boring</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <ul>
+              <li>Add a <code>preStop</code> sleep of about 5–15 s so the load balancer deregisters the pod before the process stops.</li>
+              <li>Set <code>terminationGracePeriodSeconds</code> above your longest request.</li>
+              <li>Add
+                <span class="term">PDBs</span>
+                <span class="term__gloss">PodDisruptionBudgets: limits on how many pods may be taken down at once</span>.</li>
+              <li>On ASGs, use lifecycle hooks plus instance scale-in protection for workers holding jobs.</li>
+            </ul></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Scale-in is a deployment that happens dozens of times a day. Without draining, every scale-in produces a small burst of 502s that nobody can reproduce.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Relying on the default 30 s grace period for workers that process 10-minute jobs.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Scale up fast, scale down slow, and keep the defaults until data says otherwise</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Start with the platform defaults (HPA's 300 s scale-down window, 0 s scale-up window). Shorten scale-down only after you have priced the idle tail and confirmed it does not cause flapping.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An under-provisioned minute shows up as user-visible errors. An over-provisioned minute costs cents. Netflix arrived at the same rule.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Symmetric windows "for tidiness".</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Cut startup time before tuning the controller</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use baked images or AMIs, small container images, lazy initialization off the critical path, and readiness probes that pass only when the app can really serve traffic.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Every second removed from startup is a second of dead time no controller setting can recover.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Readiness that returns 200 before caches and JIT are warm. The pod gets full traffic and times out.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Pre-scale for events you already know about</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Raise <code>minReplicas</code> or ASG minimum capacity with scheduled actions (or the KEDA cron scaler) before launches, sales, and matches. Use predictive scaling for daily cycles.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>No reactive loop can absorb growth that is faster than its dead time.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"The autoscaler will handle Black Friday."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Keep warm node capacity and diverse instance types</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run low-priority
+              <span class="term">pause pods</span>
+              <span class="term__gloss">placeholder pods that hold node space and get evicted the moment real pods need it</span>
+              (a negative <code>PriorityClass</code>) as overprovisioning, or EC2 warm pools. Give Karpenter NodePools or ASG mixed-instances policies several instance families and zones.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Pause pods turn a 3-minute node boot into a 10-second preemption. Instance diversity avoids <code>InsufficientInstanceCapacity</code> exactly when everyone in the region is scaling.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>One node group with one instance type in one zone.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">12</div>
+          <h3 class="practice-card__title">Keep HPA and VPA off the same resource</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use VPA in recommendation mode (<code>updateMode: "Off"</code>) to right-size requests, and let HPA scale on a demand metric.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>If both act on CPU, VPA raises requests, utilization drops, HPA scales in, and the loop repeats.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Turning both on "for full automation".</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Scaling on p99 latency</p>
+            <p>The HPA targets a latency metric. Latency rises for reasons replicas cannot fix (a slow dependency, a lock, GC), so the fleet runs to max and puts more load on the dependency that caused the problem. Alert on latency; scale on concurrency or RPS.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Counting retries as demand</p>
+            <p>The RPS metric includes client retries, health checks, and bot traffic. During a downstream outage, retries inflate RPS and the autoscaler pays to amplify the incident. Scale on successful-request concurrency or backlog, and cap retries with budgets.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>minReplicas: 1</code> on a user-facing service</p>
+            <p>Looks thrifty overnight. A single pod is a single point of failure, and the morning ramp starts from zero headroom. Use a floor of 2–3 spread across zones with <code>topologySpreadConstraints</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Node-pinning pods everywhere</p>
+            <p><code>emptyDir</code> scratch space, <code>safe-to-evict: "false"</code>, and PDBs with <code>maxUnavailable: 0</code> look harmless one at a time. Together they stop Cluster Autoscaler and Karpenter from removing nodes, and the cluster only ever grows. Audit blockers quarterly and use <code>karpenter.sh/do-not-disrupt</code> only on pods that truly need it.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Autoscaling a stateful tier like a stateless one</p>
+            <p>An HPA on Kafka consumers with more replicas than partitions, or on a cache tier. Extra consumers sit idle, and every scale event triggers a rebalance that pauses consumption. Cap replicas at the partition count, or scale the partitions deliberately.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Fixing flapping by stretching every window to 30 minutes</p>
+            <p>The oscillation stops, and so does the autoscaler. Widen the tolerance band, or fix the metric's non-linearity, instead of hiding the problem behind lag.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Never testing scale-out at burst size</p>
+            <p>The provisioning path (AMI bootstrap, config service, image registry, cloud quotas) is only ever exercised one instance at a time. It fails when 200 instances start at once. Load-test the scale-up path itself.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Slack, January 2021: CPU-scaled web tier</div>
+            <p>The web tier scaled on CPU through AWS autoscaling. When an AWS Transit Gateway saturated, threads blocked on the network, CPU fell, and the autoscaler <em>scaled the web tier down</em>. The recovery scale-up then overloaded the internal provision-service, which hit the Linux open-files limit and an AWS quota. <em>Lesson:</em> the metric and the scale-up machinery are both production dependencies. Test them in a degraded-network game day, not only under clean load.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Hotstar: 25.3M concurrent viewers</div>
+            <p>Viewer counts grew by more than 1M per minute around key moments. ASG step scaling, single-instance-type groups, and capacity errors could not keep up. They pre-warmed before matches, scaled with their own script on request count and platform concurrency, used fully baked AMIs to fit a ~90 s reaction window, and used Spot Fleet across instance types. <em>Lesson:</em> past a certain growth rate, autoscaling becomes a capacity-scheduling problem; reactive scaling only handles the leftover error.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Queue-driven workers</div>
+            <p>Document processing, video, email. KEDA or an SQS target-tracking policy scales on backlog per worker, often down to zero overnight. Workers enable scale-in protection while they hold a job. <em>Lesson:</em> scale-to-zero is safe here because the queue absorbs the cold start. The same setting on a synchronous API becomes a user-facing latency spike.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Netflix Scryer: predictive plus reactive</div>
+            <p>A forecast-driven engine layered over reactive Amazon autoscaling. The forecast sets capacity ahead of the daily ramp; the reactive policy corrects for deviations. <em>Lesson:</em> reactive scaling misreads traffic drops caused by outages. It scales in, then the recovery surge hits a shrunken fleet. A forecast-based floor protects against that.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Monitoring:</strong> are desired vs current vs max replicas, pending-pod age, scale-out latency (load step → <code>Ready</code>), and the scaling metric itself all on one dashboard?</li>
+              <li><strong>Alerting:</strong> is there an alert for "HPA/ASG at <code>max</code> for more than 10 minutes" and for "HPA metric <code>&lt;unknown&gt;</code>"?</li>
+              <li><strong>Signal:</strong> has someone verified the metric scales roughly linearly with replicas (double load at fixed replicas, check <code>actual/target</code>)?</li>
+              <li><strong>Failure handling:</strong> has a load test run while forcing scale-in, with zero LB 5xx? Are <code>preStop</code> hooks, grace periods, and PDBs in place?</li>
+              <li><strong>Dependencies:</strong> does <code>maxReplicas × pool size</code> fit inside the database's connection limit, and the limits of any rate-limited API?</li>
+              <li><strong>Security:</strong> is the node autoscaler's IAM role scoped to the specific node groups or launch templates it may create, not <code>ec2:*</code>? Can a compromised workload inflate its own scaling metric to drive up the bill?</li>
+              <li><strong>Cost:</strong> do budget alerts fire on node count or spend anomalies? Has anyone audited node-pinning pods that block scale-in?</li>
+              <li><strong>Capacity:</strong> do cloud quotas and IP space (subnet CIDR, VPC CNI IPs per node) cover <code>max</code> across all autoscaled groups at once?</li>
+              <li><strong>Onboarding:</strong> does a new engineer know where the HPA/ScaledObject lives, which metric drives it, and why <code>spec.replicas</code> is absent from the manifest?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Fixed fleet → default CPU scaling.</span> Teams start with a fixed fleet, then add a CPU-based HPA or ASG target-tracking policy with default settings, often copied between services.</li>
+          <li><span class="steps__title">First incident where CPU lies.</span> An I/O-bound service fails to scale, or scales in during an outage. The next step is custom metrics through Prometheus Adapter or KEDA, plus a node autoscaler once pods start sitting in <code>Pending</code>.</li>
+          <li><span class="steps__title">The shared-resource wall.</span> Replica counts grow until database connections run out. That forces a connection pooler (PgBouncer, RDS Proxy) and a hard look at <code>maxReplicas</code>.</li>
+          <li><span class="steps__title">The node layer takes over.</span> Node latency and cost start to dominate. Moving from node-group Cluster Autoscaler to Karpenter, EKS Auto Mode, or AKS Node Auto Provisioning means re-checking every node selector, PDB, and <code>do-not-disrupt</code> annotation, because consolidation actively evicts pods that used to stay put.</li>
+          <li><span class="steps__title">Mature: three layers.</span> Scheduled or predictive floors, reactive demand-signal scaling, and cost governance on top. Autoscaling config gets the same review discipline as application code, because it changes production capacity many times a day.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph L1["Layer 1: floors for the known"]
+      F["Scheduled or predictive floors for daily cycles and planned events"]
+    end
+    subgraph L2["Layer 2: react to the unknown"]
+      R["Reactive scaling on a demand signal: queue depth, concurrency, RPS"]
+    end
+    subgraph L3["Layer 3: cost governance"]
+      G["Spend alerts, quarterly right-sizing from VPA recommendations, reviewed node-pinning exceptions"]
+    end
+    F -- "sets the minimum" --> R
+    R -- "corrects deviations above the floor" --> G
+    G -. "tunes floors and targets" .-> F
+          </pre>
+          <figcaption class="diagram__caption">Where mature setups land: forecasts handle the expected curve, the reactive loop handles the surprise, and governance keeps the bill honest.</figcaption>
+        </figure>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/" rel="noopener">Kubernetes: Horizontal Pod Autoscaling</a> — the authoritative reference for the algorithm, <code>behavior</code>, container metrics, and the <code>spec.replicas</code> migration note.</li>
+          <li><a href="https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md" rel="noopener">Cluster Autoscaler FAQ</a> — why nodes do not scale down, and how to set up overprovisioning with pause pods. Most node-layer debugging ends here.</li>
+          <li><a href="https://karpenter.sh/docs/concepts/disruption/" rel="noopener">Karpenter: Disruption</a> — consolidation, disruption budgets, and <code>do-not-disrupt</code>. Read it before turning consolidation on in production.</li>
+          <li><a href="https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.html" rel="noopener">AWS: Scaling policy based on Amazon SQS</a> — the backlog-per-instance method for deriving a target from a latency SLO.</li>
+          <li><a href="https://slack.engineering/slacks-outage-on-january-4th-2021/" rel="noopener">Slack's Outage on January 4th, 2021</a> — a post-mortem showing CPU-based scaling and the provisioning path failing together.</li>
+          <li><a href="https://medium.com/netflix-techblog/scryer-netflixs-predictive-auto-scaling-engine-a3f8fc922270" rel="noopener">Scryer: Netflix's Predictive Auto Scaling Engine</a> — why a mature team layers forecasting on top of reactive scaling.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/cloud/autoscaling/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
