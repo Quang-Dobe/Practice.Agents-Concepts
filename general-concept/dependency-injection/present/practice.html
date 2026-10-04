@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dependency Injection · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Dependency Injection</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Dependency Injection</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/dependency-injection/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Dependency Injection</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>When an engineer asks why two requests saw each other's data, or why memory climbs until a nightly restart, the answer is usually a lifetime decision in the startup file. You'll meet DI in three places:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Startup code + request scope</div><p>In a SaaS backend on ASP.NET Core, Spring Boot or NestJS, DI is the startup code (<code>Program.cs</code>, <code>@Configuration</code> classes, Nest modules) plus the per-request scope the framework opens for every HTTP call.</p></div>
+          <div class="card"><div class="card__title">Background work</div><p>Queue consumers, hosted services, cron jobs. They run outside the request pipeline, so the scope the framework normally opens for you is missing. Most lifetime bugs from Detail show up here first.</p></div>
+          <div class="card"><div class="card__title">The test suite</div><p><code>WebApplicationFactory.ConfigureTestServices</code>, FastAPI's <code>app.dependency_overrides</code> and Spring's test context all replace pieces of the production graph. The graph's design decides whether integration tests are fast and test what actually ships.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Constructor injection by default; method injection for per-call data</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Required collaborators go in the constructor, stored in <code>readonly</code>/<code>final</code> fields. Request-specific values (cancellation token, current tenant, the message being handled) go in as method parameters.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The object can't exist half-built, and code review sees every dependency. Field injection (<code>@Autowired</code> on a field, <code>[Inject]</code> properties) gives objects that throw <code>NullPointerException</code> when built with <code>new</code> in a test. The Spring reference itself recommends constructor injection for this reason.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using setter injection to make a circular dependency compile.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">One composition root per deployable, split into feature modules</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Wire only at the entry point. Group registrations per feature (<code>services.AddBilling(config)</code>, a Spring <code>@Configuration</code> per module, a Nest module) so <code>Program.cs</code> reads like a table of contents.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Wiring spread across the codebase makes "which implementation runs in prod?" an afternoon's question. Wiring in one 600-line method makes every feature PR conflict with every other.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Reusable libraries that need a container. A library exposes constructors and, at most, an optional <code>AddX()</code> extension.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Choose lifetimes from the object's state, not from performance guesses</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <ul>
+              <li>Stateless service → transient or scoped.</li>
+              <li>Per-request
+                <span class="term">unit of work</span>
+                <span class="term__gloss">one batch of changes committed or rolled back together</span>
+                (<code>DbContext</code>, transaction, current user) → scoped.</li>
+              <li>Expensive, thread-safe, shared resource (connection pool, compiled regex cache, <code>SocketsHttpHandler</code>) → singleton.</li>
+            </ul></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A singleton must be thread-safe and keeps its whole object graph alive until shutdown. Microsoft's own guidance warns against making stateless services singletons. Most "singleton for speed" changes save nanoseconds and add a concurrency bug.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A blanket <code>AddSingleton</code> for everything because "allocations are slow."</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    Q1{"Holds per-request state? DbContext, transaction, current user"} -- yes --> SC["Scoped"]
+    Q1 -- no --> Q2{"Expensive, thread-safe and shared? pool, regex cache, SocketsHttpHandler"}
+    Q2 -- yes --> SG["Singleton — must be thread-safe, lives until shutdown"]
+    Q2 -- no --> TR["Transient or scoped — stateless service"]
+          </pre>
+          <figcaption class="diagram__caption">Pick the lifetime from what the object holds. Singleton is the last answer, not the default.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Validate the full graph before traffic arrives</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set <code>ValidateScopes</code> and <code>ValidateOnBuild</code> to <code>true</code> in every environment (the .NET host enables them only in Development). If startup time is tight, add a CI test that builds the provider with validation on and resolves every controller, handler and hosted service.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without validation, a missing registration or a captive <code>DbContext</code> turns into a 500 on the first call to a rarely used endpoint, often days after deploy. With it, the deploy fails.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Turning on Spring's <code>spring.main.lazy-initialization</code> globally for faster boot without that test. Spring's docs say directly it delays discovery of misconfigured beans until first use.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Open an explicit scope per unit of background work</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Hosted services and consumers take <code>IServiceScopeFactory</code> (or Spring's <code>ObjectProvider&lt;T&gt;</code>) and create one scope per message or job: <code>await using var scope = scopeFactory.CreateAsyncScope();</code></p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Hosted services are singletons. A <code>DbContext</code> passed into their constructor lives for days, so its
+              <span class="term">change tracker</span>
+              <span class="term__gloss">EF Core's in-memory record of every entity it has loaded or modified</span>
+              grows without limit and the connection eventually breaks. In practice the scope boundary is also your transaction boundary and your retry boundary.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Resolving scoped services from the root provider "just this once" in a worker.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant Q as Queue
+    participant W as Hosted service (singleton)
+    participant F as IServiceScopeFactory
+    participant S as Scope (one per message)
+    Q->>W: message 1
+    W->>F: CreateAsyncScope()
+    F-->>S: new scope
+    W->>S: resolve handler + DbContext
+    S-->>W: fresh DbContext and transaction
+    W->>S: process, commit
+    W->>S: dispose scope (DbContext disposed)
+    Q->>W: message 2
+    Note over W,S: next message gets a brand-new scope, transaction and retry boundary
+          </pre>
+          <figcaption class="diagram__caption">The worker lives forever; the <code>DbContext</code> does not. One scope per message keeps the change tracker small and the connection fresh.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Respect resources that rotate on their own clock</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For anything with built-in expiry (HTTP connections and DNS, rotated DB credentials, OAuth tokens), inject a factory or provider and ask it for the resource at the point of use. In .NET: <code>IHttpClientFactory</code> (pooled handlers recycle every <strong>two minutes</strong> by default), or a singleton <code>HttpClient</code> over a <code>SocketsHttpHandler</code> with <code>PooledConnectionLifetime</code> set.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A singleton that captures a typed <code>HttpClient</code> keeps the old IP after a blue/green DNS cutover. Microsoft's troubleshooting docs list "typed client captured by a singleton" as a known cause.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>new HttpClient()</code> per call. It exhausts sockets under load.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Keep constructors and DI factories cheap, synchronous and free of I/O</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Constructors only assign fields. Warm-up work (open connections, load caches, fetch secrets) runs in an explicit startup step: <code>IHostedService.StartAsync</code>, a Spring <code>ApplicationRunner</code>, or a FastAPI lifespan handler.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Resolution happens on the request path, and transient constructors run on every resolve. Microsoft documents that an async factory blocked with <code>.Result</code> can deadlock. A constructor that calls the network makes every test that builds the class slow or flaky.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>AddSingleton(sp =&gt; LoadFromVaultAsync().Result)</code>.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Inject typed, validated configuration, not the raw config bag</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Bind settings into typed objects and validate them at startup: .NET <code>AddOptions&lt;T&gt;().ValidateDataAnnotations().ValidateOnStart()</code>, Spring <code>@ConfigurationProperties</code> with <code>@Validated</code>, pydantic <code>BaseSettings</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Injecting <code>IConfiguration</code> or <code>Environment</code> everywhere is a service locator for strings. A typo in <code>"Stripe:ApiKey"</code> shows up as a <code>null</code> at checkout instead of a failed boot.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>config["Some:Key"]</code> reads inside business classes.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Treat parameter count as a design alarm, not a DI problem</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Once a constructor takes about <strong>five or more</strong> dependencies, look for a cohesive subset and extract it into a real, named service. Seemann calls these
+              <span class="term">facade services</span>
+              <span class="term__gloss">a new service that bundles several related dependencies behind one meaningful operation</span>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Over-injection is a symptom of an SRP problem that DI makes visible. The class behind it is the one that collects merge conflicts and needs 15 mocks per test.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hiding the count behind property injection or a <code>Dependencies</code> record.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Make test overrides explicit, narrow and reset</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Override only the boundary you can't run in tests (payment provider, clock, LLM client) through the framework's override hook, and reset it per test (<code>app.dependency_overrides.clear()</code> in a fixture teardown). Keep the rest of the graph real.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <ul>
+              <li><strong>Spring:</strong> the test context cache treats each distinct <code>@MockitoBean</code>/<code>@MockBean</code> combination as a new context, so scattered mocks multiply context startups and CI time.</li>
+              <li><strong>FastAPI:</strong> an override nobody clears leaks into the next test, and results start depending on execution order.</li>
+            </ul></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Mocking every constructor argument. That tests the wiring of mocks, not the code.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">The ambient container</p>
+            <p><code>IServiceProvider</code> captured in a static field, <code>ApplicationContextAware</code> stashed in a holder, or a <code>ServiceLocator.Current</code> helper. It works until two tests run in parallel or two hosts share a process, then it resolves from the wrong container. Pass dependencies through constructors. If code can't take them (an attribute, an EF entity), push the work to a service that can.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>BuildServiceProvider()</code> during registration</p>
+            <p>Called inside <code>ConfigureServices</code> to resolve one value for another registration. It builds a second container, so every "singleton" can exist twice; ASP.NET Core flags it with analyzer <strong>ASP0000</strong>. Use the factory overload <code>AddSingleton&lt;T&gt;(sp =&gt; ...)</code> or the options pattern.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>@Lazy</code> / <code>Lazy&lt;T&gt;</code> as a cycle breaker</p>
+            <p>Added when startup fails with a circular reference. The cycle is still there; the failure just moves from boot to first use. Extract the shared logic into a third service both depend on.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Request data in the container as a singleton</p>
+            <p>"Current user", tenant or shopping cart registered so it's injectable everywhere. Under concurrency, requests read each other's values: a data leak, not just a bug. Use a scoped accessor, or pass the value as a method argument.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Environment branches inside feature modules</p>
+            <p><code>if (env.IsProduction()) services.AddX(...)</code> scattered through registration code. Staging and test graphs drift from production, so the code you validated is not the code you deployed. Keep environment decisions in the composition root, each one swapping a single binding.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Transient <code>IDisposable</code> resolved from the root</p>
+            <p>A factory or singleton calls <code>rootProvider.GetService&lt;SomeDisposable&gt;()</code> in a loop. The container keeps every instance for disposal at shutdown, so memory grows steadily until the pod is OOM-killed. Create a scope, or build the object with <code>ActivatorUtilities.CreateInstance</code> and dispose it yourself.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Multi-tenant B2B API</div>
+            <p>Middleware reads the tenant from the JWT into a scoped <code>TenantContext</code>; repositories take it to filter every query. <em>Lesson:</em> scope validation catches a singleton that <em>injects</em> <code>TenantContext</code>. It does not catch a singleton cache that <em>stores</em> a tenant-specific value it read once. Singleton caches should take the tenant as part of the cache key, passed per call.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Queue consumer fleet</div>
+            <p>Workers pull from SQS or Kafka and process orders with EF Core or JPA. Each message gets its own scope, <code>DbContext</code> and transaction. <em>Lesson:</em> moving to batch consumption forced an explicit choice between scope per message and scope per batch. Per-batch scope meant one poisoned message's tracked entities were flushed with the next message's commit. The scope is the failure-isolation unit.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Mobile + cold-start-sensitive services</div>
+            <p>Android apps use Dagger/Hilt; serverless or Native AOT services move from reflection containers to generated wiring or Pure DI. <em>Lesson:</em> the win isn't only milliseconds. A whole class of failures (missing binding, cycle, type removed by R8 or the trimmer) turns from a crash on launch into a build error.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">LLM-backed service with an eval suite</div>
+            <p>The model client, vector store and tool executor are injected behind small capability-level interfaces (<code>Completer</code>, <code>Retriever</code>). Evals swap in recorded-response fakes. <em>Lesson:</em> inject at the capability level, not the vendor SDK client. Otherwise every fake mimics the SDK's request/response shapes, and switching vendors rewrites the fakes along with production.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Graph validation:</strong> does the app (or CI) fail on a missing registration or a scoped service captured by a singleton, in the production configuration and not only in Development?</li>
+              <li><strong>Background scopes:</strong> does every hosted service or consumer create its own scope per unit of work, with no scoped type in its constructor?</li>
+              <li><strong>Singletons:</strong> is every singleton thread-safe, with a stated reason to be one?</li>
+              <li><strong>HTTP clients:</strong> obtained through a factory, or built on a handler with a bounded connection lifetime, and never captured by singletons as typed clients?</li>
+              <li><strong>Constructors:</strong> do constructors and DI factories avoid I/O and <code>.Result</code>/<code>.Wait()</code>, with warm-up in an explicit startup hook?</li>
+              <li><strong>Configuration:</strong> bound to typed objects and validated at startup, with no raw <code>config["..."]</code> reads in business code?</li>
+              <li><strong>Provider access:</strong> is <code>IServiceProvider</code>/<code>ApplicationContext</code> injected only into framework-level infrastructure (factories, middleware), never into domain or application services?</li>
+              <li><strong>Memory:</strong> is per-pod memory tracked over days, so root-tracked disposables show up as a slope before an OOM kill?</li>
+              <li><strong>Findability:</strong> can a new engineer find, from one file, which implementation of each port runs in production and where environment-specific swaps happen?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Framework container, a dozen registrations.</span> Everything is explicit and readable.</li>
+          <li><span class="steps__title">~100 services: the first fork.</span> <code>Program.cs</code> grows long, and someone adds
+            <span class="term">assembly scanning</span>
+            <span class="term__gloss">auto-registering every type that matches a naming or folder convention</span>
+            (Scrutor, Spring component scanning, Nest auto-imports). Two camps disagree:
+            <ul>
+              <li>Seemann: convention-based registration gives the best value once conventions are strict.</li>
+              <li>Teams that have been burned: explicit registration, so <code>grep</code> answers "what runs here?"</li>
+              <li>Tie-breaker in practice is enforcement: scanning works when an architecture test pins the conventions, and turns chaotic when it doesn't.</li>
+            </ul></li>
+          <li><span class="steps__title">The painful migration.</span> Triggered by an incident (cross-tenant leak, memory leak, stale DNS) that forces a lifetime audit, or a platform change (Native AOT, GraalVM native image, a cold-start budget) that rules out reflection-heavy wiring. Both are expensive because lifetimes were decided one PR at a time and nobody owns the whole graph.</li>
+          <li><span class="steps__title">Mature end state.</span> Feature-module composition roots, graph validation in CI, scoped units of work for all background processing, and a small set of overridable test boundaries. When a monolith is split, the composition root is the clearest map of where to cut: modules that share no registrations can already be deployed separately.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://martinfowler.com/articles/injection.html" rel="noopener">Martin Fowler, "Inversion of Control Containers and the Dependency Injection pattern" (2004)</a> — the origin of the term, and the clearest comparison of DI with Service Locator.</li>
+          <li><a href="https://www.manning.com/books/dependency-injection-principles-practices-patterns" rel="noopener">Mark Seemann &amp; Steven van Deursen, <em>Dependency Injection Principles, Practices, and Patterns</em> (Manning, 2019)</a> — the standard book on composition roots, lifetimes and DI anti-patterns; most of the vocabulary here comes from it.</li>
+          <li><a href="https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/guidelines" rel="noopener">Microsoft, "Dependency injection guidelines"</a> — production anti-patterns from the runtime team (captive dependencies, async factory deadlocks, disposable leaks); useful outside .NET too.</li>
+          <li><a href="https://blog.ploeh.dk/2014/06/02/captive-dependency/" rel="noopener">Mark Seemann, "Captive Dependency" (2014)</a> — the lifetime bug behind most DI incidents, in one short post.</li>
+          <li><a href="https://blog.ploeh.dk/2012/11/06/WhentouseaDIContainer/" rel="noopener">Mark Seemann, "When to use a DI Container" (2012)</a> — Pure DI vs explicit vs convention-based registration. Read it before adding a container to a codebase that doesn't have one.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/dependency-injection/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

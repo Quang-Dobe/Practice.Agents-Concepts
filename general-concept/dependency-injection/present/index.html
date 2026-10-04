@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dependency Injection — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Dependency Injection</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Dependency Injection</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/dependency-injection/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>general-concept</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Dependency Injection</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">general-concept</span>
+            <span class="badge">application composition</span>
+            <span class="badge">testability</span>
+            <span class="badge">object lifetimes</span>
+          </div>
+          <h1 class="hero__title">Dependency Injection</h1>
+          <p class="hero__tagline">Code gets the things it needs passed in from outside instead of building or looking them up itself, so you can test it without real infrastructure and swap parts in one place.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">2004</div><div class="stat__label">Fowler's article names "Dependency Injection"</div></div>
+          <div class="stat"><div class="stat__num">3</div><div class="stat__label">.NET lifetimes: singleton · scoped · transient</div></div>
+          <div class="stat"><div class="stat__num">250+</div><div class="stat__label">framework services the ASP.NET Core templates register</div></div>
+          <div class="stat"><div class="stat__num">~5</div><div class="stat__label">constructor dependencies = time to split the class</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM -->
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph before["Without DI — the class builds its own"]
+        A1["OrderService"] -- "new PostgresOrderRepo(DB_URL)" --> A2[("PostgresOrderRepo")]
+    end
+    subgraph after["With DI — the class receives it"]
+        CR["Composition root (main / Program.cs)"] -- "production: passes" --> P[("PostgresOrderRepo")]
+        CR -- "unit test: passes" --> M[("InMemoryOrderRepo")]
+        P -- "injected" --> S["OrderService(repo: OrderRepo)"]
+        M -- "injected" --> S
+    end
+          </pre>
+          <figcaption class="diagram__caption">The whole idea in one shape: the class lists what it needs in its constructor, and one place at startup chooses and builds it.</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the two-chefs kitchen model, and what DI is <em>not</em> (not a container, not DIP, not a locator).</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: injection styles, Pure DI vs containers, the six-step resolve lifecycle, lifetimes, the full trade-off table, and ten failure modes.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Ten best practices with the Do/Why/Avoid triad, six anti-patterns, four real case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail for lifetimes and captive dependencies, or Practice for the rules that prevent production incidents.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

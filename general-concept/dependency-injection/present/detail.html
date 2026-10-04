@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dependency Injection · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Dependency Injection</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Dependency Injection</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/dependency-injection/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Dependency Injection</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~10 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Dependency Injection (DI) is a technique where a component's collaborators are supplied by an outside party, the <strong>injector</strong>, instead of being built or looked up by the component itself.</p>
+        <ul>
+          <li><strong>Needs are public.</strong> The component declares its dependencies in its contract: constructor parameters, settable properties, or method parameters.</li>
+          <li><strong>Building moves out.</strong> Assembling the
+            <span class="term">object graph</span>
+            <span class="term__gloss">the tree of objects and the objects they depend on</span>
+            moves to one place outside the component, the <strong>composition root</strong>.</li>
+          <li><strong>A case of IoC.</strong> DI is a specific case of Inversion of Control. The control being inverted is the <em>acquisition</em> of dependencies.</li>
+          <li><strong>Pairs with DIP, but does not need it.</strong> DI makes the Dependency Inversion Principle easy, because the injector can hand over any implementation of an abstraction. Injecting a concrete class or a plain function is still DI.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Service (dependency)</dt><dd>Any object or function a component needs: a repository, clock, HTTP client, logger.</dd></div>
+          <div><dt>Client (consumer)</dt><dd>The component that receives the service. Its constructor signature is its list of needs.</dd></div>
+          <div><dt>Injection point</dt><dd>Where the service enters the client. <a href="https://martinfowler.com/articles/injection.html" rel="noopener">Fowler (2004)</a> named three: <em>constructor</em> (PicoContainer), <em>setter</em> (Spring) and <em>interface</em> injection (Avalon). Interface injection is mostly historical; <em>method injection</em> (passed per call) replaced it in practice.</dd></div>
+          <div><dt>Composition root</dt><dd>The single place near the entry point (<code>main</code>, <code>Program.cs</code>, the application factory) where concrete types are chosen and the graph is assembled.</dd></div>
+          <div><dt>Injector</dt><dd>Whatever runs the composition. Either hand-written code, which Mark Seemann calls <a href="https://blog.ploeh.dk/2014/06/10/pure-di/" rel="noopener">Pure DI</a> (formerly "Poor Man's DI"), or a <strong>DI container</strong> that builds the graph from registrations.</dd></div>
+          <div><dt>Registration</dt><dd>A container entry mapping a <em>service key</em> (usually a type, sometimes type plus name/key) to a <em>recipe</em> (implementation type, factory delegate, or pre-built instance) and a <strong>lifetime</strong>.</dd></div>
+          <div><dt>Lifetime / scope</dt><dd>The rule for when the injector reuses an instance, when it makes a new one, and who disposes it. Common set: singleton, scoped (per request or unit of work), transient.</dd></div>
+        </dl>
+
+        <h3>Its siblings: other ways code gets its collaborators</h3>
+        <p>DI belongs to the family of <em>dependency acquisition</em> strategies. Each answers "how does this code get its collaborators?" differently:</p>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Strategy</th><th scope="col">How the dependency arrives</th><th scope="col">Visible in the signature?</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Direct construction (<code>new</code>)</td><td>Client builds it</td><td>No</td></tr>
+              <tr><td>Singleton / global / ambient context</td><td>Client reads a static</td><td>No</td></tr>
+              <tr><td>Service Locator</td><td>Client asks a registry at runtime</td><td>No</td></tr>
+              <tr><td>Factory / Abstract Factory</td><td>Client asks an injected factory</td><td>Yes (the factory is injected)</td></tr>
+              <tr><td><strong>DI</strong></td><td>Injector passes it in</td><td>Yes</td></tr>
+              <tr><td>Module patching (<code>unittest.mock.patch</code>, <code>jest.mock</code>)</td><td>Test rewrites the import binding</td><td>No; works only in dynamic module systems</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>In functional programming the same idea shows up as partial application, the Reader monad, or Scala's <code>given</code>/<code>using</code> context parameters.</p>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>DI is not a layer. It is an application-composition concern that lives in two places:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Constructor signatures across the codebase.</span> Each class states its needs here.</li>
+          <li><span class="steps__title">The composition root at process startup.</span> The graph is built here.</li>
+        </ol>
+        <p>A container is an in-process library with no network or storage part. Web frameworks plug it into the request pipeline: they open a child
+          <span class="term">scope</span>
+          <span class="term__gloss">a short-lived container view that owns its own instances and disposes them when it ends</span>
+          per HTTP request and resolve controllers or handlers from it. So DI touches the application layer and the framework boundary, not transport or persistence.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph codebase["Across the codebase"]
+        SIG["Constructor signatures — each class states its needs"]
+    end
+    subgraph startup["Process startup"]
+        CR["Composition root — main / Program.cs / app factory"] --> RP["Root provider — holds singletons"]
+    end
+    subgraph request["Per HTTP request — framework boundary"]
+        SC["Child scope"] --> CTL["Controller or handler resolved from the scope"]
+    end
+    SIG -.->|"read by"| CR
+    RP --> SC
+          </pre>
+          <figcaption class="diagram__caption">Two homes: the signatures (what each class needs) and the root (what gets built). The framework opens one child scope per request.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">ASP.NET Core / .NET Generic Host</div><p><code>Microsoft.Extensions.DependencyInjection</code> is built in. Controllers, middleware, hosted services and Razor components all resolve through it. The templates register more than <strong>250</strong> framework services by default (<a href="https://learn.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection" rel="noopener">docs</a>).</p></div>
+          <div class="card"><div class="card__title">Spring Framework / Spring Boot</div><p>The <code>ApplicationContext</code> is a DI container; IoC was Spring's founding feature. Since <strong>Spring 4.3</strong>, a class with a single constructor gets constructor injection with no <code>@Autowired</code> (<a href="https://spring.io/blog/2016/03/04/core-container-refinements-in-spring-framework-4-3" rel="noopener">Spring blog</a>).</p></div>
+          <div class="card"><div class="card__title">Angular</div><p>Hierarchical injectors: an <code>ElementInjector</code> tree follows the DOM, and an <code>EnvironmentInjector</code> tree handles app-wide providers. The <code>inject()</code> function (<strong>Angular 14+</strong>) supplements constructor injection (<a href="https://angular.dev/guide/di/hierarchical-dependency-injection" rel="noopener">angular.dev</a>).</p></div>
+          <div class="card"><div class="card__title">Android</div><p>Dagger 2 and Hilt generate the wiring code at compile time, with no runtime reflection (<a href="https://android.googlesource.com/platform/external/dagger2/+/refs/heads/main" rel="noopener">Dagger README</a>).</p></div>
+          <div class="card"><div class="card__title">FastAPI</div><p><code>Depends()</code> injects per-request dependencies into path-operation functions, a form of method injection.</p></div>
+          <div class="card"><div class="card__title">pytest</div><p>Fixtures are DI keyed by parameter name. The test declares <code>db</code>, and pytest builds and tears down the <code>db</code> fixture.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Runtime (reflection-based) containers:</strong> <code>Microsoft.Extensions.DependencyInjection</code>, Autofac (.NET); Spring IoC, Google Guice (JVM); NestJS, InversifyJS, tsyringe (TypeScript); <code>dependency-injector</code> (Python); Uber <code>dig</code>/<code>fx</code> (Go).</li>
+          <li><strong>Compile-time / code-gen injectors:</strong> Dagger 2 and Hilt (JVM/Android); Google Wire (Go; the repo was <a href="https://github.com/google/wire" rel="noopener">archived in August 2025</a> as feature-complete); source-generator containers in .NET; Spring Boot 3's AOT processing, which precomputes bean definitions for GraalVM native images.</li>
+          <li><strong>Standards:</strong> <a href="https://jcp.org/en/jsr/detail?id=330" rel="noopener">JSR-330</a> (<code>javax.inject</code>, final release October 2009, co-led by Rod Johnson of SpringSource and Bob Lee of Google), now <code>jakarta.inject</code>. Jakarta CDI builds scopes and lifecycle on top of it.</li>
+          <li><strong>Graph validation:</strong> .NET <code>ServiceProviderOptions.ValidateScopes</code> / <code>ValidateOnBuild</code>; Spring Boot's startup failure on circular references (default since 2.6); Dagger's compile errors.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Code touches slow or non-deterministic resources (DB, network, clock, randomness, filesystem) and you want fast, isolated unit tests.</li>
+              <li>The implementation varies by environment, tenant, or feature flag, and you want that choice in one place.</li>
+              <li>Several components should share one instance with a managed lifetime: a connection pool, <code>HttpClient</code>, or cache.</li>
+              <li>Per-request state (unit of work, current user, DB transaction) must reach many components without threading it through every method.</li>
+              <li>Your framework is built around a container (ASP.NET Core, Spring, Angular, NestJS). Fighting it costs more than using it.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It is a short script or CLI where <code>main</code> builds two objects. Use plain functions with arguments.</li>
+              <li>The "dependency" is a value object or pure function (<code>Money</code>, <code>slugify</code>). Nothing to swap, no lifetime to manage.</li>
+              <li>You would add a single-implementation interface to every class just to mock it. Inject the concrete class, or test against a real in-memory implementation.</li>
+              <li>You would add a container to a small or medium app with no framework container. Pure DI gives compile-time checking and readable wiring for free.</li>
+              <li>The language idiom resists it. Idiomatic Go wires by hand in <code>main</code>; Python tests often use <code>monkeypatch</code> for one-off seams.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <p>In the late 1990s, enterprise Java either called <code>new</code> on concrete collaborators, used GoF Singletons, or looked them up through JNDI (EJB 2's service-locator style). All three tied business logic to infrastructure, so testing meant running inside an application server. Lightweight containers were the answer:</p>
+            <ul>
+              <li><strong>~2003:</strong> Apache Avalon (interface injection), then PicoContainer (constructor) and Spring (setter).</li>
+              <li><strong>January 2004:</strong> Fowler's article coins "Dependency Injection" to set it apart from "IoC" (too generic) and Service Locator.</li>
+              <li><strong>2007:</strong> Guice. <strong>2009:</strong> JSR-330.</li>
+              <li><strong>2010:</strong> Seemann, <a href="https://blog.ploeh.dk/2010/02/03/ServiceLocatorisanAnti-Pattern/" rel="noopener">"Service Locator is an Anti-Pattern"</a>.</li>
+              <li><strong>2012:</strong> Dagger; Google's Dagger 2 in <strong>2015</strong>.</li>
+              <li><strong>2016:</strong> ASP.NET Core ships a container in the box.</li>
+            </ul>
+            <p>DI went from an opt-in library to a default platform feature.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <h3>Pure DI: just ordinary code</h3>
+        <p>The composition root calls constructors in dependency order and keeps shared instances in local variables:</p>
+        <pre><code>def compose(cfg) -&gt; App:
+    pool    = ConnectionPool(cfg.db_url)          # "singleton": one local, reused
+    clock   = SystemClock()
+    def handle_request(req):                       # "scoped": built per request
+        uow   = UnitOfWork(pool)
+        repo  = OrderRepo(uow)
+        svc   = OrderService(repo, clock)
+        return OrderController(svc).handle(req)
+    return App(handle_request)</code></pre>
+
+        <h3>A container automates exactly this</h3>
+        <p>A typical reflection-based container (this matches <code>Microsoft.Extensions.DependencyInjection</code>, Spring and Guice in broad strokes) runs this lifecycle:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Register.</span> The app adds descriptors <code>(service key → recipe, lifetime)</code> to a mutable collection.
+            <ul>
+              <li>In .NET, registering the same key twice: the <strong>last one wins</strong> for a single resolve, while <code>IEnumerable&lt;T&gt;</code> returns all of them in order.</li>
+              <li>Keyed registrations (.NET 8+ <code>AddKeyed*</code>, Spring <code>@Qualifier</code>, Guice binding annotations) tell apart several implementations of one type.</li>
+            </ul></li>
+          <li><span class="steps__title">Build.</span> The collection is frozen into a lookup table and a root provider is created. The full graph can be validated now. In .NET's default host, <code>ValidateScopes</code> and <code>ValidateOnBuild</code> are both set to <code>IsDevelopment()</code> (<a href="https://source.dot.net/Microsoft.Extensions.Hosting/HostingHostBuilderExtensions.cs.html" rel="noopener">source</a>), so production builds <strong>skip these checks</strong> unless you opt in.</li>
+          <li><span class="steps__title">Resolve <code>T</code>.</span> Find the descriptor and check the lifetime cache. On a miss, <strong>select a constructor</strong>: .NET picks the one with the most parameters it can resolve, and throws if two are equally good (<a href="https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/overview" rel="noopener">docs</a>). Then resolve each parameter recursively, depth-first. A "currently resolving" stack catches cycles and fails with a circular-dependency error.</li>
+          <li><span class="steps__title">Construct and cache.</span> Call the constructor. Singletons are cached in the root, scoped instances in the current scope, transients nowhere. Every <code>IDisposable</code> the container creates is recorded by the scope that created it.</li>
+          <li><span class="steps__title">Compile the plan.</span> Reflection is expensive, so containers cache a per-service resolution plan (a
+            <span class="term">call site</span>
+            <span class="term__gloss">.NET's name for the cached recipe of how to build one service</span>)
+            and may compile it to a delegate. After warm-up, a resolve costs about a few dictionary lookups plus the constructor calls.</li>
+          <li><span class="steps__title">End the scope.</span> When the request ends, the framework disposes the scope, which disposes its tracked instances in <strong>reverse creation order</strong>. Singletons are disposed only when the root provider is disposed at shutdown.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant App as App startup
+    participant C as Container
+    participant L as Lifetime cache
+    App->>C: 1 · Register (service key → recipe, lifetime)
+    App->>C: 2 · Build (freeze table, validate if enabled)
+    App->>C: 3 · Resolve OrderService
+    C->>L: cached instance for this lifetime?
+    alt hit (singleton, or same scope)
+        L-->>C: existing instance
+    else miss
+        C->>C: pick constructor with most resolvable params
+        C->>C: resolve each param depth-first, check cycle stack
+        C->>C: 4 · construct, cache by lifetime, track IDisposable
+    end
+    C-->>App: instance
+    App->>C: 6 · end scope → dispose in reverse creation order
+          </pre>
+          <figcaption class="diagram__caption">One resolve through a reflection-based container. Step 5 (compiling the plan) makes the miss path cheap after warm-up.</figcaption>
+        </figure>
+
+        <h3>Scopes nest inside the root</h3>
+        <figure class="diagram">
+          <svg viewBox="0 0 560 260" role="img" aria-labelledby="scopeTitle scopeDesc" width="560" style="max-width:100%">
+            <title id="scopeTitle">Root provider and request scopes</title>
+            <desc id="scopeDesc">The root provider holds singletons until process shutdown. Inside it, request A and request B each have their own scope with scoped instances disposed at the end of the request. Transients inside scope A are new on every resolve and disposed with A if they are IDisposable.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="10" y="10" width="540" height="240" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="26" y="36" fill="var(--accent)" font-weight="600">Root provider</text>
+              <text x="26" y="56" fill="var(--text-muted)">singletons — live until process shutdown</text>
+
+              <rect x="26" y="72" width="250" height="164" rx="8" fill="var(--bg-elev-2)" stroke="var(--info)"/>
+              <text x="40" y="96" fill="var(--info)" font-weight="600">Scope: request A</text>
+              <text x="40" y="116" fill="var(--text-muted)">scoped instances</text>
+              <text x="40" y="134" fill="var(--text-faint)" font-size="12">disposed at end of A</text>
+              <rect x="40" y="148" width="222" height="74" rx="6" fill="none" stroke="var(--text-faint)" stroke-dasharray="5 4"/>
+              <text x="52" y="172" fill="var(--text)">transients</text>
+              <text x="52" y="192" fill="var(--text-muted)" font-size="12">new on every resolve</text>
+              <text x="52" y="210" fill="var(--text-faint)" font-size="11">disposed with A if IDisposable</text>
+
+              <rect x="290" y="72" width="244" height="164" rx="8" fill="var(--bg-elev-2)" stroke="var(--info)"/>
+              <text x="304" y="96" fill="var(--info)" font-weight="600">Scope: request B</text>
+              <text x="304" y="116" fill="var(--text-muted)">its own scoped instances</text>
+              <text x="304" y="134" fill="var(--text-faint)" font-size="12">disposed at end of B</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Each request gets its own scope inside the root. Whoever creates an instance disposes it: the scope at request end, the root at shutdown.</figcaption>
+        </figure>
+
+        <h3>The one rule that governs lifetimes</h3>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Lifetime invariant</p>
+            <p><strong>A component may depend only on components whose lifetime is equal to or longer than its own.</strong></p>
+            <ul>
+              <li>A singleton may take a singleton.</li>
+              <li>A scoped component may take a scoped component or a singleton.</li>
+              <li>Break the rule and the longer-lived object traps the shorter-lived one. Seemann calls this a
+                <span class="term">captive dependency</span>
+                <span class="term__gloss">a short-lived object kept alive, and reused, by a longer-lived one that holds it</span>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 240" role="img" aria-labelledby="capTitle capDesc" width="560" style="max-width:100%">
+            <title id="capTitle">Lifetimes on a timeline, and a captive dependency</title>
+            <desc id="capDesc">A singleton lives from process start to shutdown. Scoped instances live for request A and then request B. Transients are created many times. A captive dependency is request A's scoped object kept alive by a singleton long after request A has ended.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="10" y="28" fill="var(--text-faint)" font-size="12">time →</text>
+
+              <text x="10" y="56" fill="var(--text-muted)">singleton</text>
+              <rect x="110" y="40" width="430" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="325" y="57" fill="var(--accent)" text-anchor="middle" font-size="12">process start → shutdown</text>
+
+              <text x="10" y="102" fill="var(--text-muted)">scoped</text>
+              <rect x="110" y="86" width="150" height="24" rx="5" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="185" y="103" fill="var(--info)" text-anchor="middle" font-size="12">request A</text>
+              <rect x="300" y="86" width="150" height="24" rx="5" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="375" y="103" fill="var(--info)" text-anchor="middle" font-size="12">request B</text>
+
+              <text x="10" y="148" fill="var(--text-muted)">transient</text>
+              <rect x="130" y="132" width="10" height="24" rx="2" fill="var(--text-faint)"/>
+              <rect x="180" y="132" width="10" height="24" rx="2" fill="var(--text-faint)"/>
+              <rect x="230" y="132" width="10" height="24" rx="2" fill="var(--text-faint)"/>
+              <rect x="320" y="132" width="10" height="24" rx="2" fill="var(--text-faint)"/>
+              <rect x="380" y="132" width="10" height="24" rx="2" fill="var(--text-faint)"/>
+              <rect x="430" y="132" width="10" height="24" rx="2" fill="var(--text-faint)"/>
+
+              <text x="10" y="194" fill="var(--danger)">captive</text>
+              <rect x="110" y="178" width="150" height="24" rx="5" fill="var(--info-soft)" stroke="var(--info)"/>
+              <text x="185" y="195" fill="var(--info)" text-anchor="middle" font-size="12">A's scoped object</text>
+              <rect x="260" y="178" width="280" height="24" rx="5" fill="var(--danger-soft)" stroke="var(--danger)" stroke-dasharray="5 4"/>
+              <text x="400" y="195" fill="var(--danger)" text-anchor="middle" font-size="12">still held by a singleton after A ends</text>
+
+              <text x="10" y="230" fill="var(--text-faint)" font-size="12">Legal: depend on equal or longer bars. Illegal: a long bar holding a short one.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A singleton that takes a scoped object keeps request A's instance alive, so request B reads and writes into it. The code demo shows exactly this with a <code>UnitOfWork</code>.</figcaption>
+        </figure>
+
+        <p><strong>Compile-time injectors</strong> (Dagger, Wire) run steps 1–3 inside the build. They emit generated source equal to the Pure DI <code>compose()</code> above. Missing bindings and cycles become compile errors, and nothing is reflected at runtime.</p>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Constructor injection (default)</td><td>Object is valid once constructed; fields can be <code>final</code>/<code>readonly</code>; needs are visible</td><td>Long parameter lists show up immediately (which is also a useful signal)</td></tr>
+              <tr><td>Setter / field injection</td><td>Optional dependencies; can break cycles</td><td>Object can exist half-initialised; hidden needs; no immutability</td></tr>
+              <tr><td>Method injection</td><td>Per-call variation (request context, middleware <code>InvokeAsync</code>)</td><td>Every caller must supply the dependency</td></tr>
+              <tr><td>Pure DI</td><td>Compiler checks the graph; wiring is readable; zero startup cost</td><td>Hand-maintained wiring; lifetimes managed by hand</td></tr>
+              <tr><td>Runtime container</td><td>Auto-wiring, scopes, disposal, decorators, framework integration</td><td>Errors at startup or first request instead of at compile time; reflection cost; conflicts with AOT and trimming</td></tr>
+              <tr><td>Compile-time container</td><td>Compile-time errors; no reflection; fast cold start</td><td>Build step, generated code, slower builds, less dynamic registration</td></tr>
+              <tr><td>Assembly scanning / auto-registration</td><td>Less boilerplate</td><td>Nobody can point to the line that chose the implementation</td></tr>
+              <tr><td>DI vs Service Locator</td><td>Explicit contracts; no dependency on the locator API</td><td>Locator is quicker to retrofit into legacy code</td></tr>
+              <tr><td>DI vs module patching</td><td>Works in any language and makes seams explicit</td><td>Patching needs no production-code change in Python/JS</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Captive dependency</p>
+            <p>A singleton holds an EF Core <code>DbContext</code> or session; requests see each other's data or fail on concurrent use. Cause: the lifetime rule is broken, and scope validation is off outside Development.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Scoped service resolved from the root</p>
+            <p>Memory grows with no clear bound. Cause: the "scoped" instance lives in the root provider and is in effect promoted to singleton.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Transient <code>IDisposable</code> resolved from root or a long-lived scope</p>
+            <p>A leak until shutdown. Cause: the container tracks every disposable it creates, so it holds a reference to each one.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Background worker takes a scoped service in its constructor</p>
+            <p>A stale or broken connection hours later. Cause: hosted services are singletons. Fix: inject <code>IServiceScopeFactory</code> and create a scope per unit of work.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Missing registration</p>
+            <p>Production returns a 500 on the first call to a rarely used endpoint. Cause: graph validation runs only in Development, or not at all.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Circular dependency</p>
+            <p>Startup fails (<code>BeanCurrentlyInCreationException</code>, .NET "circular dependency was detected"). Cause: two services need each other, which usually means a responsibility is split in the wrong place.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Silent override</p>
+            <p>A test or library registration replaces the production implementation. Cause: last-registration-wins semantics.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Constructor over-injection</p>
+            <p>A class takes 8 or more dependencies. Cause: an SRP violation that DI makes visible but does not cause.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Service locator in disguise</p>
+            <p><code>IServiceProvider</code> or <code>ApplicationContext</code> is injected and queried inside methods. Cause: needs are hidden again, and failures move from startup to runtime.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Reflection broken by trimming or obfuscation</p>
+            <p>A release build crashes on resolve (R8/ProGuard on Android, .NET trimming/Native AOT). Cause: types reached only through reflection were removed by the build tool.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>DI separates <strong>using</strong> an object from <strong>choosing and building</strong> it.</p>
+        <ul>
+          <li><strong>Choosing is app-wide policy:</strong> which database, which environment, how long an instance lives.</li>
+          <li><strong>Using is local mechanism.</strong></li>
+          <li><strong>Mixing them hurts:</strong> every policy change edits business code, every test pulls in real infrastructure, and lifetime decisions spread across hundreds of <code>new</code> calls.</li>
+        </ul>
+        <p>Moving construction to one composition root gives you:</p>
+        <ul>
+          <li><strong>Substitutability:</strong> tests and environments swap implementations without touching consumers.</li>
+          <li><strong>Explicit contracts:</strong> the constructor lists every need, so coupling shows up in code review.</li>
+          <li><strong>Central lifetime management:</strong> pools, caches and transactions are created, shared and disposed by one owner.</li>
+        </ul>
+
+        <h3>Why it looks the way it does</h3>
+        <p><strong>Why injection rather than a locator?</strong> Fowler in 2004 treated the two as close alternatives and gave Service Locator "a slight edge" for application code, as more straightforward. The industry went the other way:</p>
+        <ul>
+          <li>A locator call compiles whether or not the service is registered, so missing dependencies surface at runtime, inside a method, on whichever code path runs first.</li>
+          <li>Every class also takes a dependency on the locator API.</li>
+          <li>Constructor injection moves both problems to construction time, where a container (or the compiler, with Pure DI) can check the whole graph at once.</li>
+          <li>Microsoft's ASP.NET Core guidance now says outright to avoid the service locator pattern, including injected factories that resolve services at runtime.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph loc["Service Locator"]
+        L1["Locator.get(Repo) inside a method"] --> L2["Compiles even if not registered"] --> L3["Fails at runtime, on the first code path that hits it"]
+    end
+    subgraph inj["Constructor injection"]
+        D1["Needs listed in the constructor"] --> D2["Container or compiler checks the whole graph"] --> D3["Fails at construction time, before traffic"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">Same missing dependency, two different moments of failure. Injection moves the error to where it can be checked all at once.</figcaption>
+        </figure>
+
+        <ul>
+          <li><strong>Why type-keyed containers?</strong> The type system already describes the contract. Keying by type lets the container read a constructor signature and wire it with no per-class config. The cost is ambiguity when one type has several implementations, which is why keyed services and qualifiers exist.</li>
+          <li><strong>Why do containers own disposal?</strong> The client did not create the dependency and may share it, so it cannot safely dispose it. "Whoever creates it disposes it" puts disposal on the injector, and that rule is what makes scopes necessary.</li>
+          <li><strong>Why the move toward compile-time wiring?</strong> Reflection costs startup time and conflicts with
+            <span class="term">AOT</span>
+            <span class="term__gloss">ahead-of-time compilation to native code, which strips types it cannot see being used</span>
+            and tree-shaking. Dagger made this trade on Android, where cold start and R8 matter. Spring Boot 3 AOT and .NET Native AOT apply the same pressure on the server.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026, DI is <strong>stable and built in</strong> on the JVM and .NET, and the default in Angular and NestJS. You rarely choose <em>whether</em> to use it; you choose how much container automation to accept. The live changes are at the edges:</p>
+        <ul>
+          <li><strong>Compile-time and AOT:</strong> serverless cold starts and native images favour generated wiring over reflection.</li>
+          <li><strong>TypeScript:</strong> the standard decorators in TS 5.0 support neither parameter decorators nor <code>emitDecoratorMetadata</code>. Reflection-based TS containers (NestJS, InversifyJS) still depend on the legacy <code>experimentalDecorators</code> mode, and Angular has moved toward the <code>inject()</code> function.</li>
+          <li><strong>Go:</strong> Wire's archival reinforces the idiom of hand-wiring in <code>main</code>.</li>
+          <li><strong>LLM-backed systems:</strong> model clients, vector stores and tool executors are exactly the slow, non-deterministic dependencies DI was built to isolate. Injecting them is what makes deterministic fakes possible in evals and tests.</li>
+        </ul>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify in practice</p>
+            <ul>
+              <li>Does my production build validate the container graph at startup? In .NET, <code>ValidateOnBuild</code> is off outside Development by default. What does a missing registration look like under load?</li>
+              <li>When the same service is registered twice (by me, a library, and a test override), which one wins, and do I get a warning?</li>
+              <li>Can I write a test that fails if any singleton transitively depends on a scoped service?</li>
+              <li>What do container build and first-resolve cost in cold-start time, compared with a Pure DI composition root?</li>
+              <li>Does my container survive trimming, Native AOT, GraalVM native image, or R8 without manual keep-rules?</li>
+              <li>At what constructor-parameter count does my team agree a class needs splitting, and can a linter enforce it?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

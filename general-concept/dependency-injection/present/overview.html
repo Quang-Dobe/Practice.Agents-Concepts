@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dependency Injection · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-general-concept" data-category="general-concept">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Dependency Injection</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Dependency Injection</h1>
+        <span class="pill pill--category">general-concept</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/general-concept/dependency-injection/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Dependency Injection</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Dependency Injection (DI) means code receives the things it needs from outside instead of creating or looking them up itself. It is a technique, not a framework.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <p>Most code needs collaborators: a database, an HTTP client, a clock, a logger. The instinct is to build them where you use them: <code>self.repo = PostgresOrderRepo()</code>. DI flips that:</p>
+            <ul>
+              <li>The class <strong>declares</strong> what it needs, usually as constructor parameters.</li>
+              <li>Whoever <strong>creates</strong> the class passes those in.</li>
+              <li>The class stops caring <em>which</em> database or <em>which</em> clock it gets.</li>
+            </ul>
+            <p>That one change lets you test code without real infrastructure and swap implementations in one place. Martin Fowler's <a href="https://martinfowler.com/articles/injection.html" rel="noopener">2004 article</a> made the name popular, but the core idea is just "pass it in as an argument."</p>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of a restaurant kitchen with two chefs.</p>
+        <ul>
+          <li><strong>Chef A</strong> drives to one particular farm every morning for tomatoes and cooks on a stove they bought and installed themselves. The recipe is welded to that farm. If the farm closes, dinner is cancelled. To try the recipe at home, you have to drive to that farm too.</li>
+          <li><strong>Chef B</strong> posts a list at their station: "tomatoes, flour, a stove." Before service, the kitchen manager stocks the station. Chef B cooks with whatever arrives, as long as it is a tomato. If the manager switches suppliers, Chef B never notices. On training day, the manager stocks cheap practice tomatoes.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph chefA["Chef A — builds its own"]
+        A["Chef A"] -- "drives to" --> F[("One fixed farm")]
+    end
+    subgraph chefB["Chef B — receives it (DI)"]
+        L["Station list = constructor signature"]
+        KM["Kitchen manager = composition root"] -- "service day" --> R[("Real supplier tomatoes")]
+        KM -- "training day" --> T[("Cheap practice tomatoes")]
+        R -- "stocks station" --> B["Chef B"]
+        T -- "stocks station" --> B
+        L -.->|"asks for tomatoes, flour, a stove"| B
+    end
+          </pre>
+          <figcaption class="diagram__caption">Chef A is welded to one farm. Chef B lists needs, and the manager decides what fills them: real supplies in service, practice ones in training.</figcaption>
+        </figure>
+
+        <p>Chef B is DI. The list at the station is the constructor signature. The kitchen manager is the
+          <span class="term">composition root</span>
+          <span class="term__gloss">the one place, at app startup, where the real objects are built and wired together</span>.</p>
+
+        <pre><code># Chef A: builds its own dependency
+class OrderService:
+    def __init__(self):
+        self.repo = PostgresOrderRepo(DB_URL)
+
+# Chef B: receives it
+class OrderService:
+    def __init__(self, repo: OrderRepo):
+        self.repo = repo
+
+OrderService(PostgresOrderRepo(DB_URL))   # production
+OrderService(InMemoryOrderRepo())         # unit test</code></pre>
+
+        <p>The manager can take two forms. Both count as DI:</p>
+        <ul>
+          <li><strong>A person wiring by hand</strong>: plain code in <code>main</code>.</li>
+          <li><strong>A staffing agency working from a chart</strong>: a
+            <span class="term">DI container</span>
+            <span class="term__gloss">a library that builds the object graph from registrations</span>.
+            The container only automates the wiring.</li>
+        </ul>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a DI container.</strong> Spring, .NET's <code>IServiceCollection</code> and Angular's injector automate the wiring. Passing arguments by hand is already DI.</li>
+              <li><strong>Not the Dependency Inversion Principle.</strong> DIP says high-level code should depend on abstractions. DI is one way to deliver the concrete object. They work well together, but they are separate ideas.</li>
+              <li><strong>Not the whole of Inversion of Control.</strong>
+                <span class="term">IoC</span>
+                <span class="term__gloss">the broad idea of "the framework calls you"</span>
+                is bigger. DI is one specific case, where control over <em>creating dependencies</em> moves outside the class.</li>
+              <li><strong>Not a Service Locator.</strong> A
+                <span class="term">locator</span>
+                <span class="term__gloss">a global registry a class reaches into, e.g. <code>Locator.get(Repo)</code></span>
+                hides needs inside the method body. With DI, every need is visible in the signature.</li>
+              <li><strong>Not "interfaces everywhere."</strong> You can inject a concrete class or a plain function.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You want unit tests that run without a real database, network or system clock.</li>
+              <li>The right implementation depends on the environment, such as local disk in dev and S3 in production.</li>
+              <li>Several objects should share one expensive instance, such as a connection pool or an HTTP client.</li>
+              <li>You want to see everything a class needs just by reading its constructor.</li>
+              <li>The app is big enough that hand-wiring in <code>main</code> is a chore. That is when a container starts to pay off.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It is a throwaway script. A 50-line script does not need an injectable clock.</li>
+              <li>It is a value object or pure helper like <code>Money</code> or <code>slugify()</code>. There is nothing to swap.</li>
+              <li>You would add a one-implementation interface to every class "so it can be injected." That is ceremony, not design.</li>
+              <li>Container auto-wiring is so magical nobody can say which implementation runs in production. You lose readable wiring and get surprises at startup instead.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Dependency</dt><dd>An object or service a piece of code needs to do its job.</dd></div>
+          <div><dt>Client</dt><dd>The code that uses a dependency (the chef).</dd></div>
+          <div><dt>Injector</dt><dd>Whatever builds dependencies and hands them to clients (the kitchen manager).</dd></div>
+          <div><dt>Constructor injection</dt><dd>Passing dependencies through the constructor. The default, because the object cannot exist without them.</dd></div>
+          <div><dt>Setter injection</dt><dd>Assigning dependencies after construction. Usually for optional ones.</dd></div>
+          <div><dt>Composition root</dt><dd>The single place near the entry point where the object graph is assembled.</dd></div>
+          <div><dt>DI container</dt><dd>A library that builds the object graph from registrations.</dd></div>
+          <div><dt>Lifetime</dt><dd>How long an injected instance lives. Names vary by framework. .NET uses <em>singleton</em> (one per app), <em>scoped</em> (one per request) and <em>transient</em> (new every time).</dd></div>
+        </dl>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">What's next</p>
+            <p>Detail answers What / Where / When / How / Why: the three injection styles side by side, a hand-built composition root, what a container does under the hood, lifetime bugs like a singleton holding a per-request object, and why Service Locator is widely treated as an anti-pattern.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
