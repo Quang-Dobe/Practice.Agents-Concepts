@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vector Search — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Vector Search</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Vector Search</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/vector-search/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>ai</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Vector Search</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">ai</span>
+            <span class="badge">retrieval</span>
+            <span class="badge">ANN</span>
+            <span class="badge">RAG</span>
+          </div>
+          <h1 class="hero__title">Vector Search</h1>
+          <p class="hero__tagline">Find the stored vectors closest to a query vector, so "find things similar to this" becomes a geometry problem you can answer in milliseconds.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">95–99%</div><div class="stat__label">of the true top-K that an approximate index returns</div></div>
+          <div class="stat"><div class="stat__num">~3 GB</div><div class="stat__label">read per query by a flat scan of 1M × 768-dim float32</div></div>
+          <div class="stat"><div class="stat__num">40</div><div class="stat__label">pgvector default <code>hnsw.ef_search</code></div></div>
+          <div class="stat"><div class="stat__num">4–32×</div><div class="stat__label">less memory with int8 / PQ / binary quantization</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM: the geometry -->
+        <figure class="diagram">
+          <svg viewBox="0 0 560 300" role="img" aria-labelledby="heroTitle heroDesc" width="560" style="max-width:100%">
+            <title id="heroTitle">Nearest neighbours in embedding space</title>
+            <desc id="heroDesc">A 2D picture of embedding space. Stored vectors form clusters. A query point sits in the middle, and the five stored points closest to it are highlighted inside a dashed circle: these are the top-5 results.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- background points (far from q) -->
+              <g fill="var(--text-faint)">
+                <circle cx="90"  cy="60"  r="5"/><circle cx="120" cy="70"  r="5"/><circle cx="105" cy="100" r="5"/>
+                <circle cx="140" cy="95"  r="5"/><circle cx="80"  cy="110" r="5"/><circle cx="130" cy="120" r="5"/>
+                <circle cx="100" cy="220" r="5"/><circle cx="140" cy="240" r="5"/><circle cx="160" cy="215" r="5"/>
+                <circle cx="120" cy="260" r="5"/><circle cx="170" cy="255" r="5"/>
+                <circle cx="430" cy="70"  r="5"/><circle cx="470" cy="60"  r="5"/><circle cx="490" cy="100" r="5"/>
+                <circle cx="450" cy="115" r="5"/><circle cx="510" cy="80"  r="5"/>
+                <circle cx="420" cy="215" r="5"/><circle cx="460" cy="240" r="5"/><circle cx="400" cy="250" r="5"/>
+                <circle cx="480" cy="220" r="5"/><circle cx="445" cy="265" r="5"/>
+                <circle cx="350" cy="195" r="5"/><circle cx="240" cy="100" r="5"/><circle cx="230" cy="190" r="5"/>
+                <circle cx="345" cy="95"  r="5"/>
+              </g>
+              <!-- search radius -->
+              <circle cx="290" cy="150" r="46" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="5 4"/>
+              <!-- links to the 5 nearest -->
+              <g stroke="var(--accent)" stroke-width="1.5">
+                <line x1="290" y1="150" x2="262" y2="132"/>
+                <line x1="290" y1="150" x2="318" y2="140"/>
+                <line x1="290" y1="150" x2="300" y2="180"/>
+                <line x1="290" y1="150" x2="270" y2="172"/>
+                <line x1="290" y1="150" x2="312" y2="118"/>
+              </g>
+              <!-- the 5 nearest -->
+              <g fill="var(--accent)">
+                <circle cx="262" cy="132" r="6"/><circle cx="318" cy="140" r="6"/><circle cx="300" cy="180" r="6"/>
+                <circle cx="270" cy="172" r="6"/><circle cx="312" cy="118" r="6"/>
+              </g>
+              <!-- the query -->
+              <rect x="283" y="143" width="14" height="14" fill="var(--warn)" transform="rotate(45 290 150)"/>
+              <text x="290" y="226" fill="var(--warn)" text-anchor="middle">q = query vector</text>
+              <text x="290" y="244" fill="var(--accent)" text-anchor="middle">top-5 nearest = results</text>
+              <text x="20" y="24" fill="var(--text-muted)">Embedding space (shown in 2D; real vectors have 384–3072 dims)</text>
+              <text x="20" y="290" fill="var(--text-faint)" font-size="12">Exact k-NN measures all N points. ANN checks only a small region and may miss a few.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The whole idea in one picture: similar things sit close together, so a search is "which K stored points are nearest to q?"</figcaption>
+        </figure>
+
+        <!-- "WHAT YOU'LL FIND" MAP -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the 30-second version, the city-map mental model (districts vs highways), and what vector search is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: how HNSW and IVF are built and queried, real defaults, filtering strategies, the trade-off table, and why storage shapes the index.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Ten best practices with the Do/Why/Avoid triad, anti-patterns, case studies from Notion, Cursor, and Spotify, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know embeddings? Jump to Detail for how HNSW and IVF work, or Practice for recall, filtering, and sizing rules.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

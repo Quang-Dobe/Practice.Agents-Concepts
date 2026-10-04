@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vector Search · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Vector Search</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Vector Search</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/vector-search/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Vector Search</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~12 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Given a set X of N vectors in ℝ<sup>d</sup>, a dissimilarity function δ, a query vector q, and an integer k:</p>
+        <ul>
+          <li><strong>k-nearest-neighbour (k-NN) search</strong> returns the k points of X with the smallest δ(q, x). A flat scan solves it exactly in O(N·d) per query.</li>
+          <li><strong>Approximate nearest-neighbour (ANN) search</strong> returns a set S of size k. It is judged by <strong>recall@k = |S ∩ true top-k| / k</strong>, under a latency and memory budget.</li>
+          <li>Graph and partition indexes give <strong>no worst-case recall guarantee</strong>.</li>
+          <li>Only LSH offers a probabilistic (1+ε)-approximation bound, and it pays for that bound in memory.</li>
+        </ul>
+
+        <h3>How the three metrics relate</h3>
+        <ul>
+          <li>On unit-normalized vectors, <strong>‖q − x‖² = 2 − 2·(q·x)</strong>. So L2, cosine, and inner product produce the same ranking.</li>
+          <li>On unnormalized vectors, inner product is not a metric: it breaks the
+            <span class="term" data-gloss="d(a,c) ≤ d(a,b) + d(b,c): going via a detour is never shorter">triangle inequality</span>.</li>
+          <li>Ranking by it is called
+            <span class="term">maximum inner product search (MIPS)</span>
+            <span class="term__gloss">find the stored vectors with the largest dot product with q</span>.
+            Some indexes need a transform or special handling to support it.</li>
+        </ul>
+        <p>On this page, "vector search" means an ANN index plus the query execution around it: metric, filters, top-k merge, and optional re-ranking.</p>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Vectors + a metric</dt><dd>Dense float vectors, usually 384–3072 dimensions, from an embedding model. The metric must match the one the model was trained with.</dd></div>
+          <div><dt>Partition indexes (IVF family)</dt><dd>k-means splits the space into <code>nlist</code> cells; a query scans only the <code>nprobe</code> nearest cells. SPANN and SPFresh are disk- and update-oriented variants.</dd></div>
+          <div><dt>Graph indexes</dt><dd>Each vector is a node linked to nearby nodes; a query walks the graph greedily. HNSW (<a href="https://arxiv.org/abs/1603.09320" rel="noopener">Malkov &amp; Yashunin</a>), Vamana/DiskANN, NVIDIA's GPU-built CAGRA.</dd></div>
+          <div><dt>Hash and tree indexes</dt><dd>LSH and random-projection trees such as Spotify's Annoy. Largely displaced by graphs at high recall.</dd></div>
+          <div><dt>Quantization</dt><dd>Compresses stored vectors. int8 scalar = 4× smaller than float32. PQ = typically 16–64× smaller. Binary (1 bit per dim, e.g. RaBitQ, Elastic's BBQ) = 32× smaller.</dd></div>
+          <div><dt>Re-ranking (refinement)</dt><dd>Over-fetch candidates using compressed vectors, then re-score them with full-precision vectors to win back recall.</dd></div>
+          <div><dt>Filter integration</dt><dd>Pre-filter, post-filter, or filter-aware traversal. Decides whether <code>WHERE tenant_id = 42</code> still returns k rows.</dd></div>
+          <div><dt>Query-time knobs</dt><dd><code>ef_search</code> for graphs, <code>nprobe</code>/<code>probes</code> for IVF. They move each query along the recall/latency curve.</dd></div>
+          <div><dt>Evaluation setup</dt><dd>Brute-force ground truth on a query sample plus recall@k. <a href="https://ann-benchmarks.com/" rel="noopener">ANN-Benchmarks</a> is the public reference.</dd></div>
+        </dl>
+
+        <h3>Its neighbours</h3>
+        <ul>
+          <li>Vector search is the dense, high-dimensional branch of <strong>similarity search</strong>.</li>
+          <li><strong>Lexical retrieval</strong> is its closest sibling: BM25 over an inverted index, matching exact terms in sparse, very high-dimensional space.</li>
+          <li><strong>Learned sparse retrieval</strong> (SPLADE) sits in between: model-produced weights stored in an inverted index.</li>
+          <li><strong>Spatial indexes</strong> (R-trees, kd-trees) solve the same problem well in 2–10 dimensions (geo, CAD) and collapse beyond that.</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>It runs in the <strong>retrieval layer of the data tier</strong>, on the hot path of every semantic query. The app embeds the query by calling a model, sends the vector to the index, and gets back IDs, scores, and payloads. Four deployment shapes:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">1 · In-process library</div><p>FAISS, hnswlib, USearch. Your service owns the index's memory, persistence, and replication.</p></div>
+          <div class="card"><div class="card__title">2 · Feature of a general DB</div><p>pgvector, Lucene-based Elasticsearch/OpenSearch, MongoDB Atlas, SQL Server 2025. Vectors live next to relational or document data.</p></div>
+          <div class="card"><div class="card__title">3 · Dedicated vector DB</div><p>Milvus, Qdrant, Weaviate, Pinecone. Sharding, filtering, and hybrid search are built in.</p></div>
+          <div class="card"><div class="card__title">4 · Object-storage-native</div><p>turbopuffer, LanceDB, Amazon S3 Vectors. Data lives in S3-class storage with an NVMe/RAM cache in front.</p></div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    App["Application"] -->|embed query via model call| V["Query vector"]
+    V --> A["1 · In-process library (FAISS, hnswlib, USearch)"]
+    V --> B["2 · General DB feature (pgvector, Elasticsearch, MongoDB Atlas, SQL Server 2025)"]
+    V --> C["3 · Dedicated vector DB (Milvus, Qdrant, Weaviate, Pinecone)"]
+    V --> D["4 · Object-storage-native (turbopuffer, LanceDB, S3 Vectors)"]
+    A --> O["IDs + scores + payloads"]
+    B --> O
+    C --> O
+    D --> O
+          </pre>
+          <figcaption class="diagram__caption">Same job, four homes. The further down the list, the cheaper the storage and the more each round trip costs.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <ul>
+          <li>The retrieval step of RAG systems and coding assistants that search a codebase or document corpus.</li>
+          <li>Candidate generation in recommenders: a two-tower model embeds users and items, ANN fetches the top few hundred items, then a heavier ranker scores them.</li>
+          <li>E-commerce "similar products" and visual search.</li>
+          <li>Near-duplicate detection for images, support tickets, or scraped pages.</li>
+          <li>Hybrid site search in Elasticsearch/OpenSearch, where kNN results are fused with BM25.</li>
+        </ul>
+
+        <h3>Ecosystem and tooling</h3>
+        <dl class="vocab">
+          <div><dt>Index libraries</dt><dd>FAISS (Meta; flat, IVF, PQ, HNSW, GPU), hnswlib, ScaNN (Google), DiskANN (Microsoft), USearch.</dd></div>
+          <div><dt>In an existing DB</dt><dd>pgvector (current release 0.8.7), Elasticsearch <code>dense_vector</code>, OpenSearch k-NN, MongoDB Atlas Vector Search, SQL Server 2025 <code>VECTOR</code> type. SQL Server's DiskANN index is still behind <code>PREVIEW_FEATURES</code> (<a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/create-vector-index-transact-sql" rel="noopener">docs</a>).</dd></div>
+          <div><dt>Dedicated engines</dt><dd>Milvus, Qdrant, Weaviate, Pinecone, Vespa.</dd></div>
+          <div><dt>Object storage / serverless</dt><dd>turbopuffer, LanceDB, S3 Vectors.</dd></div>
+          <div><dt>GPU acceleration</dt><dd>NVIDIA cuVS (CAGRA, IVF-PQ), integrated into FAISS from 1.10.0.</dd></div>
+          <div><dt>Hybrid fusion</dt><dd>Reciprocal Rank Fusion (RRF) is built into Elasticsearch, OpenSearch, Weaviate, and Azure AI Search.</dd></div>
+          <div><dt>Benchmarks</dt><dd>ANN-Benchmarks and big-ann-benchmarks.</dd></div>
+        </dl>
+
+        <!-- WHEN -->
+        <h2>When it emerged</h2>
+        <ol class="steps">
+          <li><span class="steps__title">1975–1998 · Trees hit the dimensionality wall.</span> kd-trees work well in low dimensions. <a href="https://www.vldb.org/conf/1998/p194.pdf" rel="noopener">Weber, Schek &amp; Blott (VLDB 1998)</a> showed tree and partitioning methods lose to a sequential scan above roughly 10 dimensions. That pushed the field toward approximation.</li>
+          <li><span class="steps__title">1998 · LSH.</span> Indyk &amp; Motwani introduced locality-sensitive hashing, the first sublinear approximate scheme with guarantees. High recall needed many hash tables, so memory grew fast.</li>
+          <li><span class="steps__title">2011 · Product quantization.</span> Jégou, Douze &amp; Schmid (TPAMI) compressed vectors to a few bytes each and computed distances through lookup tables. IVFADC (IVF + PQ) made billion-scale search fit in RAM.</li>
+          <li><span class="steps__title">2014–2016 · Navigable small-world graphs.</span> NSW, then HNSW (arXiv 2016, TPAMI 2018), gave logarithmic-scaling search with high recall. HNSW became the default in-memory index.</li>
+          <li><span class="steps__title">2017–2020 · Industrial libraries.</span> FAISS open-sourced in 2017. <a href="https://papers.nips.cc/paper/2019/hash/09853c7fb1d3f8ee67a61b6bf4a7f8e6-Abstract.html" rel="noopener">DiskANN (NeurIPS 2019)</a> served 1B SIFT vectors from a 64 GB RAM machine plus an SSD at &gt;5,000 QPS, &lt;3 ms mean latency, and 95%+ 1-recall@1. ScaNN followed in 2020.</li>
+          <li><span class="steps__title">2023 onward · The LLM wave.</span> RAG turned ANN from a recommender/IR specialty into general app infrastructure. pgvector added HNSW in 0.5.0 (August 2023).</li>
+        </ol>
+
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Queries describe intent in natural language or by example ("like this image"), and exact-term matching misses relevant results.</li>
+              <li>The corpus is big enough that a flat scan breaks your latency budget.</li>
+              <li>A recall of about 0.95 is fine, because a downstream step (an LLM, a reranker, or a human) tolerates a few misses.</li>
+              <li>You already embed content for other reasons, so an index costs little extra.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>The corpus has fewer than about 10⁴–10⁵ vectors. A flat scan is exact, simple, and fast enough; an index adds build cost and tuning for no gain.</li>
+              <li>Lookups are exact: IDs, SKUs, error codes, emails. Use B-tree or inverted indexes.</li>
+              <li>Recall must be complete and auditable (e-discovery, compliance holds).</li>
+              <li>Structured predicates already narrow the set to a few thousand rows. Filter first, then rank exactly.</li>
+              <li>The team can't run an embedding pipeline. Re-embedding on every model change is a real operational cost.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Rule of thumb</p>
+            <p>A flat scan of 1M × 768-dim float32 vectors touches about <strong>3 GB per query</strong>. If that blows your latency budget, you need an index.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <h3>HNSW: build and query</h3>
+        <figure class="diagram">
+          <svg viewBox="0 0 620 290" role="img" aria-labelledby="hnswTitle hnswDesc" width="620" style="max-width:100%">
+            <title id="hnswTitle">HNSW layers</title>
+            <desc id="hnswDesc">Three layers of an HNSW graph. Layer 2 holds only nodes E and X with one long link. Layer 1 holds E, B, X, and Y. Layer 0 holds every node: E, C, B, D, F, X, G, Y. A query q sits on the right of layer 0. The highlighted path enters at E on layer 2, hops to X, drops to layer 1, hops to Y, drops to layer 0, and ends next to q.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="26"  fill="var(--text-muted)">Layer 2 · few nodes, long-range links</text>
+              <text x="20" y="114" fill="var(--text-muted)">Layer 1 · more nodes, medium links</text>
+              <text x="20" y="202" fill="var(--text-muted)">Layer 0 · every node, up to 2·M links</text>
+
+              <!-- vertical "same node" links -->
+              <g stroke="var(--border)" stroke-dasharray="4 4">
+                <line x1="50"  y1="58"  x2="50"  y2="234"/>
+                <line x1="170" y1="146" x2="170" y2="234"/>
+                <line x1="350" y1="146" x2="350" y2="234"/>
+              </g>
+              <!-- normal edges -->
+              <g stroke="var(--border)" stroke-width="1.5">
+                <line x1="50"  y1="146" x2="350" y2="146"/>
+                <line x1="50"  y1="234" x2="470" y2="234"/>
+              </g>
+              <!-- query path (accent) -->
+              <g stroke="var(--accent)" stroke-width="2.5">
+                <line x1="50"  y1="58"  x2="350" y2="58"/>
+                <line x1="350" y1="58"  x2="350" y2="146" stroke-dasharray="5 4"/>
+                <line x1="350" y1="146" x2="470" y2="146"/>
+                <line x1="470" y1="146" x2="470" y2="234" stroke-dasharray="5 4"/>
+                <line x1="470" y1="234" x2="545" y2="234" stroke-dasharray="5 4"/>
+              </g>
+
+              <!-- nodes: off-path -->
+              <g fill="var(--bg-elev-2)" stroke="var(--border)">
+                <circle cx="50"  cy="146" r="13"/>
+                <circle cx="170" cy="146" r="13"/>
+                <circle cx="50"  cy="234" r="13"/>
+                <circle cx="110" cy="234" r="13"/>
+                <circle cx="170" cy="234" r="13"/>
+                <circle cx="230" cy="234" r="13"/>
+                <circle cx="290" cy="234" r="13"/>
+                <circle cx="350" cy="234" r="13"/>
+                <circle cx="410" cy="234" r="13"/>
+              </g>
+              <!-- nodes: on-path -->
+              <g fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5">
+                <circle cx="50"  cy="58"  r="13"/>
+                <circle cx="350" cy="58"  r="13"/>
+                <circle cx="350" cy="146" r="13"/>
+                <circle cx="470" cy="146" r="13"/>
+                <circle cx="470" cy="234" r="13"/>
+              </g>
+              <!-- node letters -->
+              <g fill="var(--text)" text-anchor="middle" font-size="12">
+                <text x="50"  y="62">E</text><text x="350" y="62">X</text>
+                <text x="50"  y="150">E</text><text x="170" y="150">B</text><text x="350" y="150">X</text><text x="470" y="150">Y</text>
+                <text x="50"  y="238">E</text><text x="110" y="238">C</text><text x="170" y="238">B</text><text x="230" y="238">D</text>
+                <text x="290" y="238">F</text><text x="350" y="238">X</text><text x="410" y="238">G</text><text x="470" y="238">Y</text>
+              </g>
+              <!-- query -->
+              <rect x="546" y="226" width="16" height="16" fill="var(--warn)" transform="rotate(45 554 234)"/>
+              <text x="554" y="268" fill="var(--warn)" text-anchor="middle">q</text>
+              <text x="20" y="282" fill="var(--text-faint)" font-size="12">Highlighted: one query's greedy path. Long hop on top, shorter hop in the middle, refine on layer 0.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">A skip list over a proximity graph: coarse layers cover distance fast, layer 0 does the fine search.</figcaption>
+        </figure>
+        <ol class="steps">
+          <li><span class="steps__title">Level assignment.</span> Each new vector draws a top layer from an exponentially decaying distribution, with normalization factor m<sub>L</sub> = 1/ln(M). Most nodes live only on layer 0. The result is a probabilistic skip list over a proximity graph.</li>
+          <li><span class="steps__title">Insert.</span> From the global entry point, greedily descend the layers above the node's top layer. On each layer from there down, run a
+            <span class="term">beam search</span>
+            <span class="term__gloss">a search that keeps the best N candidates at each step instead of only the single best</span>
+            of width <code>ef_construction</code>. Then pick up to M neighbours (2·M on layer 0) with a diversity rule: drop a candidate if it is closer to an already-chosen neighbour than to the new node. This keeps long-range edges and prevents isolated clusters.</li>
+          <li><span class="steps__title">Query.</span> Greedy descent with beam width 1 through the upper layers. On layer 0, run a best-first search that keeps the <code>ef_search</code> best candidates. Stop when the nearest unexplored candidate is farther than the worst kept result. Return the top k.</li>
+          <li><span class="steps__title">Cost.</span> Search cost grows roughly as log N × node degree. Memory = raw vectors + about 2·M × 4 bytes of neighbour IDs per node. For 1M × 1536-dim float32: about <strong>6.1 GB of vectors vs about 0.13 GB of graph</strong> at M=16. Vectors dominate, which is why quantization matters more than M.</li>
+        </ol>
+
+        <h3>IVF (and IVF-PQ): build and query</h3>
+        <ol class="steps">
+          <li><span class="steps__title">Train.</span> Run k-means on a representative sample to get <code>nlist</code> centroids. pgvector recommends <code>lists = rows/1000</code> up to 1M rows and <code>sqrt(rows)</code> beyond.</li>
+          <li><span class="steps__title">Assign.</span> Put each vector in its nearest centroid's inverted list.</li>
+          <li><span class="steps__title">Optional PQ.</span> Split each residual vector into m sub-vectors and quantize each to one of 256 sub-centroids, so each vector costs m bytes. Example: 1536 dims with m=192 gives <strong>192 bytes vs 6,144 bytes</strong> as float32.</li>
+          <li><span class="steps__title">Query.</span> Compute distances to all centroids and pick the <code>nprobe</code> nearest. For PQ, precompute an m × 256 distance lookup table per query (
+            <span class="term">asymmetric distance computation</span>
+            <span class="term__gloss">the query stays full precision; only stored vectors are compressed, so distances come from table lookups</span>).
+            Scan the chosen lists via table lookups, keep a top-k heap, and optionally re-rank with full vectors.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant A as App
+    participant M as Embedding model
+    participant I as ANN index
+    participant S as Full vectors
+    A->>M: embed query text
+    M-->>A: query vector q
+    A->>I: top-k for q, filter, ef_search or nprobe
+    alt HNSW
+        I->>I: greedy descent through upper layers (beam 1)
+        I->>I: best-first on layer 0, keep ef_search best
+    else IVF / IVF-PQ
+        I->>I: distance to all centroids, pick nprobe nearest
+        I->>I: scan those lists via PQ lookup table, top-k heap
+    end
+    opt re-rank
+        I->>S: fetch full-precision vectors for over-fetched candidates
+        S-->>I: exact scores
+    end
+    I-->>A: IDs, scores, payloads
+          </pre>
+          <figcaption class="diagram__caption">One query end to end. The <code>alt</code> branches are the two index families; the optional re-rank is how quantized indexes win back recall.</figcaption>
+        </figure>
+
+        <h3>What the MVP shows</h3>
+        <p>The <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/vector-search/code" target="_blank" rel="noopener">code folder</a> builds an IVF index from scratch in standard-library Python. With <code>random.seed(7)</code> it prints:</p>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col"><code>nprobe</code></th><th scope="col">recall@10</th><th scope="col">Vectors scanned per query</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>1</td><td>0.382</td><td>104 (2% of corpus)</td></tr>
+              <tr><td>4</td><td>0.716</td><td>406 (8% of corpus)</td></tr>
+              <tr><td>16</td><td>0.962</td><td>1,599 (32% of corpus)</td></tr>
+              <tr><td>50</td><td>1.000</td><td>5,000 (100% of corpus)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>At <code>nprobe=1</code> (pgvector's <code>ivfflat.probes</code> default) recall is poor. Scanning every cell (<code>nprobe=50</code>) is just a slower flat scan.</p>
+
+        <h3>Defaults you will actually hit</h3>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Engine</th><th scope="col">Build params</th><th scope="col">Query param</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>pgvector HNSW</td><td><code>m=16</code>, <code>ef_construction=64</code></td><td><code>hnsw.ef_search=40</code></td></tr>
+              <tr><td>pgvector IVFFlat</td><td><code>lists</code> (no safe default; size it)</td><td><code>ivfflat.probes=1</code></td></tr>
+              <tr><td>FAISS <code>IndexHNSW</code></td><td>M set by caller (32 is common), <code>efConstruction=40</code></td><td><code>efSearch=16</code></td></tr>
+              <tr><td>Elasticsearch 9.1+</td><td><code>bbq_hnsw</code> default for &gt;384 dims</td><td><code>num_candidates</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Filtering strategies</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Post-filter</div><p>Run ANN, then drop non-matching rows. With a selective filter, this returns fewer than k rows.</p></div>
+          <div class="card"><div class="card__title">Pre-filter</div><p>Compute the matching set first, then scan it exactly. Ideal when the filter is selective; cost grows with the size of the matching set.</p></div>
+          <div class="card"><div class="card__title">Filter-aware traversal</div><p>The graph walk skips or bridges non-matching nodes. Qdrant adds per-payload-value edges ("filterable HNSW") and a cardinality-based query planner. <a href="https://arxiv.org/abs/2403.04871" rel="noopener">ACORN (SIGMOD 2024)</a> expands neighbour lists so predicate subgraphs stay navigable; Weaviate added it in v1.27 and made it the default in v1.34.</p></div>
+          <div class="card"><div class="card__title">Iterative scan</div><p>pgvector 0.8.0 (October 2024) keeps fetching from the index until k rows pass the filter, capped by <code>hnsw.max_scan_tuples</code> (default 20,000).</p></div>
+        </div>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 560 240" role="img" aria-labelledby="pfTitle pfDesc" width="560" style="max-width:100%">
+            <title id="pfTitle">Why post-filtering loses rows</title>
+            <desc id="pfDesc">Forty candidate boxes returned by an ANN index with ef_search 40. Only four of them match a ten percent selective tenant filter. The query asked for ten results and gets about four.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="24" fill="var(--text-muted)">ANN returns ef_search = 40 candidates</text>
+              <g fill="var(--bg-elev-2)" stroke="var(--border)">
+                <rect x="20"  y="40" width="46" height="26" rx="5"/><rect x="72"  y="40" width="46" height="26" rx="5"/><rect x="124" y="40" width="46" height="26" rx="5"/>
+                <rect x="228" y="40" width="46" height="26" rx="5"/><rect x="280" y="40" width="46" height="26" rx="5"/><rect x="332" y="40" width="46" height="26" rx="5"/>
+                <rect x="384" y="40" width="46" height="26" rx="5"/><rect x="436" y="40" width="46" height="26" rx="5"/><rect x="488" y="40" width="46" height="26" rx="5"/>
+
+                <rect x="20"  y="74" width="46" height="26" rx="5"/><rect x="72"  y="74" width="46" height="26" rx="5"/><rect x="124" y="74" width="46" height="26" rx="5"/>
+                <rect x="176" y="74" width="46" height="26" rx="5"/><rect x="228" y="74" width="46" height="26" rx="5"/><rect x="280" y="74" width="46" height="26" rx="5"/>
+                <rect x="332" y="74" width="46" height="26" rx="5"/><rect x="436" y="74" width="46" height="26" rx="5"/><rect x="488" y="74" width="46" height="26" rx="5"/>
+
+                <rect x="20"  y="108" width="46" height="26" rx="5"/><rect x="124" y="108" width="46" height="26" rx="5"/>
+                <rect x="176" y="108" width="46" height="26" rx="5"/><rect x="228" y="108" width="46" height="26" rx="5"/><rect x="280" y="108" width="46" height="26" rx="5"/>
+                <rect x="332" y="108" width="46" height="26" rx="5"/><rect x="384" y="108" width="46" height="26" rx="5"/><rect x="436" y="108" width="46" height="26" rx="5"/>
+                <rect x="488" y="108" width="46" height="26" rx="5"/>
+
+                <rect x="20"  y="142" width="46" height="26" rx="5"/><rect x="72"  y="142" width="46" height="26" rx="5"/><rect x="124" y="142" width="46" height="26" rx="5"/>
+                <rect x="176" y="142" width="46" height="26" rx="5"/><rect x="228" y="142" width="46" height="26" rx="5"/>
+                <rect x="332" y="142" width="46" height="26" rx="5"/><rect x="384" y="142" width="46" height="26" rx="5"/><rect x="436" y="142" width="46" height="26" rx="5"/>
+                <rect x="488" y="142" width="46" height="26" rx="5"/>
+              </g>
+              <!-- the 4 that pass the filter -->
+              <g fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5">
+                <rect x="176" y="40"  width="46" height="26" rx="5"/>
+                <rect x="384" y="74"  width="46" height="26" rx="5"/>
+                <rect x="72"  y="108" width="46" height="26" rx="5"/>
+                <rect x="280" y="142" width="46" height="26" rx="5"/>
+              </g>
+              <g fill="var(--accent)" text-anchor="middle" font-size="12">
+                <text x="199" y="58">✓</text><text x="407" y="92">✓</text><text x="95" y="126">✓</text><text x="303" y="160">✓</text>
+              </g>
+              <text x="20" y="198" fill="var(--text)">WHERE tenant_id = 42 (10% selective) keeps ~4 of 40</text>
+              <text x="20" y="222" fill="var(--danger)">Asked for k = 10, got ~4 back. No error raised.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Post-filtering a 40-candidate list with a 10% filter. The MVP measures this: post-filter averages 4.1 rows, pre-filter plus exact scan returns all 10.0.</figcaption>
+        </figure>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>HNSW over IVF</td><td>High recall at low latency; incremental inserts; no training step</td><td>Slow, memory-hungry build; random-access pattern needs RAM; deletes degrade the graph</td></tr>
+              <tr><td>IVF over HNSW</td><td>Fast build; small overhead; partitions map cleanly to disk and object storage</td><td>Needs representative training data; recall depends heavily on <code>nprobe</code>; drifts as data changes</td></tr>
+              <tr><td>Quantization (int8 / PQ / binary)</td><td>4–32× less memory and bandwidth</td><td>Recall loss, which you claw back with over-fetch plus full-precision re-rank</td></tr>
+              <tr><td>Higher <code>M</code> / <code>ef_construction</code></td><td>Better graph, higher recall ceiling</td><td>Longer builds, larger index</td></tr>
+              <tr><td>Higher <code>ef_search</code> / <code>nprobe</code></td><td>Recall, per query</td><td>Latency, roughly linear in the knob</td></tr>
+              <tr><td>RAM vs SSD (DiskANN) vs object storage</td><td>Latency of a few ms in RAM</td><td>5–10× more vectors per node on SSD; ~100 ms+ per round trip on object storage, much cheaper</td></tr>
+              <tr><td>Dedicated engine vs pgvector</td><td>Sharding, filter-aware ANN, hybrid search out of the box</td><td>A second datastore to keep consistent with the source of truth</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">A filtered query returns 3 rows instead of 10</p>
+            <p>Cause: post-filtering an <code>ef_search=40</code> candidate list. A 10%-selective filter leaves about 4 matches.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Recall quietly drops weeks after launch</p>
+            <p>Cause: update/delete churn leaves
+              <span class="term">tombstones</span>
+              <span class="term__gloss">deleted entries that are only marked dead, not removed from the graph</span>
+              and <a href="https://arxiv.org/abs/2407.07871" rel="noopener">unreachable nodes</a> in the graph. The index needs periodic rebuilds.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">IVF recall falls after a data shift</p>
+            <p>Cause: centroids were trained on old or tiny data, so the lists become unbalanced. pgvector warns to build IVFFlat only after the table has data.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">The Postgres index is never used</p>
+            <p>Cause: the query operator doesn't match the
+              <span class="term">opclass</span>
+              <span class="term__gloss">the operator class an index was built for, which fixes which distance operator it can serve</span>
+              (for example <code>&lt;-&gt;</code> against <code>vector_cosine_ops</code>), or the planner costs a high <code>ef_search</code> above a sequential scan.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">p99 jumps from milliseconds to hundreds of milliseconds</p>
+            <p>Cause: the HNSW index outgrew RAM, so every hop became a page fault.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Scores look reasonable but results are garbage</p>
+            <p>Cause: vectors from two embedding models, or two model versions, were mixed in one index. Their spaces are not comparable.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Ranking is subtly wrong</p>
+            <p>Cause: the metric doesn't match the model's training (L2 on unnormalized vectors from a dot-product model).</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Searches for "ERR_4012" or a SKU miss</p>
+            <p>Cause: dense embeddings blur rare exact tokens. Add BM25 and fuse the results with
+              <span class="term" data-gloss="Reciprocal Rank Fusion: score = sum of 1/(k + rank) across result lists">RRF</span>
+              (k=60 by convention, per Cormack et al. 2009).</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">A fixed similarity threshold behaves inconsistently</p>
+            <p>Cause: cosine scores are not calibrated across queries or models.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <ul>
+          <li>Exact nearest-neighbour search in high dimensions has no known algorithm that is both sublinear and free of exponential dependence on d.</li>
+          <li>At N = 10⁸ and d = 1024, a flat scan reads <strong>hundreds of gigabytes per query</strong>. That is a memory-bandwidth problem no CPU solves at interactive QPS.</li>
+          <li>ANN trades a measured, tunable amount of correctness (recall) for orders of magnitude less data touched per query.</li>
+          <li>It works because real embeddings have a much lower
+            <span class="term">intrinsic dimension</span>
+            <span class="term__gloss">the number of directions the data really varies along, versus the nominal d</span>
+            than their nominal d. Locality survives in a navigable structure even where trees fail.</li>
+        </ul>
+
+        <h3>Why it looks the way it does</h3>
+        <dl class="vocab">
+          <div><dt>Why graphs beat LSH and trees</dt><dd>LSH gives guarantees but needs many hash tables for high recall, which multiplies memory. Trees degrade toward a scan above about 10 dimensions. Graphs adapt to the data's intrinsic dimension and reach 0.95+ recall while visiting a tiny fraction of nodes.</dd></div>
+          <div><dt>Why HNSW has layers</dt><dd>A flat NSW graph mixes long and short links, so searches waste hops and complexity scales polylogarithmically. HNSW separates links by length scale, like a skip list: coarse layers cover distance fast, layer 0 refines. That gives log-scaling hop counts.</dd></div>
+          <div><dt>Why DiskANN goes back to one flat layer</dt><dd>On SSD each hop is a random 4 KB read, so hop count matters more than CPU. Vamana's α-pruning keeps long edges in a single graph to cut hops. Compressed PQ codes stay in RAM to steer the search; full vectors come from disk only for re-ranking.</dd></div>
+          <div><dt>Why object-storage engines use IVF-style partitions</dt><dd>A graph walk on S3 would cost one ~100 ms round trip per hop. Centroid indexes need about 3–4 round trips total, and a partition is a natural unit for batch writes. <a href="https://turbopuffer.com/docs/architecture" rel="noopener">turbopuffer</a> reports about 400–500 ms cold and about 16 ms p50 warm.</dd></div>
+        </dl>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    RAM["RAM: random access is cheap"] --> G["Layered graph (HNSW)"]
+    SSD["SSD: each hop is a random 4 KB read"] --> D["One flat long-edge graph (Vamana / DiskANN) + PQ codes in RAM"]
+    OBJ["Object storage: ~100 ms per round trip"] --> P["IVF-style partitions, ~3–4 round trips total"]
+          </pre>
+          <figcaption class="diagram__caption">The general rule: index structure follows the cost of a random access on the storage medium.</figcaption>
+        </figure>
+
+        <h3>Why it matters now</h3>
+        <p>As of 2026, vector search is turning into a feature of existing databases rather than a product category of its own:</p>
+        <ul>
+          <li>pgvector is the default answer in Postgres shops.</li>
+          <li>SQL Server 2025 ships a <code>VECTOR</code> type.</li>
+          <li>Elasticsearch 9.1+ quantizes by default with <code>bbq_hnsw</code>.</li>
+          <li><a href="https://aws.amazon.com/about-aws/whats-new/2025/12/amazon-s3-vectors-generally-available/" rel="noopener">Amazon S3 Vectors</a> went GA on 2 December 2025: up to 2 billion vectors per index, sub-second infrequent queries, about 100 ms for frequent ones.</li>
+        </ul>
+        <p>The open problems have moved from "which index" to four narrower areas:</p>
+        <ul>
+          <li>Filtered recall (ACORN-style traversal).</li>
+          <li>Aggressive quantization with re-ranking (RaBitQ, BBQ).</li>
+          <li>Tiered RAM/SSD/object storage for cost.</li>
+          <li>GPU index builds. cuVS CAGRA builds up to about 12× faster than CPU HNSW in Meta's FAISS benchmarks.</li>
+        </ul>
+        <p>The core is stable. Storage tiering and filtering are where it is still changing.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify on your own data</p>
+            <ul>
+              <li>At pgvector defaults (<code>ef_search=40</code>), what is recall@10 against brute-force ground truth? What <code>ef_search</code> reaches 0.95, and what does that cost in p95 latency?</li>
+              <li>How does filtered recall change at 50%, 5%, and 0.5% filter selectivity, and how much does <code>hnsw.iterative_scan = relaxed_order</code> recover?</li>
+              <li>What is the recall difference between <code>vector</code>, <code>halfvec</code>, and binary quantization with full-precision re-ranking, versus the memory saved?</li>
+              <li>After deleting or updating 30% of rows, how far does recall drop, and does <code>REINDEX</code> fully restore it?</li>
+              <li>Do exact-token queries (codes, SKUs) measurably improve with BM25 + RRF hybrid search compared with pure vector search?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

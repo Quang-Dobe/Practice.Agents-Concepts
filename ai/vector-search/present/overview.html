@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vector Search · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Vector Search</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Vector Search</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/vector-search/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Vector Search</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Vector search finds the stored vectors closest to a query vector. That turns "find things similar to this" into a geometry problem. In practice it means approximate nearest-neighbour search over embeddings.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <ul>
+              <li>Text, images, or products get turned into
+                <span class="term">embeddings</span>
+                <span class="term__gloss">lists of numbers produced by a model, where similar meaning lands at nearby points</span>.
+                "Similar" now means "close together in space."</li>
+              <li>Vector search answers one question: given a query vector, which K stored vectors are nearest?</li>
+              <li>Checking every vector gives the exact answer, but it gets too slow at millions of items.</li>
+              <li>So almost every real system uses an approximate index. It returns about <strong>95–99%</strong> of the true top-K in a few milliseconds instead of a full scan.</li>
+              <li>This is the retrieval step behind semantic search, recommendations, deduplication, and RAG.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture a city map with <strong>ten million</strong> coffee shops pinned on it. You stand at one spot and want the <strong>10</strong> closest shops.</p>
+        <ul>
+          <li><strong>The exact way.</strong> Measure your distance to all ten million pins and take the top 10. Always right. Far too slow at a thousand queries per second.</li>
+          <li><strong>The approximate way.</strong> Organize the map in advance so you only look at a small part of it. There are two common ways to do that.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Q["You: a query vector"] --> X{"How do you search 10M pins?"}
+    X -->|exact| F["Measure all 10M distances"]
+    F --> T1["Top 10 · always right · too slow at 1,000 QPS"]
+    X -->|approximate| P["Organize the map in advance"]
+    P --> IVF["Districts (IVF): 1,000 districts, check only the few nearest landmarks"]
+    P --> H["Highways (HNSW): start on a highway, exit near you, walk side streets"]
+    IVF --> R["About 95–99% of the true top 10, in a few ms"]
+    H --> R
+          </pre>
+          <figcaption class="diagram__caption">Exact search touches every pin. Approximate search pays an up-front cost to organize the map, then looks at only a small part of it per query.</figcaption>
+        </figure>
+
+        <h3>Districts (IVF)</h3>
+        <ul>
+          <li>Split the city into <strong>1,000</strong> districts, each with a central landmark.</li>
+          <li>To search, find the few landmarks nearest to you and check only the shops in those districts.</li>
+          <li>If the right shop sits just over the border of a district you skipped, you miss it.</li>
+          <li>Checking more districts means fewer misses but a slower search.</li>
+        </ul>
+
+        <h3>Highways and side streets (HNSW)</h3>
+        <ul>
+          <li>Build a road network. A sparse top level has a few long highways. Lower levels add more and more local streets.</li>
+          <li>You start on a highway, get off near your area, and walk the side streets toward closer and closer shops.</li>
+          <li>Fast and usually right, but you can end up on a street that only <em>looks</em> like the closest one.</li>
+        </ul>
+
+        <h3>The three-way balance</h3>
+        <p>Vector search always balances three things. Every index setting moves you somewhere between them:</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 520 250" role="img" aria-labelledby="triTitle triDesc" width="520" style="max-width:100%">
+            <title id="triTitle">Recall, latency, and memory trade-off</title>
+            <desc id="triDesc">A triangle with recall, latency, and memory at its corners. A dot inside the triangle stands for one index setting; moving it toward one corner moves it away from the others.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <polygon points="260,40 80,210 440,210" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+              <circle cx="260" cy="40"  r="7" fill="var(--accent)"/>
+              <circle cx="80"  cy="210" r="7" fill="var(--accent)"/>
+              <circle cx="440" cy="210" r="7" fill="var(--accent)"/>
+              <text x="260" y="24"  fill="var(--text)" text-anchor="middle" font-size="14">Recall</text>
+              <text x="80"  y="238" fill="var(--text)" text-anchor="middle" font-size="14">Latency</text>
+              <text x="440" y="238" fill="var(--text)" text-anchor="middle" font-size="14">Memory</text>
+              <circle cx="250" cy="150" r="8" fill="var(--warn)"/>
+              <text x="266" y="155" fill="var(--warn)">one index setting</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Recall, latency, memory: you can push toward one corner, never all three at once.</figcaption>
+        </figure>
+        <ul>
+          <li><span class="term">Recall</span> <span class="term__gloss">the share of the true nearest neighbours the index actually found</span></li>
+          <li><strong>Latency</strong> — how long one query takes.</li>
+          <li><strong>Memory</strong> — how much RAM the index needs.</li>
+        </ul>
+
+        <h3>What "distance" means</h3>
+        <p>"Close" can be measured in different ways:</p>
+        <ul>
+          <li><span class="term">Cosine similarity</span> <span class="term__gloss">compares only the direction two vectors point in</span>.</li>
+          <li><strong>Dot product</strong> compares direction <em>and</em> length.</li>
+          <li><strong>Euclidean (L2)</strong> measures straight-line distance.</li>
+          <li>If your vectors are
+            <span class="term">normalized</span>
+            <span class="term__gloss">scaled so every vector has length 1</span>,
+            all three give the same ranking.</li>
+          <li>Use the metric your embedding model was trained for.</li>
+        </ul>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not embeddings.</strong> Embeddings are the coordinates. Vector search is how you look things up among them.</li>
+              <li><strong>Not a vector database.</strong> Pinecone, Qdrant, Milvus, and <code>pgvector</code> are <em>products</em> that store vectors and run vector search, plus filtering, persistence, and replication.</li>
+              <li><strong>Not keyword search.</strong> BM25 and full-text indexes match exact terms. Vector search matches by meaning and can miss an exact SKU or error code.</li>
+              <li><strong>Not RAG.</strong> RAG is a pattern that <em>uses</em> vector search to fetch context for an LLM.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Semantic search: users describe what they want instead of typing the exact title.</li>
+              <li>The retrieval step of a RAG pipeline over thousands to billions of chunks.</li>
+              <li>"More like this" recommendations for products, articles, or images.</li>
+              <li>Finding near-duplicates, such as reposted images or reworded support tickets.</li>
+              <li><span class="term">Hybrid search</span> <span class="term__gloss">merging vector results with keyword results to get both meaning and exact matches</span>.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>You need exact lookups by ID, email, or SKU. Use a B-tree index.</li>
+              <li>The dataset is small (roughly tens of thousands of vectors or fewer). A brute-force scan is exact and fast enough, so skip the index.</li>
+              <li>Results must be fully explainable or guaranteed complete, as in legal discovery or compliance. Approximate recall is a liability there.</li>
+              <li>Hard structured filters do most of the work, like "orders from tenant 42 last week." Filter first and rank second.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>k-NN</dt><dd>Exact K-nearest-neighbour search. Compares the query against every vector.</dd></div>
+          <div><dt>ANN</dt><dd>Approximate nearest neighbour. Trades a little accuracy for a large speedup.</dd></div>
+          <div><dt>Recall@K</dt><dd>The share of the true top-K that the index actually returned.</dd></div>
+          <div><dt>Similarity metric</dt><dd>Cosine, dot product, or L2. Defines what "close" means.</dd></div>
+          <div><dt>HNSW</dt><dd>A layered graph index. Fast with high recall, but uses a lot of RAM. See the <a href="https://arxiv.org/abs/1603.09320" rel="noopener">original paper</a>.</dd></div>
+          <div><dt>IVF</dt><dd>A cluster-based index that searches only the <code>nprobe</code> nearest clusters.</dd></div>
+          <div><dt>Product quantization (PQ)</dt><dd>Compresses vectors so more fit in memory, at some cost in accuracy.</dd></div>
+        </dl>
+
+        <p>Next up: the deep dive covers how HNSW and IVF are built and queried, which settings control the recall/latency trade-off, how filtering interacts with ANN, and when disk-based indexes like DiskANN make sense.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

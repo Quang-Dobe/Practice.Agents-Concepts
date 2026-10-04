@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vector Search · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Vector Search</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Vector Search</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/vector-search/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Vector Search</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~11 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>Vector search is usually one column and one query that nobody owns until recall drops or the index outgrows RAM. Three common settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">RAG backend</div><p>A <code>vector(1536)</code> column on a <code>chunks</code> table in Postgres, an HNSW index on it, and one <code>ORDER BY embedding &lt;=&gt; $1 LIMIT 20</code> query on every chat turn.</p></div>
+          <div class="card"><div class="card__title">Multi-tenant SaaS</div><p>"Search my workspace", "ask my docs": a per-tenant retrieval layer. The tenant filter matters as much as the ANN index. Most incidents are filtered-recall bugs or cross-tenant leaks, not algorithm problems.</p></div>
+          <div class="card"><div class="card__title">Recommenders and e-commerce</div><p>The candidate-generation stage. ANN pulls a few hundred items in under 10 ms; a heavier ranker decides what the user sees. Recall only has to be good enough for the ranker.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Build a recall check before you tune anything</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Sample 500–1,000 real production queries. Compute exact top-k with a flat scan (FAISS <code>IndexFlat</code>, or pgvector with <code>SET enable_indexscan = off</code>) as your
+              <span class="term">ground truth</span>
+              <span class="term__gloss">the known-correct answer you score the index against</span>.
+              Report recall@k at several <code>ef_search</code>/<code>nprobe</code> values on a nightly schedule.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>ANN never throws errors. Defaults like pgvector <code>hnsw.ef_search=40</code> or <code>ivfflat.probes=1</code> return <em>something</em> fast, and recall decay from churn or data drift stays invisible until users complain.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Checking five demo queries by eye and calling it tuned.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Version embeddings like a schema</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Store <code>embedding_model</code> and version next to every vector. A new model gets a new column, index, or namespace. Backfill it,
+              <span class="term">shadow-evaluate</span>
+              <span class="term__gloss">run the new version on real queries in parallel without serving its results</span>
+              it with the recall check and a labelled query set, then switch over behind a flag.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Vectors from two models live in incompatible spaces. A mixed index returns plausible-looking scores and nonsense results. Providers also ship new model versions, so a pinned version is your only defence.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Re-embedding in place inside the live index ("it'll be consistent by morning").</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Size for RAM, and quantize before you shard</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Budget N × d × bytes-per-dim, plus graph overhead. In pgvector, count it twice: the HNSW index stores its own copy of each vector next to the heap. Reach for <code>halfvec</code> (2× smaller) or binary quantization with full-precision re-ranking on a 4–10× over-fetch before you add nodes.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>HNSW access is random. Once the index stops fitting in memory, every hop becomes a page fault and p99 jumps from single-digit milliseconds to hundreds.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Adding replicas to fix latency when the real fix was halving the footprint.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Choose a filter strategy per filter, deliberately</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <div>
+              <p>Know how selective each filter is.</p>
+              <ul>
+                <li><strong>Tenant IDs</strong> get physical isolation: pgvector <code>PARTITION BY LIST</code>, a partial index, or Qdrant's <code>is_tenant</code> payload index.</li>
+                <li><strong>Mid-selectivity filters</strong> get filter-aware traversal or pgvector 0.8+ <code>hnsw.iterative_scan = relaxed_order</code>.</li>
+                <li><strong>Very selective filters</strong> (a few thousand rows) get an exact scan.</li>
+              </ul>
+            </div></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Post-filter a 40-candidate list with a 10% filter and you get about 4 rows when you asked for 10. The query succeeds, and the answer is quietly worse.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Adding <code>WHERE</code> to an ANN query and trusting the planner.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    W["ANN query + WHERE filter"] --> S{"How selective is the filter?"}
+    S -->|tenant ID| T["Physical isolation: PARTITION BY LIST, partial index, Qdrant is_tenant"]
+    S -->|mid-selectivity| M["Filter-aware traversal, or pgvector 0.8+ iterative_scan = relaxed_order"]
+    S -->|a few thousand rows| E["Exact scan of the matching set"]
+    S -.->|never by default| P["Post-filter 40 candidates: ~4 of 10 rows come back"]
+          </pre>
+          <figcaption class="diagram__caption">Pick the strategy from the filter's selectivity. Plain post-filtering is the trap, not a strategy.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Use hybrid retrieval for anything users type into</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run BM25 and vector retrieval in parallel, fuse them with
+              <span class="term">Reciprocal Rank Fusion</span>
+              <span class="term__gloss">merges ranked lists by summing 1/(k + rank) for each item</span>
+              (k=60), and run a
+              <span class="term">cross-encoder reranker</span>
+              <span class="term__gloss">a model that reads query and document together and scores their relevance</span>
+              over the top 50–100. Anthropic measured top-20 retrieval failure falling <strong>35%</strong> with contextual embeddings alone, <strong>49%</strong> with BM25 added, and <strong>67%</strong> with reranking on top (<a href="https://www.anthropic.com/news/contextual-retrieval" rel="noopener">source</a>).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Dense embeddings blur rare tokens. Error codes, SKUs, function names, and people's names get missed.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Pure dense retrieval for support search or code search.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    Q["User query"] --> B["BM25: exact terms"]
+    Q --> V["Vector ANN: meaning"]
+    B --> F["Reciprocal Rank Fusion, k = 60"]
+    V --> F
+    F --> R["Cross-encoder reranker over top 50–100"]
+    R --> O["Top-k to the user or the LLM"]
+          </pre>
+          <figcaption class="diagram__caption">Hybrid retrieval: two retrievers in parallel, fused by rank, then reranked. Each stage cut Anthropic's top-20 failure rate further (35% → 49% → 67%).</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Build indexes in bulk, with memory raised</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Load the data first. Then, for that session only, raise <code>maintenance_work_mem</code> (pgvector) and <code>max_parallel_maintenance_workers</code>, and run <code>CREATE INDEX CONCURRENTLY</code>. Watch the build log for <code>NOTICE: hnsw graph no longer fits into maintenance_work_mem</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>At the Postgres default of 64 MB, an HNSW build over millions of rows spills to disk and runs many times slower. An IVFFlat index built on an empty table trains centroids on nothing.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Running <code>CREATE INDEX</code> without <code>CONCURRENTLY</code> on a live table. It blocks writes for the entire build.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Don't re-embed what didn't change</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Hash each chunk's text and its metadata separately. A text change triggers a re-embed. A metadata-only change gets a cheap payload patch.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The embedding pipeline usually costs more than the queries. Notion cut data volume 70% with xxHash-based change detection (<a href="https://www.notion.com/blog/two-years-of-vector-search-at-notion" rel="noopener">source</a>).</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Re-embedding the whole document on every save event.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Schedule rebuilds against churn</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Track the fraction of rows updated or deleted since the last build. Rebuild (<code>REINDEX INDEX CONCURRENTLY</code>) when the recall check shows drift, commonly somewhere around 20–30% churn, but measure it on your own data. In Elasticsearch/OpenSearch, keep segment counts low: each segment is its own HNSW graph and every query searches all of them (<a href="https://www.elastic.co/docs/solutions/search/vector/knn/optimize-performance-accuracy" rel="noopener">Elastic tuning guide</a>).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Tombstones and unreachable nodes erode graph recall weeks after launch.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Assuming <code>VACUUM</code> repairs the graph. In pgvector it is also slow on HNSW, and the docs recommend reindexing first.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Never hard-code a similarity cutoff</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Return top-k and let a reranker or the LLM judge relevance. If you need a "no good match" state, calibrate the threshold per model on labelled pairs, and recalibrate on every model change.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Cosine scores are not calibrated across queries or models. <code>similarity &gt; 0.8</code> means "most results" for one model and "nothing" for the next.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Shipping a magic number copied from a blog post.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Assert index usage in CI</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Keep <code>EXPLAIN (ANALYZE, BUFFERS)</code> checks for hot queries. Confirm the operator matches the opclass (<code>&lt;=&gt;</code> with <code>vector_cosine_ops</code>) and that the plan shows an index scan.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>An operator mismatch, an implicit cast, or a planner cost flip turns a 5 ms query into a sequential scan with no error.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Finding out from a p99 alert after a "harmless" query refactor.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Vector store as source of truth</p>
+            <p>Chunks and metadata live only in the vector DB. When you change the model or the engine, you can't rebuild because the original text is gone or stale. Keep canonical content in your primary store and treat the index as a derived, rebuildable projection.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Post-retrieval tenant filtering</p>
+            <p>The app fetches the global top-50 and drops other tenants' rows in code. Small tenants get empty results, and one missed code path leaks another customer's data. Enforce the tenant scope inside the query (partition, payload filter, or
+              <span class="term">RLS</span>
+              <span class="term__gloss">row-level security: the database itself hides rows the caller may not see</span>)
+              on every call.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Collection-per-tenant at unbounded scale</p>
+            <p>One index per customer looks clean at 50 tenants and collapses at 50,000 under per-collection overhead. Qdrant advises one collection with payload partitioning, and dedicated shards only for a few large tenants. Exception: object-storage engines like turbopuffer, whose namespaces are designed to be cheap.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Benchmark-driven engine choice</p>
+            <p>Picking an engine from ANN-Benchmarks charts, which measure unfiltered, static, single-node data. Your workload has filters, updates, and multi-tenancy. Benchmark your own queries with your filters and update rate.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Cranking <code>ef_search</code> globally</p>
+            <p>Setting <code>ef_search=1000</code> because recall was bad on one query class. Latency grows roughly linearly, and the planner may start preferring sequential scans. Set it per query or per transaction (<code>SET LOCAL</code>), and fix filtered-recall problems with a filter strategy, not brute force.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">One vector per huge document</p>
+            <p>Embedding a 40-page PDF as one vector averages away every specific fact. Chunk on semantic boundaries (sections, functions) and store a back-reference to the parent document.</p></div></div>
+        <div class="callout callout--warn"><span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body"><p class="callout__title">A dedicated vector DB on day one</p>
+            <p>A new datastore, a sync pipeline, and dual-write consistency issues for 200k vectors. Two camps:</p>
+            <ul>
+              <li><strong>Postgres-first:</strong> transactions, RLS, and joins outweigh everything until about 10M vectors.</li>
+              <li><strong>Dedicated-engine:</strong> filter-aware ANN, hybrid search, and sharding out of the box.</li>
+              <li><strong>Tie-breaker:</strong> do your vectors already sit next to relational data that must stay consistent with them?</li>
+            </ul></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Notion · workspace AI search at billions of objects</div>
+            <p>Vectors partitioned by workspace for AI Q&amp;A. Capacity grew 8× in about five months, then moved to turbopuffer (object-storage-native). Search-engine spend fell 60%; p50 latency improved from 70–100 ms to 50–70 ms. <em>Lesson:</em> past launch, the expensive part was the embedding pipeline, not the queries. Change detection and self-hosted embeddings gave the largest savings.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Cursor · codebase retrieval</div>
+            <p>One namespace per codebase, more than 80 million namespaces in total (<a href="https://turbopuffer.com/customers/cursor" rel="noopener">turbopuffer case study</a>). Files are chunked by syntax tree, embedded, and queried per question. <em>Lesson:</em> most namespaces are cold at any moment. Storage tiering (active in NVMe/RAM, long tail in S3) matters more than index choice, and copying vectors between forks of a repo avoids paying to re-embed.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Spotify · music recommendation candidates</div>
+            <p>ANN fed rankers for features like Discover Weekly. Spotify replaced its tree-based Annoy with HNSW-based Voyager: about 10× faster at similar recall and up to 4× less memory (<a href="https://engineering.atspotify.com/introducing-voyager-spotifys-new-nearest-neighbor-search-library" rel="noopener">Spotify Engineering</a>). <em>Lesson:</em> when hundreds of services embed one library, its on-disk format and API stability matter as much as speed. That's why Spotify built its own instead of using hnswlib as-is.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">B2B product · Postgres-first RAG</div>
+            <p>Chunks sit in the same database as accounts, RLS enforces the tenant scope, pgvector HNSW ranks. Deletes are transactional, so a removed document leaves search right away. <em>Lesson:</em> the pain arrives at rebuild time, around tens of millions of rows. Builds need gigabytes of <code>maintenance_work_mem</code> and hours, so plan a partitioned layout before you need it.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Recall:</strong> does a nightly job report recall@10 against brute-force ground truth, with an alert below the agreed floor (for example 0.95)?</li>
+              <li><strong>Dashboards:</strong> are p50/p95/p99 query latency, index size vs available RAM, and cache hit ratio on them?</li>
+              <li><strong>Model versioning:</strong> does every vector record its embedding model and version, and is there a written re-embedding runbook?</li>
+              <li><strong>Tenant scope:</strong> is the tenant or ACL filter enforced inside the vector query on every path, with a test proving tenant A cannot retrieve tenant B's chunks?</li>
+              <li><strong>Filtered recall:</strong> for each production filter, has recall been measured at realistic selectivity, and does the query return k rows?</li>
+              <li><strong>Embedding outage:</strong> when the embedding API is down or rate-limited, what happens: cached query embeddings, a BM25-only fallback, or a hard failure? Has that path been tested?</li>
+              <li><strong>Cost:</strong> is embedding spend bounded by change detection, with a cost alert on embedding tokens per day?</li>
+              <li><strong>Rebuilds:</strong> is there a churn-triggered rebuild procedure (<code>REINDEX CONCURRENTLY</code> or a blue/green index swap) rehearsed on a production-sized copy?</li>
+              <li><strong>Plans:</strong> do hot queries have an <code>EXPLAIN</code> assertion or a plan-regression check?</li>
+              <li><strong>Onboarding:</strong> does a new engineer know where the source text lives, which model is live, and that the index can always be rebuilt from scratch?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Prototype.</span> A flat scan or a default HNSW index on a pgvector column, one embedding model, no filters, no recall measurement. The right call for a few hundred thousand vectors: sub-10 ms queries and no new infrastructure.</li>
+          <li><span class="steps__title">First pain: tenants and filters.</span> Filtered queries return short result sets, someone bolts on post-filtering, and keyword-shaped queries start failing. This forces hybrid search, a filter strategy, and the first recall check.</li>
+          <li><span class="steps__title">Second pain: the first model upgrade.</span> Teams that didn't version vectors discover they need a full parallel index and a backfill: days of embedding spend and a careful cutover.</li>
+          <li><span class="steps__title">The migration point.</span> Around tens of millions of vectors, or when per-tenant isolation dominates. The index stops fitting in RAM, rebuilds take hours, and embedding spend goes to unchanged content. Teams either quantize hard and partition inside Postgres, or move to a dedicated or object-storage engine and keep the primary DB as source of truth. Teams that treated the index as a derived, rebuildable projection from day one do this in weeks; the rest spend a quarter.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://github.com/pgvector/pgvector" rel="noopener">pgvector README</a> — the authoritative source for index options, iterative scans, quantization recipes, and build-memory tuning.</li>
+          <li><a href="https://www.notion.com/blog/two-years-of-vector-search-at-notion" rel="noopener">Two years of vector search at Notion</a> — a rare end-to-end cost and scaling story: sharding, an engine migration, and change detection.</li>
+          <li><a href="https://www.elastic.co/docs/solutions/search/vector/knn/optimize-performance-accuracy" rel="noopener">Elastic: optimize approximate kNN performance</a> — how segment count, the filesystem cache, and quantization drive latency in Lucene-based engines.</li>
+          <li><a href="https://qdrant.tech/documentation/guides/multiple-partitions/" rel="noopener">Qdrant multitenancy guide</a> — payload partitioning vs collections vs custom shards.</li>
+          <li><a href="https://www.anthropic.com/news/contextual-retrieval" rel="noopener">Anthropic: Contextual Retrieval</a> — measured gains from hybrid BM25 + embeddings + reranking on real RAG workloads.</li>
+          <li><a href="https://engineering.atspotify.com/introducing-voyager-spotifys-new-nearest-neighbor-search-library" rel="noopener">Introducing Voyager (Spotify)</a> — why a large team replaced a tree index with HNSW and built its own library to do it.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/vector-search/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

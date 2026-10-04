@@ -1,11 +1,11 @@
-# ARIA
+# Vector Search
 
-ARIA, short for WAI-ARIA, is a W3C set of HTML attributes, `role` plus the `aria-*` family, that tells assistive technology such as screen readers what a custom piece of UI is and what state it is in. Screen readers do not look at pixels; they read the accessibility tree the browser builds from your HTML, and ARIA fills the gaps where native HTML cannot describe an element on its own.
+Vector search finds the stored vectors closest to a query vector. Once text, images, or products are turned into embeddings, which are lists of numbers, "similar" simply means "close together in space," so finding similar things becomes a geometry problem: given a query, which K stored vectors are nearest?
 
-It matters whenever you build a widget HTML has no element for, like tabs, tree views, or comboboxes, or when content changes without a page load and needs to be announced, such as a "3 results found" message. It also exposes states like expanded or selected, links elements that are not nested, and names icon-only buttons. The catch is that ARIA only changes what gets announced, not how anything behaves: it adds no keyboard handling or focus management. So the first rule is to use a native element like `<button>` or `<dialog>` when one exists, because wrong or redundant ARIA actively misleads users.
+It is the retrieval step behind semantic search, "more like this" recommendations, near-duplicate detection, and RAG pipelines. Checking every vector gives the exact answer but gets too slow at millions of items, so real systems use an approximate index that returns about 95 to 99 percent of the true top results in a few milliseconds. Every setting trades between recall, latency, and memory. You skip it for exact lookups by ID or SKU, for small datasets where a brute-force scan is fast enough, and when results must be guaranteed complete.
 
-Picture a courier who cannot see inside boxes and only reads shipping labels. A native `<button>` arrives pre-labeled. A styled `<div>` is a blank box. ARIA is a label printer: stick `role="checkbox"` and `aria-checked="true"` on the box and the courier announces "checkbox, checked." But the label does not change the contents. A `<div role="button">` is announced as a button, yet Enter, Space, and Tab still do nothing unless you write that behavior yourself.
+Picture a city map with ten million coffee shops and you want the ten closest. Measuring the distance to every pin is exact but far too slow. An IVF index splits the city into districts with a landmark each and only checks the districts nearest to you, so a shop just over a skipped border can be missed. An HNSW index builds a road network: you start on sparse highways, exit near your area, and walk side streets toward closer and closer shops. It is fast and usually right, but it uses a lot of memory.
 
 ---
 
-Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/frontend/aria/present/index.html
+Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/ai/vector-search/present/index.html
