@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARIA (WAI-ARIA) · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">ARIA (WAI-ARIA)</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">ARIA (WAI-ARIA)</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/aria/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">ARIA (WAI-ARIA)</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In most product codebases, ARIA lives in the <strong>design system</strong>. Feature code mostly touches it indirectly, by passing a <code>label</code> prop or picking the wrong component. You'll meet it in four settings:</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Design system</div><p>The <code>Combobox</code>, <code>Tabs</code>, <code>Menu</code>, <code>Dialog</code>, and <code>Toast</code> components are where <code>role</code>, <code>aria-*</code>, and keyboard handlers live.</p></div>
+          <div class="card"><div class="card__title">Single-page apps</div><p>ARIA does the work the browser used to do on a page load: announcing route changes, async search results, "saved" toasts, and validation errors through live regions.</p></div>
+          <div class="card"><div class="card__title">Data-heavy tools</div><p>File trees, spreadsheets, admin grids carry the heaviest load: <code>role="tree"</code>/<code>grid</code>, <code>aria-activedescendant</code>, <code>aria-level</code>, and hundreds of nodes whose state must stay accurate.</p></div>
+          <div class="card"><div class="card__title">Audits and legal tickets</div><p>The European Accessibility Act has applied since June 2025, and WCAG 4.1.2 (Name, Role, Value) is the criterion custom widgets fail. "Screen reader announces 'clickable' with no name" → fix with ARIA, or better, swap the <code>&lt;div&gt;</code> for a native element.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    Q["Need an interactive control"] --> N{"Native element exists?"}
+    N -- yes --> U["Use it: button, a href, dialog, details, select, popover, checkbox input"]
+    N -- no --> DS{"Already in the design system or a headless library?"}
+    DS -- yes --> R["Reuse it: pass label, description, items. No raw aria-*"]
+    DS -- no --> K{"Will you ship the full APG keyboard contract?"}
+    K -- yes --> B["Build it once in the design system, one test per key"]
+    K -- no --> X["Don't claim the role"]
+          </pre>
+          <figcaption class="diagram__caption">Practices 1–3 as one decision path: native first, shared component second, a new role only with its full keyboard contract.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Default to native elements and make custom roles go through review</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>&lt;button&gt;</code>, <code>&lt;a href&gt;</code>, <code>&lt;dialog&gt;</code>, <code>&lt;details&gt;</code>, <code>&lt;select&gt;</code>, <code>popover</code>, and <code>&lt;input type="checkbox"&gt;</code> first. Treat any new <code>role=</code> on an interactive element as a design-review item, not a code-review nit.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Native elements bring focus, Enter/Space, form submission, and platform mappings for free. Every <code>&lt;div role="button"&gt;</code> is a future bug where Enter does nothing.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Styling a <code>&lt;div&gt;</code> because "the button had default margins."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Keep ARIA in a few components, not across hundreds of call sites</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Put every composite widget in one place: your design system, or a
+              <span class="term">headless library</span>
+              <span class="term__gloss">ships behavior and ARIA with no styling, e.g. React Aria, Radix, Ariakit, Angular CDK</span>.
+              Feature code passes <code>label</code>, <code>description</code>, and <code>items</code>, never raw <code>aria-*</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A bug in one shared <code>Combobox</code> is one fix. Forty hand-rolled dropdowns mean forty slightly different keymaps and forty audit findings.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Each feature team writing its own <code>onKeyDown</code> for arrow keys.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Ship the full APG keyboard contract, or don't claim the role</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>For every widget role, write the keymap from the APG pattern into the component's docs (Tabs: Left/Right, Home/End, activation mode) and add one test per key.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The role tells the screen reader to switch to focus mode and tells the user which keys to press. If your <code>role="menu"</code> ignores arrow keys, the user is stuck in a menu that doesn't respond.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Adding <code>role="menu"</code> to site navigation because the design looks like a menu.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Derive ARIA state from the same source as visual state</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Bind <code>aria-expanded={open}</code> to the same variable that drives the CSS. Better still, style from the attribute (<code>[aria-expanded="true"] .chevron { rotate: 180deg }</code>) so visuals can't drift from semantics.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The usual "state lies" bug comes from an imperative <code>setAttribute</code> in one handler that a later re-render or a second code path never updates. Sighted QA never notices.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>An <code>isOpen</code> CSS class and a separate <code>aria-expanded</code> that only the click handler updates.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Name controls from visible text; reserve <code>aria-label</code> for icon-only controls</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Use <code>&lt;label for&gt;</code>, inner text, or <code>aria-labelledby</code> pointing at visible text. Use <code>aria-label</code> only where nothing visible exists (<code>aria-label="Close"</code> on an X icon), and write it in user language.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>WCAG 2.5.3 (Label in Name) requires the accessible name to contain the visible label. A voice-control user who says "click Submit order" fails when the name is "btn-primary." Translation tools also handle visible text more reliably than attribute values.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>aria-label</code> on a button that already has visible text. It overrides that text.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Mount live regions once at app start and change only their text</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Render one <code>role="status"</code> (polite) and one <code>role="alert"</code> (assertive) region in the app shell on first paint. Expose an <code>announce(message, priority)</code> helper. Clear the region, then set the text on the next frame. Keep messages under one sentence.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A region inserted into the DOM along with its text is often never announced. Framework re-renders that replace the region's node do the same. Centralizing the regions also stops two toasts talking over each other.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A <code>&lt;Toast&gt;</code> component that renders its own <code>&lt;div aria-live&gt;</code> alongside the message.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant App as App shell
+    participant H as announce helper
+    participant R as status region, polite
+    participant AT as Screen reader
+    App->>R: mount empty region on first paint
+    Note over R: region is already in the accessibility tree
+    H->>R: clear the text
+    H->>R: next frame, set text to Draft saved
+    R-->>AT: live-region-changed event
+    AT-->>AT: polite waits for idle, assertive would interrupt
+          </pre>
+          <figcaption class="diagram__caption">Practice 6 in motion: the region exists before any message, and only its text changes. That ordering is what makes the announcement reliable.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Use <code>&lt;dialog&gt;.showModal()</code> or <code>inert</code> for modality, not <code>aria-hidden</code> sweeps</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Open modals with <code>showModal()</code>, which makes the rest of the document
+              <span class="term">inert</span>
+              <span class="term__gloss">hidden from AT and unreachable by focus or click</span>.
+              For custom overlays, set <code>inert</code> on the background. On close, return focus to the trigger.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p><code>aria-hidden="true"</code> on a container hides it from screen readers but leaves its buttons focusable, so keyboard users tab into content they can't hear. Chrome now blocks <code>aria-hidden</code> on a focused subtree and logs a warning recommending <code>inert</code>.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Setting <code>aria-modal="true"</code> and trusting it to trap focus. It doesn't.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Default to roving <code>tabindex</code>; use <code>aria-activedescendant</code> for combobox inputs</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In trees, toolbars, tablists, and listboxes, move real DOM focus (<code>tabindex="0"</code> on the active item, <code>-1</code> on the rest). Use <code>aria-activedescendant</code> mainly where focus must stay in a text input, as in a combobox.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Real focus behaves predictably across AT. GitHub's file-tree team chose roving <code>tabindex</code> because <code>aria-activedescendant</code> caused problems with VoiceOver on macOS and iOS.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Using <code>aria-activedescendant</code> everywhere because it means less focus-management code.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Generate stable, unique IDs and keep references in the same tree scope</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Generate IDs per instance (<code>useId()</code> in React, a counter elsewhere). In Web Components, keep the label inside the same shadow root, or use
+              <span class="term">element reflection</span>
+              <span class="term__gloss">setting ARIA relations with element references instead of id strings</span>
+              (<code>el.ariaLabelledByElements = [...]</code>).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A duplicate or out-of-scope ID breaks <code>aria-labelledby</code> silently. The name is empty, no error is thrown, and axe flags it only on pages where the duplicate actually renders.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Hard-coding <code>id="field-label"</code> inside a component that appears twice on a page.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Query by role in tests so broken semantics fail the build</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Write <code>getByRole('tab', { name: 'Billing', selected: true })</code> in Testing Library or Playwright. Add <code>toMatchAriaSnapshot</code> for complex widgets.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>A role-query test fails when someone swaps <code>&lt;button&gt;</code> for <code>&lt;div&gt;</code>. A <code>data-testid</code> test keeps passing on markup a screen reader can't use.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p><code>data-testid</code> as the default selector strategy.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">11</div>
+          <h3 class="practice-card__title">Layer your testing: automated in CI, manual AT before release</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run <code>eslint-plugin-jsx-a11y</code> and axe-core on every PR. Before shipping a new widget, test it by hand on:</p>
+            <ul>
+              <li>NVDA + Chrome or Firefox</li>
+              <li>JAWS + Chrome</li>
+              <li>VoiceOver + Safari on macOS and iOS</li>
+              <li>TalkBack + Chrome</li>
+            </ul></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Experts disagree on how much automation catches. Deque's 2021 study of about 300,000 issues found axe caught <strong>57% by volume</strong>. The older rule of thumb, counted by WCAG criteria, says <strong>20–30%</strong>. Either way, axe can't press Enter or check whether <code>aria-selected</code> is accurate after a click, so behavior bugs always need a human.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Treating a Lighthouse score of 100 as sign-off.</p></div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Belt-and-braces ARIA</p>
+            <p><code>&lt;nav role="navigation"&gt;</code>, <code>&lt;button role="button" tabindex="0"&gt;</code>, <code>aria-label</code> on a plain <code>&lt;div&gt;</code>. It looks careful, but it's noise at best. <code>generic</code> elements prohibit naming in ARIA 1.2, so that label is ignored or inconsistently exposed. Delete it, and add ARIA only where native HTML leaves a gap.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Site nav as <code>role="menu"</code></p>
+            <p>Dropdown navigation marked up with <code>menubar</code>/<code>menuitem</code> because it looks like a desktop menu. Screen readers announce application-menu semantics and expect arrows, Esc, Home/End, and typeahead, while the links lose their link role. Use a list of links with disclosure buttons (<code>aria-expanded</code>) for submenus (<a href="https://adrianroselli.com/2017/10/dont-use-aria-menu-roles-for-site-nav.html" rel="noopener">Adrian Roselli</a>).</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>role="application"</code> to make keyboard handling work</p>
+            <p>Added to a whole panel so screen readers stop capturing arrow keys. It also removes browse mode, so users can no longer read the content inside with their usual shortcuts. Use the specific widget role (<code>grid</code>, <code>listbox</code>, <code>tree</code>) scoped to the interactive part.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Everything is <code>assertive</code></p>
+            <p>Every toast uses <code>role="alert"</code>. Users get interrupted mid-sentence for "Draft saved," and they learn to ignore alerts. Use <code>status</code>/polite by default; keep assertive for errors that block progress.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Accessibility overlays</p>
+            <p>A third-party script that injects ARIA and "fixes" at runtime. It patches the DOM after render, conflicts with your own ARIA, and doesn't make the site compliant. The FTC fined accessiBe <strong>$1M</strong> (order finalized April 2025) for claiming it did. Fix the source.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Generated ARIA nobody tested</p>
+            <p>Code from AI assistants or copied snippets that adds <code>aria-*</code> without the matching behavior. WebAIM's 2026 scan found pages with ARIA averaging <strong>59.1</strong> detected errors against <strong>42.0</strong> without, and partly blamed frameworks and AI-assisted code. Run lint rules and require a keyboard walkthrough in review for any new <code>role=</code>.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Copying APG examples as production code</p>
+            <p>The APG examples are reference demos. Their support varies across AT/browser pairs, as <a href="https://aria-at.w3.org/" rel="noopener">ARIA-AT</a> results show. Use them for the keyboard contract, then test in your own AT matrix.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Code-hosting file tree</div>
+            <p>GitHub's repo file browser is a <code>role="tree"</code> with thousands of nodes (<a href="https://github.blog/engineering/user-experience/considerations-for-making-a-tree-view-component-accessible/" rel="noopener">GitHub blog</a>). The team modeled keys on Windows File Explorer, used roving <code>tabindex</code>, set <code>aria-level</code> on every item, named nodes with <code>aria-labelledby</code> (VoiceOver didn't reliably derive names from complex content), and chose not to virtualize the tree. <em>Lesson:</em> in production you often set attributes the spec says the browser can compute, because real AT doesn't compute them reliably.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Government autocomplete</div>
+            <p>GOV.UK's accessible-autocomplete is a combobox that uses a live region to announce the result count and the minimum number of characters to type. In comparative testing, NVDA users preferred it to the ARIA 1.1 reference pattern, which said nothing after the user typed a few letters. <em>Lesson:</em> correct roles are the minimum. Announcement wording is UX work and decides whether users finish the task.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">SPA route changes</div>
+            <p>Client-side navigation fires no page load, so screen readers say nothing. Next.js ships a built-in route announcer that reads <code>document.title</code>, then the first <code>&lt;h1&gt;</code>, then the pathname (<a href="https://nextjs.org/docs/architecture/accessibility" rel="noopener">Next.js docs</a>). <em>Lesson:</em> page titles now feed what screen readers say; "App" on every route means every navigation announces "App." Teams disagree on announcing vs moving focus to the <code>&lt;h1&gt;</code>: focus is more reliable but can disorient sighted keyboard users if the focus ring isn't styled well.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Checkout form validation</div>
+            <p>Each field gets <code>aria-invalid="true"</code> and <code>aria-describedby</code> pointing at its error text. On submit, focus moves to an error summary at the top with links to each field. <em>Lesson:</em> don't put per-keystroke validation in a live region; it announces "invalid email" on every character. Validate on blur or submit, and let focus movement deliver the message.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Role, name, keys:</strong> does every interactive custom element have all three? Check the Chrome DevTools Accessibility pane, not the source.</li>
+              <li><strong>State binding:</strong> is every ARIA state (<code>aria-expanded</code>, <code>aria-selected</code>, <code>aria-checked</code>) bound to the same variable that drives the visuals, with a test that toggles it?</li>
+              <li><strong>Live regions:</strong> exactly one polite and one assertive region, mounted at app start, behind an <code>announce()</code> helper?</li>
+              <li><strong>Modals:</strong> <code>showModal()</code> or <code>inert</code>, focus returned to the trigger on close, and no <code>aria-hidden</code> on an ancestor of focusable content?</li>
+              <li><strong>CI:</strong> do axe-core and <code>jsx-a11y</code> (or your framework's equivalent) run in CI and fail the build on serious and critical violations?</li>
+              <li><strong>Tests:</strong> do component tests select by role and name rather than <code>data-testid</code>?</li>
+              <li><strong>AT matrix:</strong> is there a written matrix (NVDA, JAWS, VoiceOver macOS and iOS, TalkBack), and did every new widget run through it before release?</li>
+              <li><strong>IDs:</strong> generated per instance? Does any ARIA reference cross a shadow-DOM boundary?</li>
+              <li><strong>Titles:</strong> does every route set a unique, descriptive <code>document.title</code>?</li>
+              <li><strong>Onboarding:</strong> does a new engineer know the rule on day one: native element first, and a new <code>role=</code> only through the design system?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Native HTML + a few labels.</span> Most projects start with native elements and some <code>aria-label</code>s on icon buttons. That works.</li>
+          <li><span class="steps__title">Spread.</span> Designers ask for custom dropdowns, tabs, and date pickers, and each feature team builds its own from <code>&lt;div&gt;</code>s. ARIA spreads to hundreds of call sites, each with a slightly different keymap. Nobody notices, because sighted mouse testing passes.</li>
+          <li><span class="steps__title">External turning point.</span> An enterprise customer's audit, a
+            <span class="term">VPAT</span>
+            <span class="term__gloss">a vendor's formal accessibility conformance report, often required in procurement</span>
+            request, a demand letter, or an EAA deadline. The audit lists findings across dozens of near-identical widgets, and fixing them one by one doesn't scale.</li>
+          <li><span class="steps__title">Consolidation (the expensive migration).</span> Move to one component library (in-house or React Aria/Radix): find every hand-rolled widget, rewrite <code>data-testid</code> tests into role queries, and re-test with AT. Teams that hand-rolled combobox markup also paid for spec churn: the pattern changed from ARIA 1.0 to 1.1 and partly reverted in 1.2, so 1.1 implementations had to be reworked.</li>
+          <li><span class="steps__title">Maturity: less ARIA, not more.</span> As <code>&lt;dialog&gt;</code>, <code>popover</code>, <code>inert</code>, and customizable <code>&lt;select&gt;</code> land in every major browser, the best ARIA work is deleting it: focus traps, <code>aria-modal</code> workarounds, custom listboxes. Keep ARIA inside a few components so removing it later touches only those files.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.w3.org/WAI/ARIA/apg/" rel="noopener">ARIA Authoring Practices Guide</a> — the keyboard contract for every widget pattern. Read "Read Me First" ("No ARIA is better than bad ARIA") before any pattern.</li>
+          <li><a href="https://www.w3.org/TR/html-aria/" rel="noopener">ARIA in HTML</a> — the allowed-ARIA-per-element table that axe and validators enforce. Settles "is this role allowed here?" debates.</li>
+          <li><a href="https://github.blog/engineering/user-experience/considerations-for-making-a-tree-view-component-accessible/" rel="noopener">Considerations for making a tree view component accessible</a> (GitHub) — the interop compromises in a large-scale ARIA widget.</li>
+          <li><a href="https://adrianroselli.com/2017/10/dont-use-aria-menu-roles-for-site-nav.html" rel="noopener">Don't Use ARIA Menu Roles for Site Nav</a> (Adrian Roselli) — the standard explanation of the most common ARIA misuse.</li>
+          <li><a href="https://aria-at.w3.org/" rel="noopener">ARIA-AT</a> — measured support for APG patterns per screen reader and browser pair. Check it before trusting a pattern.</li>
+          <li><a href="https://webaim.org/projects/million/" rel="noopener">WebAIM Million</a> — yearly data on how ARIA is actually used and misused across the top million home pages.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/aria/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

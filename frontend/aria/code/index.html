@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ARIA Tabs — MVP</title>
+    <style>
+      body { font-family: system-ui, sans-serif; background: #111; color: #eee; padding: 2rem; }
+      [role='tab'] { background: none; color: inherit; border: 0; border-bottom: 3px solid transparent; padding: 0.5rem 1rem; font: inherit; cursor: pointer; }
+      /* Styled from the ARIA state itself: if aria-selected lies, the pixels lie too. */
+      [role='tab'][aria-selected='true'] { border-bottom-color: #4f8cff; font-weight: 600; }
+      [role='tab']:focus-visible, [role='tabpanel']:focus-visible { outline: 2px solid #ffb84f; outline-offset: 2px; }
+      [role='tabpanel'] { padding: 1rem; border: 1px solid #333; }
+    </style>
+  </head>
+  <body>
+    <p>Tab into the tabs, then use Left/Right/Home/End. Watch DevTools: Console and Elements &gt; Accessibility.</p>
+    <main id="app"></main>
+    <script type="module" src="/mvp.ts"></script>
+  </body>
+</html>

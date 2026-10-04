@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARIA (WAI-ARIA) · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">ARIA (WAI-ARIA)</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">ARIA (WAI-ARIA)</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/aria/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">ARIA (WAI-ARIA)</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>WAI-ARIA (Accessible Rich Internet Applications) is a W3C spec. It defines an <strong>ontology of roles, states, and properties</strong> that you attach to host-language elements (HTML, SVG).</p>
+        <ul>
+          <li>Those attributes change how an element shows up in the browser's <strong>accessibility tree</strong>.</li>
+          <li>From there, the browser hands it to the operating system's
+            <span class="term">accessibility API</span>
+            <span class="term__gloss">the OS-level interface (UIA, AX API, ATK…) that screen readers query</span>,
+            which assistive technology consumes.</li>
+          <li><strong>Current Recommendation:</strong> <a href="https://www.w3.org/TR/wai-aria-1.2/" rel="noopener">WAI-ARIA 1.2</a>, published 6 June 2023.</li>
+          <li><strong>Next:</strong> <a href="https://www.w3.org/TR/wai-aria-1.3/" rel="noopener">WAI-ARIA 1.3</a> is still a Working Draft. The latest draft is dated 4 June 2026.</li>
+        </ul>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">The one fact everything else follows from</p>
+            <p>ARIA is <strong>declarative and semantic only</strong>. It changes what the accessibility tree reports. It does <em>not</em> change focusability, keyboard handling, layout, or event dispatch.</p>
+          </div>
+        </div>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Roles</dt><dd>Declare what an element <em>is</em> (<code>role="tab"</code>). ARIA 1.2 groups them into: abstract roles (ontology-only, never authored: <code>widget</code>, <code>landmark</code>), widget roles (<code>button</code>, <code>tab</code>, <code>combobox</code>, <code>slider</code>), document structure roles (<code>heading</code>, <code>list</code>, <code>generic</code>), landmark roles (<code>navigation</code>, <code>main</code>, <code>search</code>), live region roles (<code>alert</code>, <code>status</code>, <code>log</code>), and window roles (<code>dialog</code>, <code>alertdialog</code>).</dd></div>
+          <div><dt>States</dt><dd>Values expected to change with interaction: <code>aria-expanded</code>, <code>aria-checked</code>, <code>aria-selected</code>, <code>aria-pressed</code>. Your script owns keeping them true.</dd></div>
+          <div><dt>Properties</dt><dd>Mostly static traits and relationships: <code>aria-label</code>, <code>aria-labelledby</code>, <code>aria-describedby</code>, <code>aria-controls</code>, <code>aria-required</code>.
+            <span class="term">IDREF</span>
+            <span class="term__gloss">an attribute value that points at another element's id</span>
+            properties create edges between elements that aren't DOM ancestors of each other.</dd></div>
+          <div><dt>Live region attributes</dt><dd><code>aria-live</code>, <code>aria-atomic</code>, <code>aria-relevant</code>, <code>aria-busy</code>. They tell the browser to raise announcement events when a subtree changes.</dd></div>
+          <div><dt>Name and description computation</dt><dd><a href="https://w3c.github.io/accname/" rel="noopener">accname 1.2</a>: the algorithm that turns markup into the single string a screen reader speaks for an element.</dd></div>
+          <div><dt>Accessibility API Mappings (AAMs)</dt><dd><a href="https://w3c.github.io/core-aam/" rel="noopener">Core-AAM</a> maps each ARIA role/state to platform APIs. HTML-AAM does the same for native HTML. The <a href="https://www.w3.org/TR/html-aria/" rel="noopener">ARIA in HTML</a> Recommendation says which ARIA is <em>allowed</em> on which HTML element (what validators like axe check against).</dd></div>
+          <div><dt>APG</dt><dd>The <a href="https://www.w3.org/WAI/ARIA/apg/" rel="noopener">ARIA Authoring Practices Guide</a>: non-normative patterns that spell out the keyboard contract each widget role implies (tabs, combobox, treeview, grid, menu, dialog).</dd></div>
+        </dl>
+
+        <h3>How it relates to the wider landscape</h3>
+        <ul>
+          <li><strong>Same layer:</strong> ARIA belongs to the <em>semantic exposure layer</em>, next to native HTML semantics (always preferred) and the mobile equivalents: Android <code>contentDescription</code>/<code>AccessibilityNodeInfo</code>, iOS <code>accessibilityTraits</code>, React Native <code>accessibilityRole</code>, Flutter <code>Semantics</code>.</li>
+          <li><strong>Not WCAG:</strong> WCAG defines success criteria. ARIA helps you meet 4.1.2 Name, Role, Value.</li>
+          <li><strong>Not a component library:</strong> React Aria and Radix ship the <em>behavior</em> ARIA does not.</li>
+          <li><strong>Sibling modules:</strong> DPUB-ARIA (digital publishing) and Graphics-ARIA (SVG charts) extend the vocabulary for niche domains.</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <p>Client side, in the browser engine, between the DOM and the operating system:</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    D["HTML, CSS, DOM: your aria-* attributes"] --> T["Browser accessibility tree: role, name, states, relations, events"]
+    T --> P["Platform a11y API: UIA, MSAA+IA2, AX API, ATK/AT-SPI, Android a11y"]
+    P --> A["Assistive tech: JAWS, NVDA, VoiceOver, TalkBack, Narrator"]
+    A -->|user input| J["Your JS: keydown and click handlers"]
+    J -->|"mutates DOM and aria-*"| D
+          </pre>
+          <figcaption class="diagram__caption">You write attributes in the DOM; the browser maps them. The AT never sees your HTML, only platform objects such as <code>AXButton</code> on macOS or a UIA <code>Button</code> control type on Windows.</figcaption>
+        </figure>
+
+        <h3>Where you'll typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Headless component libraries</div><p>React Aria (Adobe), Radix UI, Headless UI, Ariakit, Angular CDK <code>a11y</code>. ARIA is their primary output.</p></div>
+          <div class="card"><div class="card__title">Design systems</div><p>GOV.UK Frontend, Material, Fluent UI, Carbon. Every custom combobox, tabs, or menu is ARIA plus scripted keyboard handling.</p></div>
+          <div class="card"><div class="card__title">SPA frameworks</div><p>Route-change announcements and toasts use live regions, because there is no page load for the screen reader to notice.</p></div>
+          <div class="card"><div class="card__title">Rich editors and grids</div><p>Google Docs, AG Grid, and spreadsheet-style UIs lean on <code>role="grid"</code>, <code>aria-activedescendant</code>, and live regions.</p></div>
+          <div class="card"><div class="card__title">Test tooling</div><p>Testing Library <code>getByRole</code> and Playwright <code>getByRole</code> query the computed role and name, so ARIA directly shapes your selectors.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <ul>
+          <li><strong>Authoring guidance:</strong> APG patterns; <a href="https://www.w3.org/TR/html-aria/" rel="noopener">ARIA in HTML</a> for allowed attributes per element.</li>
+          <li><strong>Automated checks:</strong> axe-core (Deque; also powers Lighthouse's accessibility audit), WAVE (WebAIM), IBM Equal Access Checker, <code>eslint-plugin-jsx-a11y</code>.</li>
+          <li><strong>Inspecting the tree:</strong> Chrome DevTools Accessibility pane and full-page tree view, Firefox Accessibility Inspector, Accessibility Insights for Windows, macOS Accessibility Inspector.</li>
+          <li><strong>Regression tests:</strong> Playwright <code>toMatchAriaSnapshot</code> (since v1.49) asserts a YAML snapshot of the tree; Testing Library role queries.</li>
+          <li><strong>Real AT testing:</strong> NVDA (free, Windows), JAWS, VoiceOver (macOS/iOS), TalkBack (Android), Narrator. The W3C <a href="https://aria-at.w3.org/" rel="noopener">ARIA-AT</a> project publishes interop results for APG patterns across AT/browser pairs.</li>
+        </ul>
+
+        <!-- WHEN -->
+        <h2>When to use it</h2>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">A little history</p>
+            <ul>
+              <li><strong>~2005:</strong> Ajax-era apps built menus, trees, and tab panels from <code>&lt;div&gt;</code> and <code>&lt;span&gt;</code>. Screen readers saw only text. IBM's Becky Gibson and Rich Schwerdtfeger described the fix in "DHTML Accessibility: Solving the JavaScript Accessibility Problem".</li>
+              <li><strong>Before ARIA</strong>, the options were: avoid scripted widgets, ship a separate "accessible version", or hack with hidden form controls.</li>
+              <li><strong>September 2006:</strong> W3C publishes the <a href="https://www.w3.org/TR/wai-aria-roadmap" rel="noopener">WAI-ARIA Roadmap</a> and first drafts.</li>
+              <li><strong>20 March 2014:</strong> ARIA 1.0 Recommendation. <strong>14 December 2017:</strong> 1.1. <strong>6 June 2023:</strong> 1.2.</li>
+              <li>The long gaps reflect the hard part: getting four browser engines and many screen readers to agree on mappings.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You need a widget HTML has no element for: tabs, treeview, combobox with filtering, grid, toolbar, feed.</li>
+              <li>You must expose state native HTML can't express: <code>aria-expanded</code> on a disclosure trigger, <code>aria-current="page"</code> on a nav link, <code>aria-invalid</code> on a field after validation.</li>
+              <li>You need a relationship across DOM positions: <code>aria-describedby</code> from an input to its error text, <code>aria-labelledby</code> from a dialog to its heading.</li>
+              <li>Content updates without navigation and must be announced (status messages, route changes, async search results).</li>
+              <li>An icon-only control has no visible text (<code>aria-label="Close"</code>).</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>A native element exists: <code>&lt;button&gt;</code>, <code>&lt;a href&gt;</code>, <code>&lt;dialog&gt;</code>, <code>&lt;details&gt;/&lt;summary&gt;</code>, <code>&lt;select&gt;</code>, <code>&lt;input type="checkbox"&gt;</code>, <code>popover</code>. These bring focus, keyboard, and platform mappings for free.</li>
+              <li>You won't implement the role's full keyboard contract. <code>role="menu"</code> promises arrow keys and typeahead; a site nav called a menu with only Tab support breaks expectations.</li>
+              <li>You're adding it "just in case." Redundant ARIA (<code>&lt;button role="button"&gt;</code>) is noise; wrong ARIA overrides correct native semantics.</li>
+              <li>You're on a non-web surface (native iOS/Android, Flutter, terminal). Use that platform's accessibility API.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>What the browser and the screen reader do, from markup to spoken word:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Parse and style.</span> The engine builds the DOM and computed style. <code>display: none</code>, <code>visibility: hidden</code>, the <code>hidden</code> attribute, <code>inert</code>, and <code>aria-hidden="true"</code> all remove nodes from the tree, with different side effects on focus and rendering.</li>
+          <li><span class="steps__title">Compute role.</span> An explicit <code>role</code> wins over the implicit HTML role if it's valid for that element. Otherwise the HTML-AAM mapping applies (<code>&lt;nav&gt;</code> → <code>navigation</code>, <code>&lt;div&gt;</code> → <code>generic</code>). Invalid or abstract roles are ignored and the engine falls back.</li>
+          <li><span class="steps__title">Compute name and description.</span> accname 1.2 runs a strict precedence order (see the ladder below).</li>
+          <li><span class="steps__title">Compute states and relations.</span> <code>aria-*</code> states are normalized (invalid tokens fall back to defaults). IDREF relations resolve within the same DOM tree scope, so a plain <code>id</code> reference <strong>cannot cross a shadow root boundary</strong>.</li>
+          <li><span class="steps__title">Map and serialize.</span> Each node maps to platform objects per Core-AAM: <code>button</code> → <code>ROLE_SYSTEM_PUSHBUTTON</code> (MSAA), UIA <code>Button</code>, ATK <code>ROLE_PUSH_BUTTON</code>, <code>AXButton</code> (macOS). Adding <code>aria-pressed</code> turns it into a toggle-button mapping. In multi-process browsers the tree is serialized from the renderer to the browser process, which answers AT queries.</li>
+          <li><span class="steps__title">AT consumption.</span> Windows screen readers (JAWS, NVDA) build a virtual buffer and default to
+            <span class="term">browse mode</span>
+            <span class="term__gloss">the screen reader grabs arrow keys and letter shortcuts, e.g. H for next heading</span>.
+            On focus of a widget like a textbox or <code>grid</code>, they switch to
+            <span class="term">focus mode</span>
+            <span class="term__gloss">keys pass straight through to the page's own handlers</span>.
+            <code>role="application"</code> forces focus mode for a whole subtree.</li>
+          <li><span class="steps__title">Your script runs.</span> Keydown handlers move focus with
+            <span class="term">roving tabindex</span>
+            <span class="term__gloss">only the active item has tabindex="0"; the rest have -1, and arrow keys move it</span>
+            or update <code>aria-activedescendant</code>, and flip states like <code>aria-selected</code>. Each change fires a platform event (focus, state change, name change) and the AT announces it.</li>
+          <li><span class="steps__title">Live regions.</span> When a node inside <code>aria-live="polite"</code> (or <code>role="status"</code>) changes, the browser fires a live-region-changed event. <code>polite</code> waits for the user to go idle; <code>assertive</code> interrupts. The region must <strong>already exist</strong> in the tree before its content changes, or the change is often missed.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant AT as Screen reader
+    participant B as Browser
+    participant JS as Your tabs script
+    participant API as Platform a11y API
+    U->>AT: presses ArrowRight on a focused tab
+    AT->>B: focus mode, key passes through
+    B->>JS: keydown event
+    JS->>B: Billing gets tabindex 0, others -1, focus moves
+    JS->>B: aria-selected true on Billing, false on Profile
+    B->>B: recompute role, name, states
+    B->>API: focus and state-change events, mapped per Core-AAM
+    API->>AT: event
+    AT-->>U: Billing, tab, selected, 2 of 3
+          </pre>
+          <figcaption class="diagram__caption">One arrow key through the stack. ARIA only shows up in the middle (what the tree reports); moving focus and flipping state is all your script.</figcaption>
+        </figure>
+
+        <h3>Name precedence: who wins</h3>
+        <p>accname 1.2 checks sources in a fixed order and stops at the first one that yields text. In short: <code>aria-labelledby</code> beats <code>aria-label</code>, which beats <code>&lt;label&gt;</code>, which beats inner text.</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 600 340" role="img" aria-labelledby="accTitle accDesc" width="600" style="max-width:100%">
+            <title id="accTitle">Accessible name precedence ladder</title>
+            <desc id="accDesc">Seven accname 1.2 steps from highest to lowest priority: 2A hidden and not referenced gives an empty name, 2B aria-labelledby, 2C embedded control value, 2D aria-label, 2E host-language label, 2F to 2H name from content, 2I title tooltip as last resort.</desc>
+            <defs>
+              <marker id="accArrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)"/>
+              </marker>
+            </defs>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="12" y="22" fill="var(--text-muted)" font-size="12">wins</text>
+              <line x1="26" y1="34" x2="26" y2="312" stroke="var(--text-muted)" marker-end="url(#accArrow)"/>
+              <text x="12" y="332" fill="var(--text-muted)" font-size="12">last</text>
+
+              <rect x="50" y="30"  width="530" height="32" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <text x="62" y="51"  fill="var(--danger)"><tspan font-weight="700">2A</tspan>  hidden and not referenced → empty name</text>
+
+              <rect x="50" y="70"  width="510" height="32" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="62" y="91"  fill="var(--accent)"><tspan font-weight="700">2B</tspan>  aria-labelledby (follows IDREFs, can read hidden nodes)</text>
+
+              <rect x="50" y="110" width="490" height="32" rx="6" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="62" y="131" fill="var(--text)"><tspan font-weight="700">2C</tspan>  embedded control value (label that contains an input)</text>
+
+              <rect x="50" y="150" width="470" height="32" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <text x="62" y="171" fill="var(--accent)"><tspan font-weight="700">2D</tspan>  aria-label</text>
+
+              <rect x="50" y="190" width="450" height="32" rx="6" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="62" y="211" fill="var(--text)"><tspan font-weight="700">2E</tspan>  host label: &lt;label&gt;, alt, &lt;caption&gt;, SVG &lt;title&gt;</text>
+
+              <rect x="50" y="230" width="430" height="32" rx="6" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="62" y="251" fill="var(--text)"><tspan font-weight="700">2F–2H</tspan>  name from content (button, link, tab, heading…)</text>
+
+              <rect x="50" y="270" width="410" height="32" rx="6" fill="var(--warn-soft)" stroke="var(--warn)"/>
+              <text x="62" y="291" fill="var(--warn)"><tspan font-weight="700">2I</tspan>  title attribute (tooltip), last resort</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The accname 1.2 ladder. Name-from-content (2F–2H) only applies to roles that allow it, such as button, link, tab, and heading.</figcaption>
+        </figure>
+
+        <h3>What a correct tabs widget needs</h3>
+        <p>Per APG, attributes are only half of it. A tabs widget needs all of this (the <a href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/aria/code" target="_blank" rel="noopener">code folder</a> has a runnable version):</p>
+        <ul>
+          <li><code>role="tablist"</code> containing <code>role="tab"</code> elements, each with <code>aria-selected</code> and <code>aria-controls</code>.</li>
+          <li><code>role="tabpanel"</code> with <code>aria-labelledby</code> pointing back to its tab.</li>
+          <li>One tab in the Tab sequence (<code>tabindex="0"</code>), the others <code>-1</code>.</li>
+          <li>Left/Right arrows move between tabs; Home/End jump to first/last.</li>
+          <li>A choice between <strong>automatic activation</strong> (arrow selects) and <strong>manual activation</strong> (arrow focuses, Enter/Space selects).</li>
+        </ul>
+        <figure class="diagram">
+          <svg viewBox="0 0 600 290" role="img" aria-labelledby="tabsTitle tabsDesc" width="600" style="max-width:100%">
+            <title id="tabsTitle">Anatomy of an APG tabs widget</title>
+            <desc id="tabsDesc">A tablist holds three tabs: Profile, Billing, and Security. Billing is selected with tabindex 0; the other two have tabindex minus 1. Left and Right arrows move between tabs, Home and End jump. Below, a tabpanel is labelled by the Billing tab, which controls it.</desc>
+            <defs>
+              <marker id="tabsArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+              </marker>
+            </defs>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="20" y="20" width="560" height="112" rx="8" fill="none" stroke="var(--border)" stroke-dasharray="5 4"/>
+              <text x="32" y="38" fill="var(--text-faint)" font-size="12" font-family="var(--font-mono)">role="tablist"</text>
+
+              <rect x="40"  y="48" width="160" height="40" rx="6" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="120" y="73" fill="var(--text-muted)" text-anchor="middle">Profile</text>
+              <text x="120" y="104" fill="var(--text-faint)" text-anchor="middle" font-size="11" font-family="var(--font-mono)">tabindex=-1</text>
+              <text x="120" y="120" fill="var(--text-faint)" text-anchor="middle" font-size="11" font-family="var(--font-mono)">selected=false</text>
+
+              <rect x="220" y="48" width="160" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+              <text x="300" y="73" fill="var(--accent)" text-anchor="middle" font-weight="700">Billing</text>
+              <text x="300" y="104" fill="var(--accent)" text-anchor="middle" font-size="11" font-family="var(--font-mono)">tabindex=0</text>
+              <text x="300" y="120" fill="var(--accent)" text-anchor="middle" font-size="11" font-family="var(--font-mono)">selected=true</text>
+
+              <rect x="400" y="48" width="160" height="40" rx="6" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="480" y="73" fill="var(--text-muted)" text-anchor="middle">Security</text>
+              <text x="480" y="104" fill="var(--text-faint)" text-anchor="middle" font-size="11" font-family="var(--font-mono)">tabindex=-1</text>
+              <text x="480" y="120" fill="var(--text-faint)" text-anchor="middle" font-size="11" font-family="var(--font-mono)">selected=false</text>
+
+              <text x="300" y="154" fill="var(--text-muted)" text-anchor="middle">← → move · Home / End jump · only one tab is in the Tab order</text>
+
+              <line x1="300" y1="164" x2="300" y2="188" stroke="var(--accent)" marker-start="url(#tabsArrow)" marker-end="url(#tabsArrow)"/>
+              <text x="312" y="181" fill="var(--text-faint)" font-size="11" font-family="var(--font-mono)">aria-controls ↓ · aria-labelledby ↑</text>
+
+              <rect x="20" y="192" width="560" height="76" rx="8" fill="var(--bg-elev-2)" stroke="var(--accent)"/>
+              <text x="32" y="214" fill="var(--text-faint)" font-size="12" font-family="var(--font-mono)">role="tabpanel"</text>
+              <text x="300" y="244" fill="var(--text)" text-anchor="middle">Billing panel, named "Billing" by its tab</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Roving tabindex in one picture: Tab lands on the selected tab only; arrows move focus and selection inside the tablist; the panel takes its name from its tab.</figcaption>
+        </figure>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Native element vs. ARIA on a <code>&lt;div&gt;</code></td><td>Native: free focus, keyboard, form participation, consistent mappings</td><td>Native: styling limits (only partly fixed by <code>appearance: base-select</code> in Chromium)</td></tr>
+              <tr><td><code>aria-labelledby</code> vs. <code>aria-label</code></td><td>Labelledby reuses visible text, so name and screen match and auto-translate covers it</td><td>Needs stable, unique IDs in the same tree scope</td></tr>
+              <tr><td>Roving <code>tabindex</code> vs. <code>aria-activedescendant</code></td><td>Roving: real DOM focus, predictable across AT</td><td>Roving: more focus juggling. Activedescendant keeps focus on a container (useful for combobox inputs) but AT support is less uniform</td></tr>
+              <tr><td><code>aria-live</code> region vs. <code>ariaNotify()</code></td><td>Live regions work everywhere today</td><td><code>ariaNotify()</code> (Chrome 141, Firefox 150, not Safari per <a href="https://web.dev/blog/web-platform-04-2026" rel="noopener">web.dev</a>) avoids DOM hacks but lacks full cross-browser support</td></tr>
+              <tr><td><code>polite</code> vs. <code>assertive</code></td><td>Assertive: immediate</td><td>Assertive interrupts whatever the user was hearing. Reserve it for errors</td></tr>
+              <tr><td><code>aria-hidden</code> vs. <code>inert</code> vs. <code>display:none</code></td><td><code>aria-hidden</code>: hides from AT only, stays visible</td><td>Focusable children remain reachable by keyboard. <code>inert</code> removes both AT exposure and focus</td></tr>
+              <tr><td>Automatic vs. manual tab activation</td><td>Automatic: fewer keystrokes</td><td>Manual is required when loading a panel is slow or triggers network calls</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">"Button" that does nothing on Enter</p>
+            <p>Cause: <code>role="button"</code> on a <code>&lt;div&gt;</code> without <code>tabindex="0"</code> and keydown handling for Enter and Space.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Focus disappears into a void</p>
+            <p>Cause: <code>aria-hidden="true"</code> on an ancestor of a focused or focusable element. Chrome now blocks it on a focused subtree and logs "Blocked aria-hidden on an element because its descendant retained focus", recommending <code>inert</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Toast never announced</p>
+            <p>Cause: the live region was inserted into the DOM in the same tick as its text, or toggled from <code>display:none</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Wrong name spoken</p>
+            <p>Cause: <code>aria-label</code> overriding visible text. It also breaks voice control: the user says "click Submit" but the name is "btn-primary".</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title"><code>aria-labelledby</code> silently empty</p>
+            <p>Cause: duplicate IDs, a typo, or the referenced node lives inside a different shadow root.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Site nav unusable</p>
+            <p>Cause: <code>role="menu"</code>/<code>menuitem</code> on links, which puts AT into a menu interaction model the page doesn't implement.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">State lies</p>
+            <p>Cause: <code>aria-expanded</code> or <code>aria-selected</code> set at render and never updated by the click handler; framework re-renders reset attributes.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Mobile users stuck</p>
+            <p>Cause: keyboard-only patterns (arrow keys) with no touch or swipe equivalent. VoiceOver on iOS does not send arrow keys.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <p>Accessibility is a <strong>separation-of-concerns problem</strong>: visual look and semantic meaning travel on different channels.</p>
+        <ul>
+          <li>A sighted user infers "this is a tab, it's selected" from pixels.</li>
+          <li>A screen reader user gets only what the platform accessibility API reports.</li>
+          <li>Once the web started drawing its own controls instead of using OS widgets, the semantic channel went silent.</li>
+          <li>ARIA restores it with the smallest possible mechanism: metadata on existing elements, mapped by the browser into APIs that AT already understands.</li>
+          <li>It's a legal concern too: WCAG 2.1/2.2 success criterion 4.1.2 (Name, Role, Value) is effectively unmeetable for custom widgets without ARIA.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 600 240" role="img" aria-labelledby="whyTitle whyDesc" width="600" style="max-width:100%">
+            <title id="whyTitle">Two channels: visual and semantic</title>
+            <desc id="whyDesc">A custom div-based tab sends meaning on two channels. The visual channel carries pixels to a sighted user, who sees a selected tab. The semantic channel carries the accessibility API to a screen reader user, who hears nothing without ARIA and hears tab, selected with ARIA.</desc>
+            <defs>
+              <marker id="whyArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)"/>
+              </marker>
+            </defs>
+            <g font-family="var(--font-sans)" font-size="13">
+              <rect x="20" y="88" width="150" height="64" rx="8" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="95" y="114" fill="var(--text)" text-anchor="middle">Custom widget</text>
+              <text x="95" y="134" fill="var(--text-faint)" text-anchor="middle" font-size="11" font-family="var(--font-mono)">&lt;div&gt; tabs</text>
+
+              <path d="M170,104 C230,104 250,52 360,52" fill="none" stroke="var(--success)" stroke-width="2" marker-end="url(#whyArrow)"/>
+              <text x="200" y="64" fill="var(--success)" font-size="12">visual channel (pixels)</text>
+
+              <path d="M170,136 C230,136 250,188 360,188" fill="none" stroke="var(--danger)" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#whyArrow)"/>
+              <text x="172" y="214" fill="var(--danger)" font-size="12">semantic channel (a11y API)</text>
+
+              <rect x="364" y="24" width="216" height="58" rx="8" fill="var(--success-soft)" stroke="var(--success)"/>
+              <text x="472" y="48" fill="var(--success)" text-anchor="middle">Sighted user</text>
+              <text x="472" y="68" fill="var(--text)" text-anchor="middle" font-size="12">sees: a tab, and it's selected</text>
+
+              <rect x="364" y="146" width="216" height="80" rx="8" fill="var(--bg-elev)" stroke="var(--border)"/>
+              <text x="472" y="168" fill="var(--text)" text-anchor="middle">Screen-reader user</text>
+              <text x="472" y="190" fill="var(--danger)" text-anchor="middle" font-size="12">no ARIA: silence</text>
+              <text x="472" y="212" fill="var(--accent)" text-anchor="middle" font-size="12">with ARIA: "tab, selected"</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The failure ARIA prevents: the visual channel works, the semantic channel goes silent. ARIA puts meaning back on the second channel.</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative was <strong>new HTML elements for every widget</strong> (<code>&lt;tabs&gt;</code>, <code>&lt;tree&gt;</code>, <code>&lt;combobox&gt;</code>). That would bundle semantics and behavior correctly, but each element needs years of standards work in every engine. Authors in 2006 needed something that worked on existing markup right away. So ARIA chose <strong>attributes, not elements</strong>, and <strong>semantics, not behavior</strong>:</p>
+        <ul>
+          <li><strong>Attributes are backwards compatible.</strong> Browsers that don't understand them ignore them; layout is unaffected.</li>
+          <li><strong>Behavior was left to authors</strong> because it varies by platform and design. Specifying it would have brought back the "new elements" problem.</li>
+        </ul>
+        <p>The cost is ARIA's central failure mode: semantics and behavior can drift apart, and <strong>nothing in the browser enforces the contract</strong>. That's why the <a href="https://www.w3.org/TR/2018/WD-using-aria-20180115/" rel="noopener">Using ARIA</a> note's rules read like guardrails:</p>
+        <ol class="steps">
+          <li><span class="steps__title">Use native HTML if you can.</span></li>
+          <li><span class="steps__title">Don't change native semantics</span> unless you must.</li>
+          <li><span class="steps__title">All interactive ARIA controls must be keyboard operable.</span></li>
+          <li><span class="steps__title">Never put <code>role="presentation"</code> or <code>aria-hidden="true"</code></span> on a focusable element.</li>
+          <li><span class="steps__title">All interactive elements must have an accessible name.</span></li>
+        </ol>
+        <p>The original alternative is now coming back in stages: <code>&lt;dialog&gt;</code>, <code>popover</code>, <code>inert</code>, and customizable <code>&lt;select&gt;</code> let HTML carry both semantics and behavior, shrinking ARIA's job to the remaining gaps.</p>
+
+        <h3>Why it matters now</h3>
+        <p>Three pressures make ARIA more relevant in 2026, not less:</p>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Regulation</div>
+            <ul>
+              <li>The European Accessibility Act has applied since <strong>28 June 2025</strong>.</li>
+              <li>US: the DOJ's ADA Title II rule requires WCAG 2.1 AA for state and local governments.</li>
+              <li>An April 2026 interim final rule pushed deadlines to <strong>April 2027</strong> and <strong>April 2028</strong> (<a href="https://www.jdsupra.com/legalnews/department-of-justice-delays-compliance-2688927/" rel="noopener">JD Supra</a>).</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">Volume and quality</div>
+            <ul>
+              <li><a href="https://webaim.org/projects/million/" rel="noopener">WebAIM Million 2026</a>: ARIA on <strong>82.7%</strong> of top home pages.</li>
+              <li>Average <strong>133.6</strong> attributes per page: up <strong>27%</strong> in a year, over <strong>six times</strong> 2019 levels.</li>
+              <li>Pages with ARIA averaged <strong>59.1</strong> detected errors vs <strong>42.0</strong> without.</li>
+              <li>WebAIM partly blames third-party frameworks and AI-assisted coding, which sprinkle <code>aria-*</code> without the matching behavior.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card__title">Platform evolution</div>
+            <ul>
+              <li><span class="term" data-gloss="setting ARIA relations with element references instead of id strings">Element reflection</span> (<code>ariaLabelledByElements</code>): Baseline since April 2025 per <a href="https://developer.mozilla.org/docs/Web/API/Element/ariaLabelledByElements" rel="noopener">MDN</a>.</li>
+              <li><code>ariaNotify()</code>, and Reference Target for cross-shadow-root ARIA (approved for Chrome 151 in mid-2026, <a href="https://groups.google.com/a/chromium.org/g/blink-dev/c/eBx3sXIfJnw" rel="noopener">blink-dev</a>) close long-standing gaps for Web Components.</li>
+              <li>ARIA 1.3 drafts add <code>aria-description</code>, <code>aria-braillelabel</code>, and the <code>suggestion</code>/<code>comment</code>/<code>mark</code> roles.</li>
+            </ul>
+          </div>
+        </div>
+
+        <p>The AT market you test against is concrete too. <a href="https://webaim.org/projects/screenreadersurvey11/" rel="noopener">WebAIM Screen Reader Survey #11</a> (July–August 2026, 1,780 responses):</p>
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">55.0%</div><div class="stat__label">JAWS as primary desktop screen reader</div></div>
+          <div class="stat"><div class="stat__num">32.9%</div><div class="stat__label">NVDA</div></div>
+          <div class="stat"><div class="stat__num">6.5%</div><div class="stat__label">VoiceOver</div></div>
+          <div class="stat"><div class="stat__num">91.8%</div><div class="stat__label">also use a screen reader on mobile</div></div>
+        </div>
+
+        <!-- OPEN QUESTIONS -->
+        <h2>Open questions to verify in practice</h2>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Check these with real tools, not the spec</p>
+            <ul>
+              <li>Does your tabs widget announce "tab, 2 of 4, selected" the same way in NVDA + Firefox, JAWS + Chrome, and VoiceOver + Safari? Where does each pair diverge?</li>
+              <li>When <code>aria-labelledby</code>, <code>aria-label</code>, and visible text all conflict, what name does the Chrome DevTools accessibility tree show? Does it match accname step order?</li>
+              <li>How long must a live region exist before an update is reliably announced? Does a framework re-render that replaces the region node break it?</li>
+              <li>Is <code>aria-activedescendant</code> on a combobox input announced consistently, or does roving focus behave better with your target AT?</li>
+              <li>With <code>ariaNotify()</code> in Chrome and Firefox, what fallback do you ship for Safari, and does double-announcing occur?</li>
+              <li>Does your widget stay operable with VoiceOver on iOS and TalkBack swipe gestures, where arrow-key handlers never fire?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

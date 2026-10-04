@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARIA (WAI-ARIA) · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-frontend" data-category="frontend">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">ARIA (WAI-ARIA)</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">ARIA (WAI-ARIA)</h1>
+        <span class="pill pill--category">frontend</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/frontend/aria/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">ARIA (WAI-ARIA)</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">WAI-ARIA is a set of HTML attributes (<code>role</code>, <code>aria-*</code>) that tell
+          <span class="term">assistive technology</span>
+          <span class="term__gloss">screen readers, switch devices, voice control</span>
+          what a custom UI element <em>is</em> and what state it's in, when native HTML can't say it on its own.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <ul>
+              <li>Screen readers don't look at your pixels. They read a parallel structure the browser builds from your HTML, called the
+                <span class="term">accessibility tree</span>
+                <span class="term__gloss">the browser's semantic model of the page that assistive tech reads</span>.</li>
+              <li>A real <code>&lt;button&gt;</code> shows up there as "button, Save". A <code>&lt;div&gt;</code> styled to look like a button shows up as nothing useful.</li>
+              <li>ARIA is the W3C spec that fills that gap. It declares <strong>roles</strong> ("this is a tab"), <strong>states</strong> ("this tab is selected"), and <strong>properties</strong> ("this tab controls that panel").</li>
+              <li>If you build any custom widget (tabs, comboboxes, modals, menus), ARIA decides whether a blind user can operate it or only hears silence.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Think of your page as a warehouse of boxes, and the screen reader as a courier who can't see inside them. The courier only reads the <strong>shipping labels</strong>.</p>
+        <ul>
+          <li><strong>Native HTML elements come pre-labeled.</strong> A <code>&lt;button&gt;</code>, <code>&lt;input type="checkbox"&gt;</code>, or <code>&lt;nav&gt;</code> arrives with a printed label that says what it is and how to handle it.</li>
+          <li><strong>A <code>&lt;div&gt;</code> is a blank box.</strong> You can paint it to look like a checkbox, but the courier sees an unlabeled box and moves on.</li>
+          <li><strong>ARIA is a label printer.</strong> Stick <code>role="checkbox"</code> and <code>aria-checked="true"</code> on the blank box, and the courier now announces "checkbox, checked."</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    B1["Native button"] -->|pre-printed label| O1["Announced: button, Save. Tab and Enter work"]
+    B2["Plain div painted like a checkbox"] -->|blank box| O2["Courier moves on. Nothing useful announced"]
+    B3["div + role=checkbox + aria-checked=true"] -->|ARIA label printer| O3["Announced: checkbox, checked. Keys still up to you"]
+          </pre>
+          <figcaption class="diagram__caption">Three boxes, one courier. ARIA can print a label on the blank box, but it can't put anything inside it.</figcaption>
+        </figure>
+
+        <h3>The catch: the label doesn't change what's inside the box</h3>
+        <ul>
+          <li>ARIA only changes what gets <strong>announced</strong>, not how the element <strong>behaves</strong>.</li>
+          <li>Put <code>role="button"</code> on a <code>&lt;div&gt;</code> and the screen reader says "button", but Enter and Space still do nothing, and Tab still skips over it.</li>
+          <li>You've labeled an empty box "fragile glassware." The courier trusts you, and you lied.</li>
+          <li>That's why the spec's own guidance opens with: <strong>if a native HTML element already does the job, use it instead of ARIA.</strong></li>
+        </ul>
+        <pre><code>&lt;!-- Labeled, but still broken: no focus, no keyboard --&gt;
+&lt;div role="button" onclick="save()"&gt;Save&lt;/div&gt;
+
+&lt;!-- Correct: semantics and behavior come built in --&gt;
+&lt;button onclick="save()"&gt;Save&lt;/button&gt;</code></pre>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not a styling or behavior library.</strong> It adds no keyboard handling, focus management, or visuals. You write those yourself.</li>
+              <li><strong>Not WCAG.</strong>
+                <span class="term">WCAG</span>
+                <span class="term__gloss">the set of accessibility success criteria you're measured against</span>
+                is the yardstick. ARIA is one technique for meeting some of its criteria.</li>
+              <li><strong>Not a replacement for semantic HTML.</strong> Native elements are the default. ARIA fills gaps.</li>
+              <li><strong>Not visible to most users.</strong> Sighted mouse users never experience it, which is exactly why broken ARIA goes unnoticed.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You're building a widget HTML has no element for: tabs, tree views, comboboxes with autocomplete, grids.</li>
+              <li>Content changes without a page load and must be announced, like a toast or "3 results found". That's a
+                <span class="term">live region</span>
+                <span class="term__gloss">an area whose updates AT announces on its own</span>
+                (<code>aria-live</code>).</li>
+              <li>You need to expose state HTML can't express natively, such as <code>aria-expanded</code> on a disclosure toggle.</li>
+              <li>Two elements are related but not nested in the DOM, such as an input and its error message (<code>aria-describedby</code>).</li>
+              <li>An icon-only button has no visible text (<code>aria-label="Close"</code>).</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>A native element already exists. Use <code>&lt;button&gt;</code>, <code>&lt;dialog&gt;</code>, <code>&lt;details&gt;</code>, <code>&lt;select&gt;</code>, <code>&lt;nav&gt;</code>.</li>
+              <li>You're adding ARIA "just to be safe." Redundant or wrong ARIA actively misleads users. WebAIM's yearly scans of the top million home pages keep finding <em>more</em> detected errors on pages that use ARIA than on pages that don't.</li>
+              <li>You aren't going to implement the keyboard behavior the role promises. A half-built <code>role="menu"</code> is worse than a plain list of links.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Accessibility tree</dt><dd>The browser's semantic model of the page that assistive tech reads.</dd></div>
+          <div><dt>Assistive technology (AT)</dt><dd>Screen readers (NVDA, JAWS, VoiceOver), switch devices, voice control.</dd></div>
+          <div><dt>Role</dt><dd>What an element is: <code>button</code>, <code>tab</code>, <code>dialog</code>, <code>alert</code>.</dd></div>
+          <div><dt>State</dt><dd>A value that changes with interaction: <code>aria-expanded</code>, <code>aria-checked</code>, <code>aria-selected</code>.</dd></div>
+          <div><dt>Property</dt><dd>A mostly static characteristic: <code>aria-label</code>, <code>aria-controls</code>, <code>aria-required</code>.</dd></div>
+          <div><dt>Accessible name</dt><dd>The text AT announces for an element, computed from content, <code>&lt;label&gt;</code>, or ARIA.</dd></div>
+          <div><dt>Live region</dt><dd>An area whose updates AT announces automatically (<code>aria-live="polite"</code>).</dd></div>
+          <div><dt>APG</dt><dd>The <a href="https://www.w3.org/WAI/ARIA/apg/" rel="noopener">ARIA Authoring Practices Guide</a>, W3C's reference patterns for building common widgets correctly.</dd></div>
+        </dl>
+
+        <p>Next up, the deep dive: how the accessibility tree is built, how accessible names are computed, the five rules of ARIA use, and what a correct tabs widget needs beyond its attributes.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
