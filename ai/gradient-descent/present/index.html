@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gradient Descent — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Gradient Descent</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Gradient Descent</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/gradient-descent/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span>ai</span>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Gradient Descent</span>
+        </nav>
+
+        <!-- HERO -->
+        <header class="hero">
+          <div class="hero__eyebrow">
+            <span class="pill pill--category">ai</span>
+            <span class="badge">optimisation</span>
+            <span class="badge">model training</span>
+          </div>
+          <h1 class="hero__title">Gradient Descent</h1>
+          <p class="hero__tagline">The algorithm that trains almost every machine-learning model: measure how wrong the model is, work out which direction makes it less wrong, take a small step that way, and repeat.</p>
+        </header>
+
+        <!-- STAT TILES -->
+        <div class="stat-grid">
+          <div class="stat"><div class="stat__num">1847</div><div class="stat__label">Cauchy proposes steepest descent</div></div>
+          <div class="stat"><div class="stat__num">&lt; 2/λ<sub>max</sub></div><div class="stat__label">the hard ceiling on the learning rate</div></div>
+          <div class="stat"><div class="stat__num">1e-3</div><div class="stat__label">PyTorch AdamW default <code>lr</code></div></div>
+          <div class="stat"><div class="stat__num">16 B</div><div class="stat__label">per parameter for mixed-precision Adam</div></div>
+        </div>
+
+        <!-- HERO DIAGRAM: the loss bowl and three step sizes -->
+        <figure class="diagram">
+          <svg viewBox="0 0 600 300" role="img" aria-labelledby="bowlTitle bowlDesc" width="600" style="max-width:100%">
+            <title id="bowlTitle">Three learning rates on the same loss bowl</title>
+            <desc id="bowlDesc">The loss L(w) = (2w − 6) squared is a bowl with its lowest point at w = 3. Starting from w = 0, a learning rate of 0.05 takes shrinking steps down to w = 3. A learning rate of 0.25 jumps between w = 0 and w = 6 forever. A learning rate of 0.5 jumps off the chart to w = 12, then −24, then 84.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- axes -->
+              <line x1="40" y1="250" x2="560" y2="250" stroke="var(--border)"/>
+              <line x1="40" y1="30" x2="40" y2="250" stroke="var(--border)"/>
+              <text x="48" y="26" fill="var(--text-muted)">loss</text>
+              <text x="560" y="244" fill="var(--text-muted)" text-anchor="end">w</text>
+              <!-- ticks -->
+              <g stroke="var(--border)">
+                <line x1="120" y1="250" x2="120" y2="256"/>
+                <line x1="300" y1="250" x2="300" y2="256"/>
+                <line x1="480" y1="250" x2="480" y2="256"/>
+              </g>
+              <g fill="var(--text-faint)" text-anchor="middle" font-size="12">
+                <text x="120" y="272">w = 0 (start)</text>
+                <text x="300" y="272">w = 3 (answer)</text>
+                <text x="480" y="272">w = 6</text>
+              </g>
+              <!-- the bowl: L(w) = (2w - 6)^2 for w in [-1, 7] -->
+              <path d="M60,40 Q300,460 540,40" fill="none" stroke="var(--text-muted)" stroke-width="2"/>
+
+              <!-- lr = 0.5: blows up -->
+              <line x1="120" y1="132" x2="585" y2="15" stroke="var(--danger)" stroke-width="2" stroke-dasharray="6 4"/>
+              <polygon points="585,15 573,15 578,25" fill="var(--danger)"/>
+              <text x="170" y="40" fill="var(--danger)">lr 0.5 → w: 12, −24, 84 … blows up</text>
+
+              <!-- lr = 0.25: bounces -->
+              <line x1="126" y1="132" x2="474" y2="132" stroke="var(--warn)" stroke-width="2" stroke-dasharray="6 4"/>
+              <polygon points="120,132 130,127 130,137" fill="var(--warn)"/>
+              <polygon points="480,132 470,127 470,137" fill="var(--warn)"/>
+              <text x="345" y="122" fill="var(--warn)" text-anchor="middle">lr 0.25 → 0, 6, 0, 6 … bounces forever</text>
+
+              <!-- lr = 0.05: converges -->
+              <polyline points="120,132 192,207.5 235.2,234.7 261.1,244.5 276.7,248 300,250" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+              <g fill="var(--accent)">
+                <circle cx="192" cy="207.5" r="5"/>
+                <circle cx="235.2" cy="234.7" r="5"/>
+                <circle cx="261.1" cy="244.5" r="4.5"/>
+                <circle cx="276.7" cy="248" r="4"/>
+              </g>
+              <circle cx="300" cy="250" r="6" fill="var(--success)"/>
+              <text x="310" y="172" fill="var(--accent)" text-anchor="middle">lr 0.05 → w: 1.20, 1.92,</text>
+              <text x="310" y="188" fill="var(--accent)" text-anchor="middle">2.35 … converges to 3</text>
+              <!-- start point -->
+              <circle cx="120" cy="132" r="7" fill="var(--bg-elev-2)" stroke="var(--text)" stroke-width="2"/>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Illustrative: fit <code>y = w·x</code> to one point (x = 2, y = 6). Same algorithm, same data, same start. Only the step size changes, and it decides whether you reach the bottom, bounce, or fly off.</figcaption>
+        </figure>
+
+        <!-- WHAT YOU'LL FIND -->
+        <h2>What you'll find here</h2>
+        <div class="card-grid">
+          <a class="card" href="overview.html">
+            <div class="card__title">Overview →</div>
+            <p>The intuition-first take: the foggy-mountain mental model, the three-step-size example, and what gradient descent is <em>not</em>.</p>
+          </a>
+          <a class="card" href="detail.html">
+            <div class="card__title">Detail →</div>
+            <p>The deep dive: the update rule, SGD vs momentum vs Adam/AdamW, the <code>2/λ<sub>max</sub></code> ceiling, saddles, schedules, and why Newton loses at scale.</p>
+          </a>
+          <a class="card" href="practice.html">
+            <div class="card__title">Practice →</div>
+            <p>Nine best practices with the Do/Why/Avoid triad, six anti-patterns, PaLM/OPT/Goyal case studies, and an operational checklist.</p>
+          </a>
+        </div>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Start here</p>
+            <p>New to this? Read Overview first. Already know the basics? Jump to Detail for the update rules and stability limits, or Practice for the training-run habits that stop NaNs and silent bugs.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="../../../index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">All topics</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="overview.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gradient Descent · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Gradient Descent</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Gradient Descent</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/gradient-descent/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Gradient Descent</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>You rarely write the update rule yourself. You pick five numbers — optimiser, learning rate, schedule, batch size and clipping threshold — and they decide whether the run converges, stalls or turns into NaN at 3 a.m.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Applied ML team</div><p>The inner loop of every training and fine-tuning job. Your job is choosing and tuning those five numbers.</p></div>
+          <div class="card"><div class="card__title">ML platform team</div><p>Infrastructure. Optimiser state sets GPU memory and checkpoint size. Preemptible instances make resume-correctness a reliability issue. Going from 1 to 64 GPUs silently changes the effective batch size under a tuned learning rate.</p></div>
+          <div class="card"><div class="card__title">Classic large-scale ML</div><p>Ad click prediction, ranking, fraud scoring: online SGD on sparse logistic models fed by a stream. The question is per-feature step size, not deep-network stability.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Prove the loop is wired before you tune anything</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Check the loss at initialisation (about <code>ln(num_classes)</code> for softmax cross-entropy), then overfit one small batch to near-zero loss.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Detached graphs, frozen parameters, misaligned labels and a missing <code>zero_grad()</code> all look like "the learning rate needs tuning". These checks find them in minutes, not after a multi-day run.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Launching a sweep on a pipeline that has never memorised one batch.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Start from a published recipe and tune the learning rate first</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Copy optimiser settings from a model close to yours, then sweep <code>lr</code> on a log grid in ~3× steps (<code>1e-4, 3e-4, 1e-3</code>). Google's tuning playbook: with under 10 trials, tune only <code>lr</code> for Adam; add <code>β₁</code>, then <code>ε</code>, then <code>β₂</code> as budget grows.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p><code>lr</code> dominates every other optimiser knob. Sweeping <code>β₂</code> first spends GPU budget on second-order effects.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>A linear grid (<code>1e-3, 2e-3, 3e-3</code>) that never reaches the stable region.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Run warmup plus decay, and step the scheduler once per optimiser step</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Warm up over the first few percent of steps, then decay (cosine or WSD). Call <code>scheduler.step()</code> after <code>optimizer.step()</code>, not per micro-batch or per epoch.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>No warmup is the classic cause of NaN in the first few hundred steps. A step-based schedule stepped per epoch turns a 2,000-step warmup into 2,000 epochs. PyTorch warns if the scheduler steps first, because the first schedule value is skipped.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>A constant <code>lr</code> "because the model is small".</p>
+          </div>
+        </article>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 300" role="img" aria-labelledby="schedTitle schedDesc" width="640" style="max-width:100%">
+            <title id="schedTitle">Warmup plus cosine decay versus warmup-stable-decay</title>
+            <desc id="schedDesc">Learning rate against training steps. Both schedules ramp up linearly from near zero during a short warmup. Cosine decay then curves smoothly down to almost zero by the last step. WSD holds the peak learning rate flat for most of the run and decays only near the end. A finished cosine run ends at a learning rate close to zero, so extending it is a problem.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- axes -->
+              <line x1="60" y1="220" x2="580" y2="220" stroke="var(--border)"/>
+              <line x1="60" y1="30" x2="60" y2="220" stroke="var(--border)"/>
+              <text x="52" y="54" fill="var(--text-muted)" text-anchor="end">peak</text>
+              <text x="52" y="224" fill="var(--text-muted)" text-anchor="end">0</text>
+              <text x="66" y="24" fill="var(--text-muted)">lr</text>
+              <!-- warmup band -->
+              <rect x="60" y="30" width="25" height="190" fill="var(--accent-soft)"/>
+              <text x="64" y="240" fill="var(--text-faint)" font-size="12">warmup (first few %)</text>
+              <text x="580" y="240" fill="var(--text-faint)" font-size="12" text-anchor="end">training steps →</text>
+              <!-- WSD -->
+              <polyline points="60,220 85,50 460,50 485,80 510,130 535,185 560,215" fill="none" stroke="var(--info)" stroke-width="2.5" stroke-dasharray="7 4"/>
+              <!-- warmup + cosine -->
+              <polyline points="60,220 85,50 160,60.3 197.5,72.4 235,88.6 272.5,107.4 310,128 347.5,149 385,169.2 422.5,187.2 460,202 510,215.4 560,220" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+              <!-- end-of-run marker -->
+              <circle cx="560" cy="220" r="5" fill="var(--danger)"/>
+              <text x="566" y="208" fill="var(--danger)" font-size="12">lr ≈ 0</text>
+              <!-- legend -->
+              <line x1="60" y1="266" x2="90" y2="266" stroke="var(--accent)" stroke-width="2.5"/>
+              <text x="98" y="270" fill="var(--text-muted)">warmup + cosine decay</text>
+              <line x1="300" y1="266" x2="330" y2="266" stroke="var(--info)" stroke-width="2.5" stroke-dasharray="7 4"/>
+              <text x="338" y="270" fill="var(--text-muted)">WSD: warmup, stable, decay at the end</text>
+              <text x="60" y="292" fill="var(--text-faint)" font-size="12">A cosine run ends near lr = 0, so it can't simply be extended; WSD can.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Schematic shapes of the two common schedules. Exact warmup length and WSD decay window come from your recipe.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Log gradient norm, actual learning rate and update-to-weight ratio every step</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Record the pre-clip global gradient norm, the <code>lr</code> the optimiser really used, and the per-layer
+              <span class="term">update-to-weight ratio</span>
+              <span class="term__gloss"><code>‖Δθ‖/‖θ‖</code>: how big this step is next to the weights it changes</span>
+              (CS231n's rule of thumb: about <code>1e-3</code>).</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Gradient-norm spikes usually show up before loss spikes. A ratio near <code>1e-1</code> means a layer is overwritten every step; near <code>1e-6</code>, it is effectively frozen. Logging the real <code>lr</code> catches schedules that never ran.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>A 100-step moving average of loss as the only signal. It smooths away the spike you need.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Clip the global norm, then watch how often you clip</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Use <code>clip_grad_norm_</code> (1.0 is the common transformer value and GPT-3's). With fp16 <code>GradScaler</code>, call <code>scaler.unscale_(optimizer)</code> first. Log the clipped-step fraction.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>One outlier batch can otherwise apply a step many times the normal size. Clipping still-scaled gradients compares a number inflated by the loss scale against 1.0, so every step clips.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>A threshold that clips 100% of steps. You have silently switched to normalised-gradient descent with a different effective <code>lr</code>.</p>
+          </div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    A["optimizer.zero_grad()"] --> B["forward pass, compute loss"]
+    B --> C["scaler.scale(loss).backward()"]
+    C --> D["scaler.unscale_(optimizer)"]
+    D --> E["clip_grad_norm_(params, 1.0)"]
+    E --> F["log pre-clip grad norm, actual lr, clip fraction, loss scale"]
+    F --> G["scaler.step(optimizer), then scaler.update()"]
+    G --> H["scheduler.step(), once per optimiser step"]
+    H -->|next step| A
+          </pre>
+          <figcaption class="diagram__caption">One fp16 training step in the right order. Unscale before you clip; step the scheduler after the optimiser.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Exempt biases and norm gains from weight decay</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Build two
+              <span class="term">parameter groups</span>
+              <span class="term__gloss">subsets of parameters the optimiser treats with different settings</span>:
+              matrices decay, 1-D tensors (biases, LayerNorm/RMSNorm gains) get <code>weight_decay=0</code>. nanoGPT's rule is "<code>dim &gt;= 2</code> decays". Embeddings are disputed: nanoGPT decays them, some recipes exempt them.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Decaying norm gains toward zero fights the normalisation layer and costs quality that no single metric flags.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p><code>AdamW(model.parameters(), weight_decay=0.1)</code>.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Re-tune the learning rate whenever the effective batch size changes</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Record the
+              <span class="term">effective batch size</span>
+              <span class="term__gloss">examples per optimiser step: GPUs × per-device batch × accumulation steps</span>
+              as part of the recipe. Start from a scaling rule (linear plus warmup for SGD, per Goyal et al.; roughly <code>√B</code> for Adam, per Malladi et al. 2022, which also adjusts <code>β</code> and <code>ε</code>), then run a short sweep.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Going from 1 to 8 GPUs at the same per-device batch is an 8× batch increase, and the resulting accuracy drop looks like a data problem.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>"Same config, more GPUs" as a scaling plan.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Checkpoint the whole optimiser, not just the weights</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Save weights, optimiser state (<code>m</code>, <code>v</code>, step count), scheduler, <code>GradScaler</code>, RNG states and data-loader position. Load outside checkpoints with <code>weights_only=True</code> (PyTorch's default since 2.6).</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Fresh Adam state on resume restarts
+              <span class="term">bias correction</span>
+              <span class="term__gloss">Adam's early-step boost that makes up for <code>m</code> and <code>v</code> starting at zero</span>
+              from <code>v ≈ 0</code>: large early steps and a loss jump. A missing data position replays seen data. On spot instances this happens weekly.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Saving only <code>model.state_dict()</code> "to save disk". Budget about 3× the fp32 weight size instead.</p>
+          </div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Test that gradient accumulation equals the big batch</h3>
+          <div class="practice-card__row practice-card__row--do">
+            <span class="practice-card__tag">Do</span>
+            <p>Normalise token-level loss by total non-padding tokens across all micro-batches. Add a CI test: batch 32 versus 4 × 8 accumulated must give the same gradient within tolerance.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--why">
+            <span class="practice-card__tag">Why</span>
+            <p>Per-micro-batch averaging over-weights short sequences. This exact bug shipped in Hugging Face Transformers until October 2024.</p>
+          </div>
+          <div class="practice-card__row practice-card__row--avoid">
+            <span class="practice-card__tag">Avoid</span>
+            <p>Trusting "equivalent" because the docs say so.</p>
+          </div>
+        </article>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Adam-with-L2 labelled AdamW</p>
+            <p>The code says <code>Adam(weight_decay=0.01)</code>; the design doc says "AdamW". The decay is rescaled by <code>√v̂</code> and barely acts (see Detail → How). Use the <code>AdamW</code> class and grep for it in review.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">The untuned baseline</p>
+            <p>"Switching SGD to Adam gained 3 points", with SGD run at Adam's <code>lr</code>. Without a per-optimiser sweep you are measuring tuning effort, not the optimiser. Give every arm the same trial budget, over 2–3 seeds, as AlgoPerf does.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Extending a finished cosine run</p>
+            <p>The run ended at <code>lr ≈ 0</code>, so someone bumps <code>max_steps</code> and resumes.</p>
+            <ul>
+              <li>Either <code>lr</code> jumps back up and the loss spikes,</li>
+              <li>or it stays near zero and nothing is learned.</li>
+            </ul>
+            <p>Plan continuations with WSD, or re-warm explicitly and treat it as a new run.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">NaN whack-a-mole</p>
+            <p>Every divergence is answered by halving <code>lr</code> until training is stable and slow. That treats the symptom. Check warmup, <code>β₂</code>, clipping, fp16 overflow and data first, and read the per-layer gradient-norm log.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Silent skipped steps in fp16</p>
+            <p><code>GradScaler</code> skips steps with inf/NaN gradients and halves the scale. Under persistent overflow the model stops updating while the loss sits flat. Log scale and skip count, or use bf16 where hardware allows.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Same shuffle every epoch</p>
+            <p>Under DDP, a missing <code>sampler.set_epoch(epoch)</code> makes <code>DistributedSampler</code> replay one order forever. Training "works", slightly worse, and nobody traces it. Put the line in the shared training template.</p>
+          </div>
+        </div>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    A["Loss goes NaN or spikes"] --> B{"In the first few hundred steps?"}
+    B -- yes --> C["Check warmup and lr against the stability limit"]
+    B -- no --> D["Read the per-layer gradient-norm log"]
+    D --> E["Check β₂, clip fraction, fp16 loss scale and skipped steps, data"]
+    E --> F["Rewind about 100 steps before the spike, skip 200–500 batches (PaLM)"]
+    F --> G{"Spikes again?"}
+    G -- yes --> H["Restart earlier with a lower lr (OPT-175B)"]
+    G -- no --> I["Keep training"]
+          </pre>
+          <figcaption class="diagram__caption">A loss-spike runbook instead of whack-a-mole: diagnose first, rewind-and-skip second, lower <code>lr</code> last.</figcaption>
+        </figure>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">LLM pretraining loss spikes (PaLM, OPT-175B)</div>
+            <ul>
+              <li>PaLM 540B hit about 20 loss spikes despite clipping.</li>
+              <li>Fix: restart ~100 steps before the spike and skip 200–500 batches.</li>
+              <li>The same batches replayed from another checkpoint did not spike.</li>
+              <li>Meta's OPT-175B logbook shows divergences handled by restarting earlier with a lower <code>lr</code>.</li>
+            </ul>
+            <p><em>Lesson:</em> spikes come from data and parameter state together. Checkpoint frequency plus a "rewind and skip" runbook is a stability tool, not just a backup.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Large-batch vision training</div>
+            <ul>
+              <li>Goyal et al. trained ResNet-50 on ImageNet in one hour on 256 GPUs at batch 8192.</li>
+              <li>They used linear LR scaling with a 5-epoch gradual warmup.</li>
+              <li>Without warmup the rule failed early; above about 8K, accuracy dropped even with both.</li>
+            </ul>
+            <p><em>Lesson:</em> scaling rules have a valid range and bring their own warmup requirement. Verify at every new batch size.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Fine-tuning with gradient accumulation</div>
+            <ul>
+              <li>In October 2024, Unsloth and Hugging Face showed <code>Trainer</code> losses differed with accumulation on and off.</li>
+              <li>Cause: cross-entropy was normalised per micro-batch.</li>
+              <li>Variants of the bug had been found and reintroduced since 2021.</li>
+            </ul>
+            <p><em>Lesson:</em> "mathematically equivalent" settings need an equivalence test. Comparing two short loss curves is cheap.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Online CTR with per-coordinate step sizes</div>
+            <ul>
+              <li>Google's 2013 "view from the trenches" paper trains streaming logistic regression over billions of sparse features.</li>
+              <li>It uses
+                <span class="term" data-gloss="Follow The Regularized Leader: an online learning algorithm that keeps sparse models sparse">FTRL-Proximal</span>
+                with an AdaGrad-style learning rate per coordinate, so rare features take larger steps.</li>
+            </ul>
+            <p><em>Lesson:</em> adaptive step sizes solved a sparse-data problem before they were a deep-learning default. When feature frequencies span orders of magnitude, one global <code>lr</code> is wrong for most of them.</p>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call a training setup done</p>
+            <ul>
+              <li><strong>Smoke test:</strong> does a smoke job check initial loss and pass an overfit-one-batch test?</li>
+              <li><strong>Monitoring:</strong> are loss, actual <code>lr</code>, pre-clip gradient norm, clip fraction and (fp16) loss scale and skipped steps logged per step, unsmoothed?</li>
+              <li><strong>Weight decay:</strong> is it set through parameter groups with biases and norm gains exempt, using the <code>AdamW</code> class?</li>
+              <li><strong>Failure handling:</strong> does a checkpoint hold optimiser, scheduler, scaler, RNG and data position, and has a kill-and-resume test shown a smooth loss curve?</li>
+              <li><strong>Spike runbook:</strong> is there a written one (rewind N steps, skip batches, lower <code>lr</code>), and does checkpoint frequency support it?</li>
+              <li><strong>Batch size:</strong> is the effective batch size stored with each run, and does changing it trigger an LR re-sweep?</li>
+              <li><strong>Security:</strong> are external checkpoints loaded as <code>safetensors</code> or with <code>weights_only=True</code>, never as raw pickle?</li>
+              <li><strong>Cost:</strong> is optimiser-state memory (about 12 of the 16 bytes per parameter) budgeted, and do sweeps run on short proxy runs first?</li>
+              <li><strong>Onboarding:</strong> is the recipe of record (optimiser, <code>lr</code>, betas, warmup, schedule, clip, batch size) in one config file?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Notebook.</span> <code>Adam(model.parameters(), lr=1e-3)</code>, fixed epochs, no schedule, loss printed every 100 steps. It works on the first dataset, and the numbers harden into folklore copied into the next three projects.</li>
+          <li><span class="steps__title">First multi-GPU move (the painful phase).</span>
+            <ul>
+              <li>The effective batch changes and the old <code>lr</code> breaks.</li>
+              <li>Preemption exposes resume bugs.</li>
+              <li>Gradient accumulation arrives to fit larger models and brings normalisation bugs.</li>
+              <li>Optimiser state becomes the largest item in GPU memory, forcing ZeRO or FSDP sharding.</li>
+              <li>Checkpoints become sharded and tied to one GPU count; resharding for a different cluster size is the migration nobody planned.</li>
+            </ul>
+          </li>
+          <li><span class="steps__title">Mature setup: the optimiser as config.</span> One recipe file per model family, a shared parameter-group builder, gradient-norm alerts, tested resume, and LR sweeps on short proxy runs. Teams training several model sizes adopt
+            <span class="term">μP</span>
+            <span class="term__gloss">Tensor Programs V: a parameterisation that lets hyperparameters tuned on a small model transfer to a large one</span>,
+            and continuous trainers adopt WSD so runs can be extended. By then the recurring cost is tuning and evaluation compute.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://github.com/google-research/tuning_playbook" rel="noopener">Deep Learning Tuning Playbook (Google Research)</a> — the most practical guide to batch size, LR sweeps and reading training curves.</li>
+          <li><a href="https://karpathy.github.io/2019/04/25/recipe/" rel="noopener">A Recipe for Training Neural Networks (Karpathy, 2019)</a> — the "verify loss at init, overfit one batch" discipline that catches wiring bugs before they cost GPU-days.</li>
+          <li><a href="https://github.com/facebookresearch/metaseq/tree/main/projects/OPT/chronicles" rel="noopener">OPT-175B logbook (Meta)</a> — a day-by-day record of divergences, restarts and LR changes; the closest thing to a public post-mortem on optimiser instability.</li>
+          <li><a href="https://arxiv.org/abs/2204.02311" rel="noopener">PaLM, § Training instability (arXiv:2204.02311)</a> — the rewind-and-skip mitigation and the evidence that spikes are not just bad data.</li>
+          <li><a href="https://huggingface.co/blog/gradient_accumulation" rel="noopener">Fixing Gradient Accumulation (Hugging Face, 2024)</a> — how a "mathematically equivalent" feature drifted from the maths in a widely used library.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/gradient-descent/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gradient Descent · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Gradient Descent</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Gradient Descent</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/gradient-descent/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Gradient Descent</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~4 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">Measure how wrong the model is, work out which direction makes it less wrong, take a small step that way, and repeat. That loop trains almost every machine-learning model.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <ul>
+              <li>A model is a pile of numbers called
+                <span class="term">parameters</span>
+                <span class="term__gloss">the weights the training process is allowed to change</span>.</li>
+              <li>A <strong>loss function</strong> turns "how wrong are the predictions?" into one number.</li>
+              <li>The <strong>gradient</strong> says which way each parameter should move to lower the loss fastest.</li>
+              <li>Gradient descent nudges every parameter a little that way, then repeats, often millions of times.</li>
+              <li>Every neural network you will touch, from a small classifier to an LLM, is trained by this loop or a close relative such as Adam.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>You are on a mountainside in <strong>thick fog</strong>, trying to reach the valley floor. You can't see the valley. You can only feel the slope under your boots. So you feel which way is steepest downhill, take one step, feel again, step again. When the ground goes flat, you stop.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    A["Stand at current position (parameter values)"] --> B["Feel the slope under your boots (gradient)"]
+    B --> C["Take one stride downhill (learning rate × gradient)"]
+    C --> D{"Ground flat? (gradient near 0)"}
+    D -- no --> B
+    D -- yes --> E["Stop: you are on a valley floor"]
+          </pre>
+          <figcaption class="diagram__caption">The foggy-mountain loop. Each pass through it is one step of <code>w ← w − lr · gradient</code>.</figcaption>
+        </figure>
+
+        <h3>How the picture maps to the maths</h3>
+        <ul>
+          <li><strong>The mountain</strong> is the
+            <span class="term">loss landscape</span>
+            <span class="term__gloss">the loss value for every possible setting of the parameters</span>.</li>
+          <li><strong>Your position</strong> is the current parameter values.</li>
+          <li><strong>The slope under your boots</strong> is the gradient.</li>
+          <li><strong>Your stride length</strong> is the learning rate.</li>
+        </ul>
+        <p>The stride causes most of the trouble. Tiny steps and you spend all day on the hill. Huge steps and you leap across the valley and land higher up the other side.</p>
+
+        <h3>One concrete example (Illustrative)</h3>
+        <p>Fit <code>y = w · x</code> to one point, <code>x = 2, y = 6</code>, with squared-error loss. The right answer is <code>w = 3</code>. Start at <code>w = 0</code>. Each step does <code>w ← w − lr · gradient</code>:</p>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Learning rate</th><th scope="col">First values of w</th><th scope="col">Outcome</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>lr = 0.05</code></td><td>0 → 1.20 → 1.92 → 2.35 → …</td><td>Converges to 3</td></tr>
+              <tr><td><code>lr = 0.25</code></td><td>0 → 6 → 0 → 6 → …</td><td>Bounces forever</td></tr>
+              <tr><td><code>lr = 0.5</code></td><td>0 → 12 → −24 → 84 → …</td><td>Blows up</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Same algorithm, same data. Only the step size changed.</p>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">This is a simplification</p>
+            <ul>
+              <li>Real models have millions or billions of parameters, so the mountain has that many dimensions.</li>
+              <li>You usually measure the slope on a small random sample of data, so your footing is noisy.</li>
+              <li>The deep dive covers what that changes, including why
+                <span class="term">saddle points</span>
+                <span class="term__gloss">spots that are flat but slope down in some directions and up in others</span>
+                matter more than local minima at that scale.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not backpropagation.</strong>
+                <span class="term">Backprop</span>
+                <span class="term__gloss">the chain-rule pass that works out every parameter's gradient</span>
+                <em>computes</em> the gradient efficiently. Gradient descent <em>uses</em> it to update the weights.</li>
+              <li><strong>Not a guarantee of the best answer.</strong> Only on
+                <span class="term">convex</span>
+                <span class="term__gloss">bowl-shaped with a single lowest point</span>
+                problems does it reliably reach the global minimum, and neural networks are not convex.</li>
+              <li><strong>Not gradient boosting.</strong> Gradient boosting builds an ensemble of decision trees, each fit to the previous ones' errors.</li>
+              <li><strong>Not a rival to Adam.</strong> Adam, AdamW and RMSProp are gradient-descent variants that adapt the step size per parameter.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT TO -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>You are training a neural network of any size.</li>
+              <li>Your model has too many parameters to solve for in closed form.</li>
+              <li>Your loss is differentiable, so a gradient exists to follow.</li>
+              <li>Your data is too large for memory, and you can learn from it in mini-batches.</li>
+              <li>You are fine-tuning a pretrained model on your own data.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>Small linear regression: a least-squares solver gives the exact answer in one shot.</li>
+              <li>The objective is discrete or non-differentiable, such as choosing hyperparameters or a config. Use grid, random or Bayesian search.</li>
+              <li>The problem is small and smooth: second-order methods like L-BFGS or Newton converge in far fewer steps.</li>
+              <li>You only call a hosted model through an API. You have no weights to update.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Loss function</dt><dd>Maps predictions and targets to one number. Lower is better.</dd></div>
+          <div><dt>Gradient</dt><dd>The partial derivatives of the loss for every parameter. It points uphill, so you step the opposite way.</dd></div>
+          <div><dt>Learning rate (<code>lr</code>)</dt><dd>The multiplier on the gradient that sets the step size.</dd></div>
+          <div><dt>Batch / mini-batch / SGD</dt><dd>The gradient is computed on all the data, on a small random subset, or on one example (classic stochastic gradient descent). In practice "SGD" usually means mini-batch.</dd></div>
+          <div><dt>Epoch</dt><dd>One full pass over the training data.</dd></div>
+          <div><dt>Momentum</dt><dd>Carry part of the previous step forward, like a rolling ball, to smooth out zig-zagging.</dd></div>
+          <div><dt>Adam / AdamW</dt><dd>Adaptive optimisers that give each parameter its own effective step size. AdamW is the common default for transformers.</dd></div>
+          <div><dt>Learning-rate schedule</dt><dd>Changes <code>lr</code> during training, for example a short warmup and then a gradual decay.</dd></div>
+        </dl>
+
+        <!-- WHAT'S NEXT -->
+        <p>Next: the update rule, batch vs mini-batch gradients, momentum and Adam, and the usual failure modes — a bad learning rate, saddle points, ill-conditioned valleys, and vanishing or exploding gradients.</p>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

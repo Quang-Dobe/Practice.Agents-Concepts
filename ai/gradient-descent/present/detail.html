@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gradient Descent · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-ai" data-category="ai">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Gradient Descent</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Gradient Descent</h1>
+        <span class="pill pill--category">ai</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/ai/gradient-descent/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Gradient Descent</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~12 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>Gradient descent is a <strong>first-order iterative method</strong> for minimising a differentiable objective <code>L: ℝⁿ → ℝ</code>:</p>
+        <pre><code>θ_{t+1} = θ_t − η_t · ∇L(θ_t)</code></pre>
+        <ul>
+          <li><strong>"First-order"</strong> means it uses only the gradient, never the
+            <span class="term">Hessian</span>
+            <span class="term__gloss">the n × n matrix of second derivatives: the curvature in every pair of directions</span>.</li>
+          <li><strong>In machine learning</strong>, <code>L</code> is the
+            <span class="term">empirical risk</span>
+            <span class="term__gloss">the average loss over the training examples</span>
+            <code>(1/N) Σ ℓ(θ; xᵢ, yᵢ)</code>.</li>
+          <li><strong>Stochastic variants</strong> swap the full gradient for an unbiased mini-batch estimate <code>g_t = (1/|B|) Σ_{i∈B} ∇ℓ(θ_t; xᵢ, yᵢ)</code>.</li>
+          <li><strong>Momentum, RMSProp, Adam and AdamW</strong> all run this same loop. They differ only in how they turn <code>g_t</code> into a step.</li>
+        </ul>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Objective <code>L(θ)</code></dt><dd>A scalar loss, differentiable almost everywhere. ReLU kinks are fine.</dd></div>
+          <div><dt>Gradient oracle</dt><dd>Reverse-mode autodiff (backprop). A backward pass costs roughly 2× the forward pass.</dd></div>
+          <div><dt>Learning rate <code>η</code> and schedule <code>η_t</code></dt><dd>The step size, usually changed during training by warmup and decay.</dd></div>
+          <div><dt>Batch size <code>B</code></dt><dd>Controls gradient noise. The variance of <code>g_t</code> scales as <code>σ²/B</code>.</dd></div>
+          <div><dt>Update rule with state</dt><dd>SGD keeps no state, momentum keeps one vector, Adam keeps two.</dd></div>
+        </dl>
+        <p>Convergence proofs assume the objective is <strong>L-smooth</strong> (its gradient is
+          <span class="term" data-gloss="the gradient can't change faster than L times the distance moved">Lipschitz</span>
+          with constant <code>L</code>) and sometimes <strong>μ-strongly convex</strong>. The ratio <code>κ = L/μ</code> is the
+          <span class="term">condition number</span>
+          <span class="term__gloss">how much steeper the steepest direction is than the flattest one</span>.</p>
+
+        <h3>Its neighbours</h3>
+        <ul>
+          <li><strong>Closed-form solvers</strong>, such as least squares via QR.</li>
+          <li><strong>Second-order methods</strong>: Newton, and quasi-Newton L-BFGS, which approximates curvature from about 5–20 recent gradient pairs.</li>
+          <li><strong>Derivative-free search</strong>: grid search, Bayesian search and CMA-ES.</li>
+          <li><strong>Matrix-preconditioned optimisers</strong> (Shampoo, Muon) sit between first and second order. They use more structure than a plain gradient but never form the Hessian.</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <ul>
+          <li>It runs inside the <strong>training loop</strong>, in the same process and on the same accelerator as the model.</li>
+          <li>Autograd fills each parameter's <code>.grad</code>; the optimiser then updates the parameters in place.</li>
+          <li>In data-parallel training, a gradient
+            <span class="term">all-reduce</span>
+            <span class="term__gloss">every worker sums its gradients with every other worker's, so all end with the same average</span>
+            runs between the backward pass and the optimiser step.</li>
+          <li>Optimiser state can be sharded across devices (DeepSpeed ZeRO, PyTorch FSDP).</li>
+          <li>Serving a model takes no gradient steps, so gradient descent does not run at inference.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Train["Training process: same accelerator as the model"]
+      G1["GPU 1: forward + backward"] --> AR["All-reduce gradients"]
+      G2["GPU 2: forward + backward"] --> AR
+      AR --> OPT["Optimiser step, updates weights in place (state may be sharded: ZeRO / FSDP)"]
+      OPT -->|next mini-batch| G1
+      OPT -->|next mini-batch| G2
+    end
+    subgraph Serve["Serving"]
+      INF["Inference: forward pass only, no gradient steps"]
+    end
+    OPT -.->|final checkpoint| INF
+          </pre>
+          <figcaption class="diagram__caption">Gradient descent lives only on the training side. The all-reduce sits between backward and the optimiser step.</figcaption>
+        </figure>
+
+        <h3>Where you typically meet it</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">PyTorch <code>torch.optim</code></div><p><code>SGD</code>, <code>Adam</code>, <code>AdamW</code>, and <code>Muon</code>. Muon was added in 2.9 and supports 2-D parameters only.</p></div>
+          <div class="card"><div class="card__title">JAX / Optax</div><p>Optimisers built as composable gradient transformations.</p></div>
+          <div class="card"><div class="card__title">Hugging Face <code>Trainer</code></div><p>Defaults to <code>adamw_torch</code> with linear warmup and decay.</p></div>
+          <div class="card"><div class="card__title">scikit-learn</div><p><code>SGDClassifier</code> / <code>SGDRegressor</code>, and <code>MLPClassifier(solver='adam')</code>.</p></div>
+          <div class="card"><div class="card__title">LLM pretraining stacks</div><p>Megatron-LM, DeepSpeed: AdamW with warmup, gradient clipping and sharded optimiser state.</p></div>
+        </div>
+
+        <h3>Ecosystem and tooling</h3>
+        <dl class="vocab">
+          <div><dt>Optimisers</dt><dd><code>torch.optim</code>, Optax, and bitsandbytes 8-bit Adam, which shrinks optimiser state.</dd></div>
+          <div><dt>Schedules</dt><dd><code>torch.optim.lr_scheduler</code> and the <code>get_cosine_schedule_with_warmup</code> helper in Transformers.</dd></div>
+          <div><dt>Memory at scale</dt><dd>DeepSpeed ZeRO stages 1–3 and PyTorch FSDP.</dd></div>
+          <div><dt>Diagnostics</dt><dd>Log loss, learning rate and global gradient norm to TensorBoard or Weights &amp; Biases.</dd></div>
+          <div><dt>Comparing optimisers</dt><dd>The MLCommons <a href="https://arxiv.org/abs/2502.15015" rel="noopener">AlgoPerf</a> benchmark.</dd></div>
+        </dl>
+
+        <!-- WHEN -->
+        <h2>When it emerged</h2>
+        <ol class="steps">
+          <li><span class="steps__title">1847 · Steepest descent.</span> Cauchy proposes it.</li>
+          <li><span class="steps__title">1951 · Stochastic approximation.</span> Robbins and Monro publish the root of SGD. Their conditions <code>Σηₜ = ∞, Σηₜ² &lt; ∞</code> still say when SGD converges exactly.</li>
+          <li><span class="steps__title">1964 / 1983 · Momentum.</span> Polyak introduces heavy-ball momentum. Nesterov's accelerated gradient then reaches the optimal <code>O(1/k²)</code> rate on smooth convex functions.</li>
+          <li><span class="steps__title">1986 · Backprop.</span> Rumelhart, Hinton and Williams popularise backprop plus gradient descent for multi-layer networks.</li>
+          <li><span class="steps__title">2011–2014 · Adaptive methods.</span> AdaGrad (2011), RMSProp (Hinton's 2012 lecture, never formally published), and Adam (<a href="https://arxiv.org/abs/1412.6980" rel="noopener">arXiv:1412.6980</a>).</li>
+          <li><span class="steps__title">2017 · AdamW and large batches.</span> AdamW (<a href="https://arxiv.org/abs/1711.05101" rel="noopener">arXiv:1711.05101</a>) decouples weight decay. <a href="https://arxiv.org/abs/1706.02677" rel="noopener">Goyal et al.</a> train ResNet-50 at batch size 8192 in one hour using linear LR scaling plus warmup.</li>
+          <li><span class="steps__title">2024–2025 · Muon.</span> Keller Jordan's Muon orthogonalises momentum for weight matrices. Moonshot AI reports <a href="https://arxiv.org/abs/2502.16982" rel="noopener">about 2× compute efficiency over AdamW</a> at LLM scale.</li>
+        </ol>
+        <p>Before deep learning, small models were fit in closed form or with Newton-type methods. Gradient descent won as models grew, because each step costs <code>O(n)</code> and it tolerates noisy mini-batch gradients.</p>
+
+        <h2>When to use it</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>There are too many parameters for a Hessian.</li>
+              <li>The data must be streamed in mini-batches.</li>
+              <li>The loss is differentiable and autodiff is available.</li>
+              <li>You want a minimum that generalises, not a certified optimum.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Avoid it when</p>
+            <ul>
+              <li>A cheap closed form exists, such as least squares with a few thousand features (<code>numpy.linalg.lstsq</code>).</li>
+              <li>The problem is small, smooth and deterministic. L-BFGS or Newton (<code>scipy.optimize.minimize</code>) needs far fewer iterations.</li>
+              <li>The objective is discrete, such as a hyperparameter or architecture choice.</li>
+              <li>Hard constraints dominate. Use an LP, QP or convex solver.</li>
+              <li>You need proof of a global optimum on a non-convex problem.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Rule of thumb</p>
+            <p>At 10⁹ parameters, a dense Hessian has <strong>10¹⁸ entries</strong>. Anything that needs it is off the table; gradient descent is what's left.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <h3>One training step</h3>
+        <ol class="steps">
+          <li><span class="steps__title">Sample.</span> Draw a mini-batch <code>B</code>.</li>
+          <li><span class="steps__title">Forward pass.</span> Compute the loss. Autograd records the graph.</li>
+          <li><span class="steps__title">Backward pass.</span> Apply the chain rule in reverse to get <code>∂ℓ/∂θ</code> for every parameter.</li>
+          <li><span class="steps__title">All-reduce.</span> Average the gradients across data-parallel workers.</li>
+          <li><span class="steps__title">Clip.</span> Cap the global gradient norm, if enabled. GPT-3 clipped at 1.0.</li>
+          <li><span class="steps__title">Optimiser step.</span> Combine <code>g</code> with the stored state into an update and apply it.</li>
+          <li><span class="steps__title">Scheduler step.</span> Update <code>η</code>.</li>
+          <li><span class="steps__title">Zero the gradients.</span> PyTorch accumulates <code>.grad</code> by default.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant D as Data loader
+    participant M as Model + autograd
+    participant W as Other workers
+    participant O as Optimiser
+    participant S as Scheduler
+    D->>M: 1. mini-batch B
+    M->>M: 2. forward pass, loss, record graph
+    M->>M: 3. backward pass, chain rule gives dℓ/dθ
+    M->>W: 4. all-reduce gradients
+    W-->>M: averaged gradient g
+    M->>M: 5. clip global norm (GPT-3 used 1.0)
+    M->>O: 6. hand over g
+    O->>O: combine g with state, update θ in place
+    O->>S: 7. scheduler step
+    S-->>O: new η
+    O->>M: 8. zero the gradients
+          </pre>
+          <figcaption class="diagram__caption">The eight stages of one step. Forget stage 8 and gradients pile up across steps.</figcaption>
+        </figure>
+
+        <h3>Update rules</h3>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Optimiser</th><th scope="col">Update</th><th scope="col">Extra state / param</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>SGD</td><td><code>θ ← θ − η·g</code></td><td>0</td></tr>
+              <tr><td>SGD + momentum (PyTorch form)</td><td><code>v ← μ·v + g</code>; <code>θ ← θ − η·v</code></td><td>1</td></tr>
+              <tr><td>RMSProp</td><td><code>s ← α·s + (1−α)·g²</code>; <code>θ ← θ − η·g/(√s + ε)</code></td><td>1</td></tr>
+              <tr><td>Adam</td><td><code>m ← β₁m + (1−β₁)g</code>; <code>v ← β₂v + (1−β₂)g²</code>; <code>m̂ = m/(1−β₁ᵗ)</code>, <code>v̂ = v/(1−β₂ᵗ)</code>; <code>θ ← θ − η·m̂/(√v̂ + ε)</code></td><td>2</td></tr>
+              <tr><td>AdamW</td><td>Adam, plus a separate <code>θ ← θ − η·λ·θ</code> that never enters <code>m</code> or <code>v</code></td><td>2</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Defaults worth memorising</p>
+            <ul>
+              <li>PyTorch <a href="https://docs.pytorch.org/docs/2.9/generated/torch.optim.AdamW.html" rel="noopener">AdamW defaults</a>: <code>lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2</code>.</li>
+              <li>Plain <code>Adam</code> has <code>weight_decay=0</code>.</li>
+              <li>LLM recipes usually lower <code>β₂</code>. <a href="https://arxiv.org/abs/2005.14165" rel="noopener">GPT-3</a> used <code>β₂=0.95</code>, weight decay 0.1, warmup over 375M tokens, then cosine decay.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>Why the step size has a hard ceiling (Illustrative, the overview example)</h3>
+        <ul>
+          <li>The loss is <code>L(w) = (2w − 6)²</code>, so <code>L'(w) = 8w − 24</code> and the curvature is <code>L'' = 8</code>.</li>
+          <li>Each step gives <code>w − 3 ← (1 − 8η)(w − 3)</code>.</li>
+          <li>It converges only if <code>|1 − 8η| &lt; 1</code>, which means <code>0 &lt; η &lt; 0.25 = 2/L''</code>.</li>
+          <li>At 0.25 the factor is exactly −1, so <code>w</code> bounces forever.</li>
+          <li>In general, gradient descent on a quadratic is stable only if <strong><code>η &lt; 2/λ_max(H)</code></strong>.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 620 220" role="img" aria-labelledby="stabTitle stabDesc" width="620" style="max-width:100%">
+            <title id="stabTitle">The stability limit on a learning-rate number line</title>
+            <desc id="stabDesc">A number line for the learning rate from 0 to 0.30. Below 0.25 training converges because the factor 1 − 8·lr has size under 1. At exactly 0.25 it bounces. Above 0.25 it diverges. Measured after 50 steps: lr 0.05 gives w = 3.0000, lr 0.24 gives 2.9536, lr 0.25 gives 0.0000, lr 0.26 gives −137.7048.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- zones -->
+              <rect x="40" y="90" width="450" height="30" rx="4" fill="var(--success-soft)" stroke="var(--success)"/>
+              <rect x="490" y="90" width="90" height="30" rx="4" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <line x1="490" y1="84" x2="490" y2="126" stroke="var(--warn)" stroke-width="3"/>
+              <text x="250" y="110" fill="var(--success)" text-anchor="middle">converges: |1 − 8·lr| &lt; 1</text>
+              <text x="535" y="110" fill="var(--danger)" text-anchor="middle">diverges</text>
+              <!-- axis labels -->
+              <g fill="var(--text-faint)" font-size="12" text-anchor="middle">
+                <text x="40" y="140">0</text>
+                <text x="580" y="140">0.30</text>
+              </g>
+              <!-- markers -->
+              <g stroke="var(--text-muted)">
+                <line x1="130" y1="66" x2="130" y2="90"/>
+                <line x1="472" y1="30" x2="472" y2="90"/>
+                <line x1="490" y1="126" x2="490" y2="160"/>
+                <line x1="508" y1="62" x2="508" y2="90"/>
+              </g>
+              <g fill="var(--text)" font-size="12">
+                <text x="130" y="60" text-anchor="middle">lr 0.05 · factor +0.60 · w = 3.0000</text>
+                <text x="466" y="34" text-anchor="end">lr 0.24 · −0.92 · w = 2.9536</text>
+                <text x="490" y="176" text-anchor="middle" fill="var(--warn)">lr 0.25 · −1.00 · bounces (w = 0.0000)</text>
+                <text x="514" y="52" fill="var(--danger)">lr 0.26 · −1.08</text>
+                <text x="514" y="68" fill="var(--danger)">w = −137.7</text>
+              </g>
+              <text x="40" y="208" fill="var(--text-faint)" font-size="12">Each step multiplies (w − 3) by (1 − 8·lr). Values of w after 50 steps, from code/mvp.py.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">The ceiling is <code>2/curvature = 2/8 = 0.25</code>. A 0.02 change in <code>lr</code> is the difference between 2.9536 and −137.7048.</figcaption>
+        </figure>
+
+        <h3>Why ill-conditioning hurts</h3>
+        <ul>
+          <li>Each curvature direction shrinks by <code>(1 − η·λᵢ)</code> per step.</li>
+          <li>Because <code>λ_max</code> caps <code>η</code>, the flattest direction shrinks by only <code>1 − 1/κ</code> per step.</li>
+          <li>Cost on strongly convex problems: <code>O(κ·log(1/ε))</code> iterations. Momentum cuts this to <code>O(√κ·log(1/ε))</code>.</li>
+          <li>Adam's division by <code>√v̂</code> is a
+            <span class="term">diagonal preconditioner</span>
+            <span class="term__gloss">a per-parameter rescaling of the step, so steep and flat axes move at similar speeds</span>:
+            a cheap fix for ill-conditioning that lines up with the parameter axes.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 280" role="img" aria-labelledby="valleyTitle valleyDesc" width="640" style="max-width:100%">
+            <title id="valleyTitle">Plain gradient descent versus momentum in a narrow valley</title>
+            <desc id="valleyDesc">Contour lines of a long, narrow valley, steep across and flat along its length. Plain gradient descent bounces back and forth across the steep direction and creeps slowly along the flat one. Momentum follows a smooth curve and builds speed along the flat direction, arriving near the minimum at the centre.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <!-- contours -->
+              <g fill="none" stroke="var(--border)">
+                <ellipse cx="330" cy="130" rx="270" ry="90"/>
+                <ellipse cx="330" cy="130" rx="190" ry="63"/>
+                <ellipse cx="330" cy="130" rx="110" ry="37"/>
+                <ellipse cx="330" cy="130" rx="40" ry="13"/>
+              </g>
+              <text x="330" y="28" fill="var(--text-muted)" text-anchor="middle">↕ steep direction · curvature 100</text>
+              <text x="330" y="240" fill="var(--text-muted)" text-anchor="middle">↔ flat direction · curvature 1 · condition number κ = 100</text>
+              <!-- plain GD: zig-zag -->
+              <polyline points="114,76 127,173 139,95.4 150.5,157.6 161.3,107.9 171.4,147.7 180.9,115.8 189.9,141.3 198.3,120.9 206.2,137.2 213.6,124.2 220.6,134.6 227.2,126.3" fill="none" stroke="var(--warn)" stroke-width="2"/>
+              <!-- momentum: smooth -->
+              <path d="M114,76 C170,170 260,140 345,127 S335,131 330,130" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+              <!-- start and minimum -->
+              <circle cx="114" cy="76" r="6" fill="var(--bg-elev-2)" stroke="var(--text)" stroke-width="2"/>
+              <text x="104" y="66" fill="var(--text-muted)" text-anchor="end">start</text>
+              <circle cx="330" cy="130" r="5" fill="var(--success)"/>
+              <!-- legend -->
+              <line x1="40" y1="266" x2="70" y2="266" stroke="var(--warn)" stroke-width="2"/>
+              <text x="78" y="270" fill="var(--text-muted)">plain GD (lr 0.018): zig-zags</text>
+              <line x1="330" y1="266" x2="360" y2="266" stroke="var(--accent)" stroke-width="2.5"/>
+              <text x="368" y="270" fill="var(--text-muted)">momentum (μ = 0.9): smooth</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Schematic, not to scale. The steep axis caps <code>lr</code> below <code>2/100 = 0.02</code>, so the flat axis shrinks by only about 2% per step.</figcaption>
+        </figure>
+
+        <p>The MVP runs exactly this valley: <code>L = 0.5·(x² + 100·y²)</code>, start <code>(1, 1)</code>, loss 50.5, 100 steps.</p>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Optimiser (code/mvp.py Part 2)</th><th scope="col">Settings</th><th scope="col">Final loss</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Plain GD</td><td><code>lr=0.018</code></td><td>0.013221</td></tr>
+              <tr><td>Momentum</td><td><code>lr=0.018, μ=0.9</code></td><td>0.000084</td></tr>
+              <tr><td>Adam</td><td><code>lr=0.05, β=(0.9, 0.999)</code></td><td>0.000896</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Under these settings momentum wins. Adam beats plain GD by about 15× but lands behind momentum.</p>
+
+        <h3>Stochastic noise</h3>
+        <ul>
+          <li>With a constant <code>η</code>, SGD settles in a "noise ball" whose size grows with <code>η·σ²/B</code>.</li>
+          <li>Decaying <code>η</code> shrinks that ball.</li>
+          <li>On non-convex losses the only guarantee is reaching a near-stationary point, where <code>‖∇L‖</code> is small.</li>
+        </ul>
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In the MVP (Part 3): same compute, more steps wins</p>
+            <p>Fit <code>y = w·x</code> to 200 noisy points (true <code>w = 3</code>), <code>lr = 0.2</code>, 5 epochs. Both runs use 200 per-example gradients per epoch.</p>
+            <ul>
+              <li><strong>Full batch (200):</strong> 5 updates → <code>w = 1.4773</code>.</li>
+              <li><strong>Mini-batch (10):</strong> 100 updates → <code>w = 2.9759</code>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>Saddles, not local minima</h3>
+        <ul>
+          <li>A critical point is a minimum only if all <code>n</code> Hessian eigenvalues are positive.</li>
+          <li><a href="https://arxiv.org/abs/1406.2572" rel="noopener">Dauphin et al. (arXiv:1406.2572)</a> argue that in high dimensions saddle points vastly outnumber local minima, and that high-error local minima are rare. Part of their evidence comes from small networks.</li>
+          <li>In practice a saddle shows up as a long plateau with a near-zero gradient.</li>
+          <li>Mini-batch noise and momentum help the run escape it.</li>
+        </ul>
+
+        <h3>Edge of stability</h3>
+        <ul>
+          <li><a href="https://arxiv.org/abs/2103.00065" rel="noopener">Cohen et al. (ICLR 2021)</a> found that full-batch gradient descent on neural nets raises the
+            <span class="term">sharpness</span>
+            <span class="term__gloss">the largest Hessian eigenvalue, <code>λ_max</code>: how steep the steepest curve is</span>
+            until it hovers just above <code>2/η</code>.</li>
+          <li>The loss then wobbles over short windows but still falls over long ones.</li>
+          <li>So <code>2/η</code> is more than a ceiling the network stays under: training settles right at it.</li>
+        </ul>
+
+        <h3>Schedules</h3>
+        <ul>
+          <li><strong>Warmup</strong> ramps <code>η</code> up from near zero over the first few percent of steps. Early on, Adam's <code>v</code> estimates are unreliable and the loss surface is sharp.</li>
+          <li><strong>Cosine decay</strong> or <strong>WSD</strong> (warmup–stable–decay) follows.</li>
+          <li>WSD holds <code>η</code> constant and decays only at the end, so you can keep training without fixing the step count in advance (<a href="https://arxiv.org/abs/2410.05192" rel="noopener">arXiv:2410.05192</a>).</li>
+        </ul>
+
+        <h3>Vanishing and exploding gradients</h3>
+        <ul>
+          <li>They come from backprop, not from gradient descent.</li>
+          <li>Multiplying Jacobians across many layers can shrink or grow the gradient exponentially.</li>
+          <li>Residual connections, normalisation, careful initialisation and clipping keep it within a usable range.</li>
+        </ul>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">Gained</th><th scope="col">Given up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Full-batch vs mini-batch</td><td>Exact, deterministic gradient</td><td><code>O(N)</code> per step; no noise to escape saddles</td></tr>
+              <tr><td>Larger batch</td><td>Lower variance, better accelerator use</td><td>Diminishing returns past the "critical batch size" (McCandlish et al., 2018); LR must be rescaled and warmed up</td></tr>
+              <tr><td>Higher learning rate</td><td>Faster progress, some implicit regularisation</td><td>Divergence once <code>η &gt; 2/λ_max</code></td></tr>
+              <tr><td>Momentum</td><td><code>√κ</code> speed-up; smoother steps under noise</td><td>One extra state vector; overshoot</td></tr>
+              <tr><td>Adam/AdamW vs SGD+momentum</td><td>Less tuning; handles gradient scales that differ across layers; the transformer default</td><td>2 state vectors; worse generalisation on some vision tasks (Wilson et al., 2017); non-convergence counterexamples (Reddi et al., 2018)</td></tr>
+              <tr><td>AdamW vs Adam + L2</td><td>Decay is not divided by <code>√v̂</code>, so <code>η</code> and <code>λ</code> tune independently</td><td>PyTorch's different defaults (0 vs 0.01) invite mistakes</td></tr>
+              <tr><td>Muon / Shampoo</td><td>Matrix-aware preconditioning, ~2× compute efficiency reported for Muon</td><td>Extra matmuls (PyTorch Muon defaults to 5 Newton–Schulz steps); Muon handles 2-D weights only, so it needs AdamW for everything else</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Memory: about 16 bytes per parameter</p>
+            <p>Mixed-precision Adam (<a href="https://arxiv.org/abs/1910.02054" rel="noopener">ZeRO, arXiv:1910.02054</a>):</p>
+            <ul>
+              <li>2 bytes for fp16 weights</li>
+              <li>2 bytes for fp16 gradients</li>
+              <li>12 bytes for fp32 master weights plus <code>m</code> and <code>v</code></li>
+            </ul>
+            <p>A 7B-parameter model therefore needs about <strong>112 GB before activations</strong>.</p>
+          </div>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">NaN loss in the first few hundred steps</p>
+            <p>Cause: <code>η</code> is above the stability limit, often because there is no warmup.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Loss flat from step 1</p>
+            <p>Cause: <code>η</code> is too small, or gradients vanish (dead ReLUs, a deep unnormalised stack).</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Mid-run loss spikes in LLM training</p>
+            <p>Cause: sharpness crosses <code>2/η</code>, an outlier batch arrives, or <code>v</code> goes stale with <code>β₂=0.999</code>.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Steps grow every iteration</p>
+            <p>Cause: a missing <code>optimizer.zero_grad()</code> lets gradients accumulate.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Weight decay does nothing visible with Adam</p>
+            <p>Cause: <code>Adam(weight_decay=…)</code> applies coupled L2, which <code>√v̂</code> then rescales. Use AdamW.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Accuracy drops after an 8× batch-size increase</p>
+            <p>Cause: <code>η</code> was not rescaled to match the larger batch.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Gradients silently become zero in fp16</p>
+            <p>Cause: underflow. Use <code>GradScaler</code> or bf16.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Loss jumps after resuming from a checkpoint</p>
+            <p>Cause: the optimiser's <code>m</code>/<code>v</code>/step count and the scheduler state were not saved.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <ul>
+          <li>Training means minimising a function of 10⁶ to 10¹² variables.</li>
+          <li>Exact second-order methods need <code>O(n²)</code> memory and up to <code>O(n³)</code> time per step.</li>
+          <li>Reverse-mode autodiff delivers the full gradient for about the cost of a forward pass.</li>
+          <li>Gradient descent is the cheapest update that uses it: <code>O(n)</code> per step.</li>
+          <li>Stochastic gradients also make each step's cost independent of the dataset size <code>N</code>.</li>
+        </ul>
+        <p><a href="https://papers.nips.cc/paper/3323-the-tradeoffs-of-large-scale-learning" rel="noopener">Bottou &amp; Bousquet (NIPS 2007)</a> showed why this matters. When compute is the binding constraint, optimising below the model's estimation error is wasted work. A "mediocre" optimiser like SGD therefore generalises best for a given compute budget.</p>
+
+        <h3>Why it looks the way it does</h3>
+        <p>The obvious alternative is <strong>Newton's method</strong>, <code>θ ← θ − H⁻¹g</code>. It ignores how parameters are scaled and converges quadratically near a minimum. It loses at deep-learning scale for three reasons:</p>
+        <ul>
+          <li>At 10⁹ parameters, <code>H</code> would take about <strong>4 EB in fp32</strong>.</li>
+          <li>Mini-batch Hessian estimates are noisy.</li>
+          <li>On non-convex losses, <code>H</code> has negative eigenvalues, so Newton steps are <em>attracted</em> to saddles. Dauphin et al. designed saddle-free Newton to fix exactly this.</li>
+        </ul>
+        <p>Gradient descent drops curvature information in exchange for cheap steps. The non-obvious point: <strong>every later optimiser adds some curvature back, cheaply</strong>. Each rung pays memory or FLOPs for better conditioning.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    A["SGD: gradient only, 0 extra state"] --> B["Momentum: 1 vector, approximates acceleration along consistent directions"]
+    B --> C["Adam / AdamW: 2 vectors, diagonal preconditioner via √v̂"]
+    C --> D["Shampoo / Muon: precondition whole weight matrices"]
+    D --> E["Newton: full Hessian H⁻¹g, about 4 EB at 10⁹ params"]
+          </pre>
+          <figcaption class="diagram__caption">The curvature ladder. Each step down buys better conditioning with more memory or compute. Deep learning lives in the middle rungs.</figcaption>
+        </figure>
+
+        <ul>
+          <li><strong>Noise is useful.</strong> Even if full-batch gradient descent cost nothing extra, it would lose the mini-batch noise that helps escape saddles and acts as implicit regularisation.</li>
+          <li><strong>Adam's shape.</strong> Because <code>m̂/√v̂</code> is roughly unit-scale, each step moves parameters by about <code>η</code> regardless of the raw gradient's size. That makes <code>η</code> comparable across layers.</li>
+          <li><strong>Bias correction</strong> exists because <code>m</code> and <code>v</code> start at zero.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>In 2026 the core is stable but the edges are moving:</p>
+        <ul>
+          <li>AdamW with warmup and decay is still the default recipe for transformers.</li>
+          <li>PyTorch 2.9 shipped <code>torch.optim.Muon</code>.</li>
+          <li>Moonshot trained its Moonlight MoE model with Muon.</li>
+          <li>In the first AlgoPerf competition (<a href="https://arxiv.org/abs/2502.15015" rel="noopener">ICLR 2025</a>), Distributed Shampoo won the external-tuning track and Schedule-Free AdamW won the self-tuning track.</li>
+          <li>Optimiser state often takes more memory than the weights, which drives LoRA, 8-bit optimisers and ZeRO.</li>
+          <li>Debugging a diverging run still comes down to a few quantities: <code>η</code>, <code>β₂</code>, warmup length, the clipping threshold and the gradient norm.</li>
+        </ul>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify in practice</p>
+            <ul>
+              <li>Does the <code>η &lt; 2/L''</code> boundary hold exactly in <code>code/mvp.py</code>? Try <code>lr = 0.24</code> vs <code>0.26</code> on the overview example. (The MVP says yes: 2.9536 vs −137.7048.)</li>
+              <li>When batch size doubles, how far does the best <code>η</code> move for SGD+momentum compared with Adam?</li>
+              <li>Is a plateau on a tiny network really a saddle? Check the smallest Hessian eigenvalue there.</li>
+              <li>Does warmup matter for a small model, or only at large scale?</li>
+              <li>Does the global gradient norm warn of a loss spike earlier than the loss curve does?</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

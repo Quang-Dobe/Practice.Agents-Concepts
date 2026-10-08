@@ -1,11 +1,11 @@
-# Transaction Isolation Levels
+# Gradient Descent
 
-A transaction isolation level is the setting that controls how much of other transactions' unfinished and freshly committed work your SQL transaction can see. SQL offers a dial with four standard stops: Read Uncommitted, Read Committed, Repeatable Read, and Serializable. Each stop forbids a specific set of anomalies, which are wrong results caused by transactions interleaving, and each stronger stop trades some concurrency for correctness.
+Gradient descent is the algorithm that trains almost every machine-learning model. A model is a pile of numbers called parameters, and a loss function turns how wrong its predictions are into one number. Gradient descent computes the gradient, which says which way each parameter should move to lower that loss fastest, nudges every parameter a small step that way, and repeats, often millions of times.
 
-It matters because the default setting in your database almost certainly allows some of these anomalies: Read Committed in PostgreSQL, SQL Server, and Oracle, and Repeatable Read in MySQL InnoDB. The resulting bugs show up under load, are hard to reproduce, and look like impossible data. Engineers reach for isolation levels when money, inventory, or booking logic reads and then writes shared data, when an invariant spans several rows, or when debugging duplicate charges, negative stock, or lost increments. The same level names also behave differently across engines, so the name alone is not a guarantee.
+It matters because every neural network you will touch, from a small classifier to a large language model, is trained by this loop or a close relative such as Adam or AdamW. Engineers reach for it when a model has too many parameters to solve in closed form, the loss is differentiable, and the data is too large for memory so it must be learned in mini-batches. It is not backpropagation, which only computes the gradient, and it does not guarantee the best answer on non-convex problems like neural networks.
 
-Picture clerks sharing one paper ledger. At Read Committed you only see ink, but the ledger can change between two glances. At Repeatable Read you work from a photocopy taken when you started. That photocopy is the trap: two on-call doctors each check that another doctor is on call, each sees yes on their own copy, and both sign off, leaving nobody on call. This is write skew, and only Serializable reliably stops it, by telling one of them to start over.
+Picture standing on a mountainside in thick fog, trying to reach the valley floor. You can only feel the slope under your boots, so you step downhill, feel again, and step again. Your stride length is the learning rate, and it causes most of the trouble. Fitting y = w times x to the single point x = 2, y = 6 starting from w = 0, a learning rate of 0.05 settles on the right answer w = 3, a rate of 0.25 bounces between 0 and 6 forever, and a rate of 0.5 blows up. Same algorithm, same data, only the step size changed.
 
 ---
 
-Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/database/transaction-isolation-levels/present/index.html
+Full notes: https://quang-dobe.github.io/Practice.Agents-Concepts/ai/gradient-descent/present/index.html
