@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transaction Isolation Levels · Detail — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Transaction Isolation Levels</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Transaction Isolation Levels</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/transaction-isolation-levels/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Transaction Isolation Levels</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Detail</span>
+        </nav>
+
+        <h1>Detail — the deep dive</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◑ ~11 min read</span>
+          <span class="meta-row__item">✎ What · Where · When · How · Why</span>
+        </div>
+
+        <!-- WHAT -->
+        <h2>What it is</h2>
+        <p>An isolation level is a contract between the database and one client transaction. It states which <strong>anomalies</strong> (non-serializable interleavings) the engine may expose to that transaction.</p>
+        <ul>
+          <li><strong>The reference point is
+            <span class="term">serializability</span>
+            <span class="term__gloss">the result of running transactions concurrently equals the result of some one-at-a-time order of the same transactions</span>.</strong></li>
+          <li>Each weaker level allows a defined set of departures from it, in exchange for less blocking or fewer aborts.</li>
+          <li><strong>ANSI SQL-92</strong> defines four levels by the phenomena they forbid. That definition turned out ambiguous and tied to lock-based engines.</li>
+          <li>The working definitions today come from two later sources:
+            <ul>
+              <li><a href="https://www.microsoft.com/en-us/research/publication/a-critique-of-ansi-sql-isolation-levels/" rel="noopener">Berenson et al., "A Critique of ANSI SQL Isolation Levels" (SIGMOD 1995)</a> — added Snapshot Isolation and new phenomena.</li>
+              <li>Atul Adya's 1999 MIT thesis — defines anomalies as cycles in a dependency graph (G0, G1, G2-item, G2), independent of how the engine is built.</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h3>The phenomena (Berenson et al. vocabulary)</h3>
+        <dl class="vocab">
+          <div><dt>P0 · dirty write</dt><dd>Overwriting another transaction's uncommitted write.</dd></div>
+          <div><dt>P1 · dirty read</dt><dd>Reading another transaction's uncommitted write.</dd></div>
+          <div><dt>P2 · non-repeatable read</dt><dd>The same row read twice returns different values.</dd></div>
+          <div><dt>P3 · phantom</dt><dd>A predicate read returns a different row set when re-run.</dd></div>
+          <div><dt>P4 · lost update</dt><dd>A read-modify-write is overwritten by a concurrent one.</dd></div>
+          <div><dt>A5A · read skew</dt><dd>You see a mix of pre- and post-commit state across two related items.</dd></div>
+          <div><dt>A5B · write skew</dt><dd>Two transactions read overlapping data, write disjoint rows, and break a rule together.</dd></div>
+        </dl>
+
+        <h3>The core building blocks</h3>
+        <dl class="vocab">
+          <div><dt>Dependency graph</dt><dd>Nodes are transactions. Edges are <code>ww</code> (write-write), <code>wr</code> (write-read), and <code>rw</code> (read-write, an
+            <span class="term">anti-dependency</span>
+            <span class="term__gloss">T1 read a version that T2 then overwrote, so T1 must come before T2</span>).
+            An execution is serializable when the graph has no cycle. Every anomaly is a specific cycle shape.</dd></div>
+          <div><dt>Locks</dt><dd>Shared (S) and exclusive (X) locks on rows, plus
+            <span class="term">range locks</span>
+            <span class="term__gloss">predicate locks that also cover rows that do not exist yet, so inserts into the range block</span>
+            (SQL Server key-range locks, InnoDB next-key and gap locks). Lock duration — statement vs. transaction — is what separates the lock-based levels.</dd></div>
+          <div><dt>Snapshots</dt><dd>A read view of the database at a point in time, built from multiple row versions (MVCC, which has its own topic in this notebook). The snapshot's scope — per statement or per transaction — separates the snapshot-based levels.</dd></div>
+          <div><dt>Write-conflict rule</dt><dd>Under Snapshot Isolation, two concurrent transactions that write the same row cannot both commit. The usual rule is
+            <span class="term">first-updater-wins</span>
+            <span class="term__gloss">the second writer waits; if the first commits, the second aborts</span>.</dd></div>
+          <div><dt>Serialization failure</dt><dd>The abort the engine raises to keep its guarantee: SQLSTATE <code>40001</code> in PostgreSQL and CockroachDB, error <code>3960</code> in SQL Server SNAPSHOT, <code>ORA-08177</code> in Oracle.</dd></div>
+        </dl>
+
+        <h3>How it relates to the wider landscape</h3>
+        <ul>
+          <li>Isolation is the "I" in ACID and belongs to the concurrency-control family, next to two-phase locking (2PL), MVCC, and optimistic concurrency control (OCC).</li>
+          <li>It is a different axis from distributed <strong>consistency models</strong> (linearizability, causal, eventual), which describe what replicas show to readers.</li>
+          <li>The two meet in <strong>strict serializability</strong> — serializable plus real-time order — which Spanner advertises as "external consistency".</li>
+        </ul>
+
+        <!-- WHERE -->
+        <h2>Where it lives</h2>
+        <ul>
+          <li><strong>Enforced inside the engine</strong> by the transaction manager and lock manager (or the version-visibility check).</li>
+          <li><strong>Chosen by the client</strong>: per transaction (<code>SET TRANSACTION ISOLATION LEVEL ...</code> or <code>BEGIN ISOLATION LEVEL ...</code>), per session, or as a server or database default.</li>
+          <li><strong>The application only <em>selects</em> the level and <em>handles</em> the failures it produces.</strong> It cannot add isolation the engine does not provide.</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TB
+    APP["Application · picks the level, retries on failure"] --> DRV["Driver or ORM · BEGIN ISOLATION LEVEL or SET TRANSACTION"]
+    DRV --> ENG
+    subgraph ENG["Database engine · enforces isolation"]
+        direction LR
+        TM["Transaction manager"]
+        LM["Lock manager · S, X, range locks"]
+        VC["Version visibility check · snapshots"]
+    end
+          </pre>
+          <figcaption class="diagram__caption">The layer stack: the app chooses and copes, the engine decides. No code above the engine can make a level stronger than the engine implements.</figcaption>
+        </figure>
+
+        <h3>The same names, different behavior</h3>
+        <p>The ANSI names are portable. The behavior behind them is not:</p>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Engine (version checked)</th><th scope="col">Default</th><th scope="col">Read Uncommitted</th><th scope="col">Read Committed</th><th scope="col">Repeatable Read</th><th scope="col">Serializable</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>PostgreSQL 18</td><td>RC</td><td>Behaves as RC</td><td>Snapshot per statement</td><td>Snapshot Isolation; phantoms also prevented</td><td>SSI (since 9.1)</td></tr>
+              <tr><td>MySQL 8.4 InnoDB</td><td>RR</td><td>Real dirty reads</td><td>Snapshot per statement, no gap locks</td><td>Snapshot for plain <code>SELECT</code>; locking reads and writes see latest committed rows under next-key locks; <strong>lost update allowed</strong></td><td>Plain <code>SELECT</code> becomes <code>SELECT ... FOR SHARE</code> when autocommit is off</td></tr>
+              <tr><td>SQL Server 2022/2025</td><td>RC, <strong>lock-based</strong> (<code>READ_COMMITTED_SNAPSHOT</code> OFF)</td><td>Same as <code>NOLOCK</code></td><td>Locking, or snapshot per statement with RCSI</td><td>S locks held to commit; phantoms possible</td><td>Key-range locks held to commit</td></tr>
+              <tr><td>Azure SQL Database</td><td>RC with RCSI <strong>ON</strong></td><td>Same</td><td>Snapshot per statement</td><td>Same as SQL Server</td><td>Same</td></tr>
+              <tr><td>Oracle</td><td>RC</td><td>Not offered</td><td>Snapshot per statement</td><td>Not offered</td><td>Actually Snapshot Isolation (<code>ORA-08177</code>)</td></tr>
+              <tr><td>CockroachDB</td><td>Serializable</td><td>Upgraded to RC (or Serializable if RC is disabled)</td><td>GA in 24.1, gated by <code>sql.txn.read_committed_isolation.enabled</code></td><td>Upgraded to Serializable</td><td>Serializable</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li><strong>Sources:</strong> <a href="https://www.postgresql.org/docs/current/transaction-iso.html" rel="noopener">PostgreSQL 18 docs</a>, <a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html" rel="noopener">MySQL 8.4 docs</a>, <a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/set-transaction-isolation-level-transact-sql" rel="noopener">SQL Server docs</a>, <a href="https://www.cockroachlabs.com/docs/stable/read-committed" rel="noopener">CockroachDB docs</a>.</li>
+          <li><strong>SQL Server <code>SNAPSHOT</code></strong> is a fifth level. It needs <code>ALLOW_SNAPSHOT_ISOLATION ON</code> and is true Snapshot Isolation.</li>
+          <li><strong>The MySQL Repeatable Read row</strong> comes from <a href="https://github.com/ept/hermitage" rel="noopener">Kleppmann's Hermitage tests</a> and <a href="https://jepsen.io/analyses/mysql-8.0.34" rel="noopener">Jepsen's 2023 analysis of MySQL 8.0.34</a>. Both found it allows lost update and G2-item; Jepsen found it also violates Monotonic Atomic View.</li>
+          <li><strong>MariaDB 11.8</strong> turned on <code>innodb_snapshot_isolation</code> by default, so Repeatable Read raises error 1020 on write conflicts instead of losing the update.</li>
+        </ul>
+
+        <h3>Ecosystem and tooling</h3>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Set the level from code</div><p>JDBC <code>Connection.setTransactionIsolation</code>, .NET <code>System.Data.IsolationLevel</code> (ADO.NET and EF Core <code>BeginTransaction</code>), Spring <code>@Transactional(isolation = ...)</code>, SQLAlchemy <code>isolation_level</code>, Django <code>OPTIONS["isolation_level"]</code> for PostgreSQL.</p></div>
+          <div class="card"><div class="card__title">Observe locks and versions</div><ul>
+            <li>PostgreSQL: <code>pg_locks</code>; predicate locks show as <code>SIReadLock</code>.</li>
+            <li>SQL Server: <code>sys.dm_tran_locks</code>, <code>sys.dm_tran_version_store_space_usage</code>.</li>
+            <li>MySQL: <code>performance_schema.data_locks</code>, <code>SHOW ENGINE INNODB STATUS</code> for history list length.</li>
+          </ul></div>
+          <div class="card"><div class="card__title">Test what an engine really does</div><p><a href="https://github.com/ept/hermitage" rel="noopener">Hermitage</a> runs hand-written interleavings per engine. <a href="https://github.com/jepsen-io/elle" rel="noopener">Jepsen's Elle</a> checks transaction histories for dependency cycles.</p></div>
+          <div class="card"><div class="card__title">Tuning knobs</div><ul>
+            <li>PostgreSQL: <code>max_pred_locks_per_transaction</code>, <code>default_transaction_isolation</code>.</li>
+            <li>MySQL: <code>transaction_isolation</code>.</li>
+            <li>SQL Server: <code>READ_COMMITTED_SNAPSHOT</code>, <code>ALLOW_SNAPSHOT_ISOLATION</code>.</li>
+          </ul></div>
+        </div>
+
+        <!-- WHEN -->
+        <h2>When it emerged</h2>
+        <ul>
+          <li><strong>1976.</strong> Gray et al. defined "degrees of consistency" 0–3 for lock-based systems. The degrees differed in which locks a transaction took and whether it held them until commit.</li>
+          <li><strong>SQL-92.</strong> The standard renamed the degrees as the four levels and defined them through phenomena P1–P3, so vendors could describe them without naming locks. The standard default is <code>SERIALIZABLE</code>.</li>
+          <li><strong>Snapshot engines.</strong> Oracle already shipped multiversion reads. Its "serializable" passed the ANSI phenomenon tests yet still allowed write skew. That gap drove the 1995 Berenson critique, which formally defined Snapshot Isolation.</li>
+          <li><strong>2005.</strong> SQL Server 2005 added <code>SNAPSHOT</code> and RCSI to cut reader/writer blocking.</li>
+          <li><strong>2008–2011.</strong> Cahill, Röhm and Fekete published Serializable Snapshot Isolation (SIGMOD 2008). <a href="https://arxiv.org/abs/1208.4179" rel="noopener">PostgreSQL 9.1 shipped it in 2011</a>, the first production implementation.</li>
+          <li><strong>Since then.</strong> Distributed SQL went the other way: launched serializable-only, then added weaker levels — CockroachDB Read Committed in 23.2/24.1, and Repeatable Read (Snapshot Isolation) in Spanner.</li>
+        </ul>
+
+        <h2>When to choose a non-default level</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li><strong>Serializable</strong> — a rule spans rows or predicates ("at least one doctor on call", "sum of allocations ≤ budget", "no overlapping bookings"), the transaction is short, and you can wrap it in a retry loop.</li>
+              <li><strong>Repeatable Read or Snapshot</strong> — one unit of work runs several reads that must agree: reports, exports, balance checks across tables, consistent backups.</li>
+              <li><strong>Read Committed + explicit locks</strong> — contention is high on a few hot rows. <code>SELECT ... FOR UPDATE</code>, conditional <code>UPDATE ... WHERE version = ?</code>, or a unique constraint turns the race into a write-write conflict every level handles.</li>
+              <li><strong>RCSI</strong> — on SQL Server, readers block writers under the lock-based default and you want PostgreSQL-like Read Committed.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Avoid it when</p>
+            <ul>
+              <li><strong>Serializable everywhere</strong> — no retry path, long transactions, or hot rows colliding constantly. Abort rates climb; under lock-based Serializable (SQL Server, MySQL) deadlocks and blocking climb too.</li>
+              <li><strong>Read Uncommitted for speed</strong> — with MVCC, readers don't block writers at Read Committed anyway. In SQL Server, <code>NOLOCK</code> can return rows twice or skip them during page splits, not only uncommitted ones.</li>
+              <li><strong>Repeatable Read for "no lost updates" on MySQL</strong> — InnoDB Repeatable Read does not detect write-write conflicts. Use <code>FOR UPDATE</code> or an atomic <code>UPDATE</code>.</li>
+              <li><strong>Raising the level for a single-row race</strong> — a unique index or an atomic <code>UPDATE ... SET qty = qty - 1 WHERE qty &gt; 0</code> is cheaper and holds at every level.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">Rule of thumb</p>
+            <p>Name the anomaly first, then pick the cheapest tool that stops it. Often that is a constraint or a row lock, not a higher level.</p>
+          </div>
+        </div>
+
+        <!-- HOW -->
+        <h2>How it works</h2>
+        <p>Engines use one of three mechanisms. The SQL names map onto them differently in each engine.</p>
+
+        <h3>A · Lock-based (two-phase locking)</h3>
+        <p>SQL Server's default levels and InnoDB's locking reads work this way.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Writes.</span> Every write takes an X lock held until commit. This prevents P0 at every level.</li>
+          <li><span class="steps__title">Reads — the level decides.</span>
+            <ul>
+              <li>Read Uncommitted takes no S lock.</li>
+              <li>Read Committed takes an S lock and releases it right after the read.</li>
+              <li>Repeatable Read holds S locks until commit.</li>
+              <li>Serializable also holds range locks on the scanned key interval, so concurrent inserts into it block. This is how phantoms are prevented.</li>
+            </ul></li>
+          <li><span class="steps__title">Conflicts.</span> They show up as blocking. Cycles in the wait-for graph are resolved by the deadlock detector killing a victim.</li>
+        </ol>
+
+        <h3>B · Snapshot-based (MVCC)</h3>
+        <p>Used by PostgreSQL, Oracle, InnoDB plain reads, SQL Server RCSI and SNAPSHOT.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Take a snapshot.</span> At the first statement (Read Committed: every statement). In PostgreSQL that is xmin, xmax and the list of in-progress transaction IDs; in InnoDB it is the "read view".</li>
+          <li><span class="steps__title">Filter versions.</span> A row version is visible only if its creator committed before the snapshot. Readers never block on writers.</li>
+          <li><span class="steps__title">Update a row a concurrent transaction changed.</span>
+            <ul>
+              <li>PostgreSQL Read Committed waits, then re-checks the <code>WHERE</code> clause against the newest version and proceeds.</li>
+              <li>PostgreSQL Repeatable Read, SQL Server SNAPSHOT and Oracle Serializable apply first-updater-wins: wait; if the other committed, abort (<code>could not serialize access due to concurrent update</code>); if it rolled back, continue.</li>
+              <li>InnoDB Repeatable Read updates the latest committed version without aborting. That is the lost-update hole.</li>
+            </ul></li>
+          <li><span class="steps__title">Only write-write is checked.</span> Snapshot Isolation checks only write-write conflicts, so a write skew touching disjoint rows passes.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant T1
+    participant E as Engine
+    participant T2
+    T1->>E: UPDATE row x
+    T2->>E: UPDATE row x, waits on T1
+    T1->>E: COMMIT
+    alt PostgreSQL Read Committed
+        E-->>T2: re-check WHERE on newest version, proceed
+    else PostgreSQL RR, SQL Server SNAPSHOT, Oracle Serializable
+        E-->>T2: abort, could not serialize access
+    else InnoDB Repeatable Read
+        E-->>T2: overwrite latest committed version, lost update
+    end
+          </pre>
+          <figcaption class="diagram__caption">Step B3 as a sequence: the same two concurrent updates end three different ways depending on the engine behind the level name.</figcaption>
+        </figure>
+
+        <h3>C · Serializable Snapshot Isolation (SSI)</h3>
+        <p>PostgreSQL Serializable works this way.</p>
+        <ol class="steps">
+          <li><span class="steps__title">Run under SI.</span> Exactly as in B.</li>
+          <li><span class="steps__title">Record reads.</span> Every read becomes a non-blocking
+            <span class="term">SIREAD lock</span>
+            <span class="term__gloss">a marker of what was read; it blocks nobody and only feeds conflict detection</span>.
+            It starts at tuple granularity and is promoted to page or relation when memory runs short.</li>
+          <li><span class="steps__title">Track rw edges.</span> When T1 reads something a concurrent T2 writes, record an <code>rw</code> edge T1 → T2.</li>
+          <li><span class="steps__title">Spot the danger.</span> Cahill's theorem: every non-serializable SI execution contains a
+            <span class="term">dangerous structure</span>
+            <span class="term__gloss">two consecutive rw edges T_in → T_pivot → T_out, where T_out commits first</span>.
+            Abort one participant when it appears, typically at commit time.</li>
+          <li><span class="steps__title">Accept false positives.</span> The check is conservative and does not search for full cycles, so some aborts are false positives. Coarser SIREAD locks add more of them.</li>
+        </ol>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    TIN["T_in"] -->|"rw"| TP["T_pivot"]
+    TP -->|"rw"| TOUT["T_out · commits first"]
+    TP -.-> AB["SSI aborts one participant"]
+          </pre>
+          <figcaption class="diagram__caption">The dangerous structure SSI watches for: two back-to-back read-write edges. Seeing it is enough to abort; SSI never searches for the full cycle.</figcaption>
+        </figure>
+
+        <h3>The on-call doctors under SI vs. SSI</h3>
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant T1 as T1 Alice
+    participant E as Engine
+    participant T2 as T2 Bob
+    T1->>E: SELECT on_call rows
+    E-->>T1: Alice, Bob
+    T2->>E: SELECT on_call rows
+    E-->>T2: Alice, Bob
+    T1->>E: UPDATE Alice SET on_call = false
+    T2->>E: UPDATE Bob SET on_call = false
+    T1->>E: COMMIT
+    T2->>E: COMMIT
+    alt Snapshot Isolation
+        E-->>T2: ok, disjoint rows, no ww conflict, nobody on call
+    else SSI
+        E-->>T2: SQLSTATE 40001, rw cycle T1 to T2 to T1
+    end
+          </pre>
+          <figcaption class="diagram__caption">SI sees two writes to different rows and lets both commit. SSI sees T1 read Bob (T2 wrote it) and T2 read Alice (T1 wrote it): T1 −rw→ T2 −rw→ T1, a cycle, so the second committer gets <code>40001</code>.</figcaption>
+        </figure>
+
+        <h3>What the demo prints</h3>
+        <p>The topic's runnable demo scripts five two-transaction interleavings against a tiny in-process, PostgreSQL-flavoured engine and prints this matrix:</p>
+        <figure class="diagram">
+          <svg viewBox="0 0 640 318" role="img" aria-labelledby="mxTitle mxDesc" width="640" style="max-width:100%">
+            <title id="mxTitle">Anomaly-by-level matrix from the demo</title>
+            <desc id="mxDesc">Dirty read: anomaly at Read Uncommitted, ok above. Non-repeatable read and phantom read: anomaly at Read Uncommitted and Read Committed, ok at Repeatable Read and Serializable. Lost update: anomaly at the two lower levels, abort at Repeatable Read and Serializable. Write skew: anomaly at the three lower levels, abort only at Serializable.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="232" y="38" fill="var(--text-muted)" text-anchor="middle" font-size="12">Read Uncommitted</text>
+              <text x="347" y="38" fill="var(--text-muted)" text-anchor="middle" font-size="12">Read Committed</text>
+              <text x="462" y="38" fill="var(--text-muted)" text-anchor="middle" font-size="12">Repeatable Read</text>
+              <text x="577" y="38" fill="var(--text-muted)" text-anchor="middle" font-size="12">Serializable</text>
+              <!-- row 1: dirty read -->
+              <text x="10" y="81" fill="var(--text)">dirty read</text>
+              <rect x="180" y="56" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="232" y="81" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="295" y="56" width="105" height="40" rx="6" fill="var(--success-soft)" stroke="var(--success)"/><text x="347" y="81" fill="var(--success)" text-anchor="middle">ok</text>
+              <rect x="410" y="56" width="105" height="40" rx="6" fill="var(--success-soft)" stroke="var(--success)"/><text x="462" y="81" fill="var(--success)" text-anchor="middle">ok</text>
+              <rect x="525" y="56" width="105" height="40" rx="6" fill="var(--success-soft)" stroke="var(--success)"/><text x="577" y="81" fill="var(--success)" text-anchor="middle">ok</text>
+              <!-- row 2: non-repeatable read -->
+              <text x="10" y="127" fill="var(--text)">non-repeatable read</text>
+              <rect x="180" y="102" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="232" y="127" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="295" y="102" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="347" y="127" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="410" y="102" width="105" height="40" rx="6" fill="var(--success-soft)" stroke="var(--success)"/><text x="462" y="127" fill="var(--success)" text-anchor="middle">ok</text>
+              <rect x="525" y="102" width="105" height="40" rx="6" fill="var(--success-soft)" stroke="var(--success)"/><text x="577" y="127" fill="var(--success)" text-anchor="middle">ok</text>
+              <!-- row 3: phantom read -->
+              <text x="10" y="173" fill="var(--text)">phantom read</text>
+              <rect x="180" y="148" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="232" y="173" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="295" y="148" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="347" y="173" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="410" y="148" width="105" height="40" rx="6" fill="var(--success-soft)" stroke="var(--success)"/><text x="462" y="173" fill="var(--success)" text-anchor="middle">ok</text>
+              <rect x="525" y="148" width="105" height="40" rx="6" fill="var(--success-soft)" stroke="var(--success)"/><text x="577" y="173" fill="var(--success)" text-anchor="middle">ok</text>
+              <!-- row 4: lost update -->
+              <text x="10" y="219" fill="var(--text)">lost update</text>
+              <rect x="180" y="194" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="232" y="219" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="295" y="194" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="347" y="219" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="410" y="194" width="105" height="40" rx="6" fill="var(--warn-soft)" stroke="var(--warn)"/><text x="462" y="219" fill="var(--warn)" text-anchor="middle">abort</text>
+              <rect x="525" y="194" width="105" height="40" rx="6" fill="var(--warn-soft)" stroke="var(--warn)"/><text x="577" y="219" fill="var(--warn)" text-anchor="middle">abort</text>
+              <!-- row 5: write skew -->
+              <text x="10" y="265" fill="var(--text)">write skew</text>
+              <rect x="180" y="240" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="232" y="265" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="295" y="240" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="347" y="265" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="410" y="240" width="105" height="40" rx="6" fill="var(--danger-soft)" stroke="var(--danger)"/><text x="462" y="265" fill="var(--danger)" text-anchor="middle">ANOMALY</text>
+              <rect x="525" y="240" width="105" height="40" rx="6" fill="var(--warn-soft)" stroke="var(--warn)"/><text x="577" y="265" fill="var(--warn)" text-anchor="middle">abort</text>
+              <text x="10" y="306" fill="var(--text-faint)" font-size="12">ANOMALY = wrong result · ok = prevented · abort = prevented by a serialization failure (client must retry)</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">Computed live by the demo. The engine is simulated and PostgreSQL-flavoured, so phantoms are already blocked at Repeatable Read; lock-based SQL Server Repeatable Read would still allow them.</figcaption>
+        </figure>
+
+        <!-- KEY TRADE-OFFS -->
+        <h2>Key trade-offs</h2>
+        <div class="tradeoff table-scroll">
+          <table>
+            <thead>
+              <tr><th scope="col">Design choice</th><th scope="col">You gain</th><th scope="col">You give up</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Lock-based isolation (2PL)</td><td>No version storage. Conflicts wait instead of aborting. Serializable is straightforward</td><td>Readers and writers block each other. Deadlocks. Throughput collapses on long reads</td></tr>
+              <tr><td>Snapshot-based isolation (MVCC)</td><td>Readers never block writers. Consistent multi-statement reads</td><td>Version storage (PostgreSQL heap bloat, InnoDB undo, SQL Server version store in tempdb or the ADR persistent version store). Write skew allowed</td></tr>
+              <tr><td>SSI vs. lock-based Serializable</td><td><a href="https://arxiv.org/abs/1208.4179" rel="noopener">Close to SI performance; much faster than 2PL on read-heavy loads</a>. No read blocking</td><td>False-positive aborts. Every caller needs retry logic. Memory for predicate locks</td></tr>
+              <tr><td>Statement snapshot (RC) vs. transaction snapshot (RR)</td><td>Fewer conflicts. Short version retention</td><td>Different statements in one transaction disagree. Read skew possible</td></tr>
+              <tr><td>Abort on conflict (SI/SSI) vs. silently take the latest version (InnoDB RR)</td><td>Lost updates impossible</td><td>Application must retry. Higher abort rate on hot rows</td></tr>
+              <tr><td>Higher default (CockroachDB Serializable) vs. lower default (PostgreSQL RC)</td><td>Correct by default</td><td>Applications ported from RC engines meet retry errors they never handled</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- COMMON FAILURE MODES -->
+        <h2>Common failure modes</h2>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Serializable in production returns 500s under load</p>
+            <p>Cause: <code>40001</code> / <code>3960</code> / <code>ORA-08177</code> raised with no retry wrapper. The retry must re-run the reads too, not only the final write.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Account balance loses decrements on MySQL</p>
+            <p>Cause: app-side read-modify-write under InnoDB Repeatable Read, which does not detect lost updates.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Write skew in "Serializable" Oracle code</p>
+            <p>Cause: Oracle Serializable is Snapshot Isolation. Cross-row rules need <code>SELECT ... FOR UPDATE</code> or a constraint.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">SSI guarantee silently void</p>
+            <p>Cause: one writer in the conflict runs at Read Committed. SSI covers only transactions that <em>all</em> run at Serializable.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Abort storm after a schema or data change</p>
+            <p>Cause: SIREAD locks promoted to relation level, because <code>max_pred_locks_per_transaction</code> is too low or a sequential scan replaced an index scan.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Disk or tempdb growth, slow queries hours later</p>
+            <p>Cause: one long-open transaction pins the snapshot horizon. PostgreSQL vacuum cannot remove dead tuples, the InnoDB history list grows, the SQL Server version store fills.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Deadlocks on MySQL insert-if-absent</p>
+            <p>Cause: Repeatable Read gap and next-key locks taken by <code>SELECT ... FOR UPDATE</code> on a missing key, followed by concurrent <code>INSERT</code>s into the same gap.</p>
+          </div>
+        </div>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">SQL Server report blocks the OLTP workload</p>
+            <p>Cause: the lock-based Read Committed default. Readers hold S locks while writers queue. RCSI is off unless you turn it on.</p>
+          </div>
+        </div>
+        <div class="callout callout--danger">
+          <span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body">
+            <p class="callout__title">Isolation level leaks across requests</p>
+            <p>Cause: a session-level <code>SET</code> on a pooled connection persists for the next borrower.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <h2>Why it exists</h2>
+        <ul>
+          <li>Concurrency raises throughput and lowers latency.</li>
+          <li>But interleaved reads and writes can produce states no serial run could reach.</li>
+          <li>Full serializability has a cost: blocking under locks, or aborts under optimistic schemes.</li>
+          <li>That cost depends on the workload, so one fixed choice would be wrong for many apps.</li>
+          <li>Isolation levels make the trade-off explicit and selectable per transaction: a nightly report runs at a snapshot without blocking checkout, while the payment transfer runs Serializable.</li>
+        </ul>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 640 250" role="img" aria-labelledby="dialTitle dialDesc" width="640" style="max-width:100%">
+            <title id="dialTitle">The isolation dial</title>
+            <desc id="dialDesc">A line with four stops. Read Uncommitted still allows dirty reads plus everything Read Committed allows. Read Committed allows non-repeatable reads, phantoms, lost updates, read skew and write skew. Repeatable Read as Snapshot Isolation allows write skew. Serializable via SSI allows none and aborts instead.</desc>
+            <g font-family="var(--font-sans)" font-size="13">
+              <text x="20" y="24" fill="var(--text-muted)">← more concurrency</text>
+              <text x="620" y="24" fill="var(--text-muted)" text-anchor="end">more blocking or aborts →</text>
+              <line x1="80" y1="90" x2="560" y2="90" stroke="var(--border)" stroke-width="3"/>
+              <circle cx="80"  cy="90" r="9" fill="var(--danger-soft)" stroke="var(--danger)"/>
+              <circle cx="240" cy="90" r="9" fill="var(--warn-soft)" stroke="var(--warn)"/>
+              <circle cx="400" cy="90" r="9" fill="var(--accent-soft)" stroke="var(--accent)"/>
+              <circle cx="560" cy="90" r="9" fill="var(--success-soft)" stroke="var(--success)"/>
+              <text x="80"  y="66" fill="var(--text)" text-anchor="middle">Read Uncommitted</text>
+              <text x="240" y="66" fill="var(--text)" text-anchor="middle">Read Committed</text>
+              <text x="400" y="66" fill="var(--text)" text-anchor="middle">Repeatable Read (SI)</text>
+              <text x="560" y="66" fill="var(--text)" text-anchor="middle">Serializable (SSI)</text>
+              <text x="320" y="128" fill="var(--text-faint)" font-size="12" text-anchor="middle">still allows</text>
+              <text x="80"  y="156" fill="var(--danger)" text-anchor="middle">dirty read</text>
+              <text x="80"  y="176" fill="var(--danger)" text-anchor="middle">+ all of RC's</text>
+              <text x="240" y="156" fill="var(--warn)" text-anchor="middle">non-repeatable read</text>
+              <text x="240" y="176" fill="var(--warn)" text-anchor="middle">phantom · lost update</text>
+              <text x="240" y="196" fill="var(--warn)" text-anchor="middle">read skew · write skew</text>
+              <text x="400" y="156" fill="var(--accent)" text-anchor="middle">write skew</text>
+              <text x="560" y="156" fill="var(--success)" text-anchor="middle">none</text>
+              <text x="560" y="176" fill="var(--success)" text-anchor="middle">(aborts instead)</text>
+              <text x="20" y="236" fill="var(--text-faint)" font-size="12">Snapshot-engine view (PostgreSQL). Lock-based and InnoDB levels differ — see the engine table.</text>
+            </g>
+          </svg>
+          <figcaption class="diagram__caption">What each stop still lets through. Moving right buys correctness and pays for it in blocking (locks) or aborts (snapshots).</figcaption>
+        </figure>
+
+        <h3>Why it looks the way it does</h3>
+        <ul>
+          <li><strong>The four ANSI names are 1970s lock durations dressed up as phenomena.</strong> That is why they fit snapshot engines badly.</li>
+          <li><strong>Snapshot Isolation prevents every ANSI phenomenon</strong> in its strict reading — and still is not serializable.</li>
+          <li><strong>Vendors kept the familiar names</strong> and mapped their own mechanisms onto them, which produced the engine table above.</li>
+        </ul>
+        <p>The non-obvious design insight is SSI. Two other ways to make SI serializable were on the table:</p>
+        <ul>
+          <li><strong>Bring back read locks or range locks.</strong> That turns it into 2PL and gives up non-blocking reads.</li>
+          <li><strong>Static analysis of the application</strong> ("Making Snapshot Isolation Serializable", Fekete et al., 2005): find dangerous transaction pairs and add artificial write conflicts by hand. It breaks whenever the code changes.</li>
+          <li><strong>SSI instead</strong> accepts some false-positive aborts to keep reads non-blocking and need no application analysis. Because the cost is paid only when transactions conflict, PostgreSQL could make it the meaning of <code>SERIALIZABLE</code>.</li>
+        </ul>
+
+        <h3>Why it matters now</h3>
+        <p>Isolation is under active change in 2025–2026:</p>
+        <ul>
+          <li>Distributed SQL systems that launched serializable-only added weaker levels for compatibility and latency: CockroachDB Read Committed (GA in 24.1), Spanner Repeatable Read.</li>
+          <li><a href="https://aws.amazon.com/blogs/database/concurrency-control-in-amazon-aurora-dsql/" rel="noopener">Aurora DSQL</a> offers only strong Snapshot Isolation, so write skew is a design constraint you must handle in the schema.</li>
+          <li>MariaDB 11.8 changed Repeatable Read semantics by default.</li>
+          <li>SQL Server 2025 added <em>optimized locking</em> (TID locking, lock-after-qualification under RCSI).</li>
+        </ul>
+        <p>Teams moving between Postgres-compatible clouds, or from MySQL to PostgreSQL, get the same level names with different guarantees — and the bugs only show up under concurrency. The topic is stable in theory and changing in practice.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Open questions to verify in practice</p>
+            <ul>
+              <li>Does my driver or ORM set a level on connect, or inherit the server default? Check <code>SHOW transaction_isolation</code> / <code>SELECT @@transaction_isolation</code> / <code>DBCC USEROPTIONS</code> on a pooled connection.</li>
+              <li>Reproduce the doctors' write skew on PostgreSQL at Repeatable Read, then confirm Serializable aborts one transaction with <code>40001</code>.</li>
+              <li>Reproduce a lost update on MySQL 8.4 Repeatable Read; compare with PostgreSQL Repeatable Read, which should raise <code>could not serialize access</code>.</li>
+              <li>Measure the abort rate of a Serializable hot-row workload, and how it changes with an index scan vs. a sequential scan (that changes SIREAD granularity).</li>
+              <li>On SQL Server, compare blocking for the same report with <code>READ_COMMITTED_SNAPSHOT</code> OFF vs. ON, and watch version-store growth while a long transaction stays open.</li>
+              <li>Write a retry wrapper and confirm it re-runs the whole transaction body, reads included, with bounded backoff.</li>
+            </ul>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="overview.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Overview</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="practice.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Practice</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

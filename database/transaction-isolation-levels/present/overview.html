@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transaction Isolation Levels · Overview — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Transaction Isolation Levels</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Transaction Isolation Levels</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/transaction-isolation-levels/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Transaction Isolation Levels</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Overview</span>
+        </nav>
+
+        <h1>Overview</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">◔ ~3 min read</span>
+          <span class="meta-row__item">✎ intuition-first</span>
+        </div>
+
+        <!-- 30-SECOND VERSION -->
+        <p class="lead">When two transactions touch the same data at the same time, the database has to decide what each one may see. An isolation level is that decision, written down as a setting.</p>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">In 30 seconds</p>
+            <ul>
+              <li>Perfect isolation — every transaction acts as if it ran alone — costs throughput.</li>
+              <li>So SQL gives you a dial with four standard stops: <strong>Read Uncommitted</strong>, <strong>Read Committed</strong>, <strong>Repeatable Read</strong>, <strong>Serializable</strong>.</li>
+              <li>Each stop forbids a set of
+                <span class="term">anomalies</span>
+                <span class="term__gloss">wrong results that can only happen because transactions interleaved</span>.</li>
+              <li>Your database's <em>default</em> stop almost certainly allows some of them.</li>
+              <li>The bugs they cause show up under load, are hard to reproduce, and look like "impossible" data.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MENTAL MODEL -->
+        <h2>The mental model</h2>
+        <p>Picture an office where several clerks update one shared paper ledger. Each clerk works on a task (a transaction) made of several reads and writes. The four levels are four rules about what a clerk is allowed to look at.</p>
+        <ul>
+          <li><strong>Read Uncommitted</strong> — you can read a colleague's pencil marks while they are still writing. If they erase them, you acted on numbers that never existed.</li>
+          <li><strong>Read Committed</strong> — you only see entries written in ink (committed). But every time you look up, the ledger may have changed. Read the balance twice in one task and you can get two answers.</li>
+          <li><strong>Repeatable Read</strong> — the moment you start, you get a photocopy of the ledger, a
+            <span class="term">snapshot</span>
+            <span class="term__gloss">a frozen point-in-time view of the data</span>.
+            Your reads never move. The catch: you <em>write</em> on the real ledger, and your photocopy cannot tell you what other clerks are writing right now.</li>
+          <li><strong>Serializable</strong> — the result is guaranteed to match <em>some</em> order in which the clerks took turns, one at a time. Clerks may still work in parallel, but if their work cannot be lined up into a valid order, one clerk is told "start over."</li>
+        </ul>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart LR
+    subgraph L["Shared paper ledger"]
+        direction TB
+        P["Pencil marks · uncommitted"]
+        I["Ink entries · committed"]
+    end
+    I --> C["Photocopy made when the task starts"]
+    RU["Read Uncommitted clerk"] -->|"reads"| P
+    RC["Read Committed clerk"] -->|"re-reads at every glance"| I
+    RR["Repeatable Read clerk"] -->|"reads only"| C
+    SZ["Serializable clerk"] -->|"reads"| C
+    SZ --> Q{"Can all the work line up in one-at-a-time order?"}
+    Q -->|"yes"| OK["Commit"]
+    Q -->|"no"| RS["Start over"]
+          </pre>
+          <figcaption class="diagram__caption">The paper-ledger model: each level is a rule about which copy of the ledger a clerk reads. Serializable adds one more check before the work counts.</figcaption>
+        </figure>
+
+        <h3>The photocopy trap</h3>
+        <p>This is the one that bites. Two on-call doctors each check "is at least one other doctor on call?" Each sees "yes" on their own photocopy, and each signs off. Both writes succeed and nobody is on call. This is
+          <span class="term">write skew</span>
+          <span class="term__gloss">two transactions read overlapping data, write different rows, and together break a rule</span>,
+          and only Serializable reliably stops it.</p>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+    participant A as Alice (T1)
+    participant L as Ledger
+    participant B as Bob (T2)
+    A->>L: Is another doctor on call?
+    L-->>A: Yes, Bob is (Alice's photocopy)
+    B->>L: Is another doctor on call?
+    L-->>B: Yes, Alice is (Bob's photocopy)
+    A->>L: Take Alice off call, commit
+    B->>L: Take Bob off call, commit
+    Note over A,B: Different rows, so no write clash. Both commit and nobody is on call.
+          </pre>
+          <figcaption class="diagram__caption">Write skew: each check was true on its own photocopy, yet the two writes together break "at least one doctor on call". Repeatable Read lets this through; Serializable aborts one of them.</figcaption>
+        </figure>
+
+        <!-- WHAT IT IS NOT -->
+        <h2>What it is <em>not</em></h2>
+        <div class="callout callout--warn">
+          <span class="callout__icon" aria-hidden="true">⚠</span>
+          <div class="callout__body">
+            <p class="callout__title">Common mix-ups</p>
+            <ul>
+              <li><strong>Not atomicity.</strong> Atomicity is all-or-nothing for one transaction. Isolation is about how concurrent transactions see each other.</li>
+              <li><strong>Not durability or replication consistency.</strong> "Read-your-writes" and eventual consistency describe replicas. Isolation levels describe transactions inside one database.</li>
+              <li><strong>Not the same across engines.</strong> The names come from the ANSI SQL standard, but PostgreSQL, MySQL InnoDB, SQL Server, and Oracle each build them differently. PostgreSQL's Repeatable Read is really Snapshot Isolation, and so is Oracle's "Serializable".</li>
+              <li><strong>Not
+                <span class="term">MVCC</span>
+                <span class="term__gloss">multi-version concurrency control: keep several versions of each row so readers get a consistent view</span>.</strong>
+                MVCC is one technique engines use to build several of these levels. It has its own topic in this notebook.</li>
+              <li><strong>Not a replacement for locks you take on purpose.</strong> <code>SELECT ... FOR UPDATE</code> and unique constraints are often the better fix for a specific race.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- WHEN TO / WHEN NOT -->
+        <h2>When to reach for it — and when not to</h2>
+        <div class="do-dont">
+          <div class="do-dont__col do-dont__col--do">
+            <p class="do-dont__head"><span aria-hidden="true">✓</span> Reach for it when</p>
+            <ul>
+              <li>Money, inventory, or seat-booking logic where two requests can read-then-write the same data at the same time.</li>
+              <li>Rules spread across rows ("at least one admin", "total allocation ≤ budget") that no single-row constraint can enforce.</li>
+              <li>Reports that run several queries and need them all to agree (Repeatable Read or a snapshot).</li>
+              <li>Debugging duplicate charges, negative stock, or counters that "lose" increments under load.</li>
+            </ul>
+          </div>
+          <div class="do-dont__col do-dont__col--avoid">
+            <p class="do-dont__head"><span aria-hidden="true">✕</span> Skip it when</p>
+            <ul>
+              <li>It's a single-statement update like <code>UPDATE stock SET qty = qty - 1 WHERE id = 7 AND qty &gt; 0</code>. The row lock already makes it safe.</li>
+              <li>You want to crank everything to Serializable "just in case". You pay in retries and aborts, and code that doesn't handle a
+                <span class="term">serialization failure</span>
+                <span class="term__gloss">the error the engine raises when it aborts a transaction to keep its guarantee; the client should retry</span>
+                breaks.</li>
+              <li>You want Read Uncommitted for "speed". PostgreSQL does not even implement it (it behaves as Read Committed); elsewhere it gives wrong answers, not faster ones.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- KEY VOCABULARY -->
+        <h2>Key vocabulary</h2>
+        <dl class="vocab">
+          <div><dt>Anomaly</dt><dd>An incorrect result that can only happen because transactions interleaved.</dd></div>
+          <div><dt>Dirty read</dt><dd>Seeing another transaction's uncommitted write.</dd></div>
+          <div><dt>Non-repeatable read</dt><dd>Reading the same row twice and getting different values.</dd></div>
+          <div><dt>Phantom read</dt><dd>Re-running a query and getting a different set of rows.</dd></div>
+          <div><dt>Lost update</dt><dd>Two read-modify-write cycles overlap and one write silently overwrites the other.</dd></div>
+          <div><dt>Write skew</dt><dd>Two transactions read overlapping data, write different rows, and together break a rule.</dd></div>
+          <div><dt>Snapshot Isolation</dt><dd>Every transaction reads from a frozen point-in-time view. Not one of the four ANSI levels, but what many engines actually ship.</dd></div>
+          <div><dt>Serialization failure</dt><dd>The error a Serializable transaction gets when the engine aborts it to stay correct. The client is expected to retry.</dd></div>
+          <div><dt>Default level</dt><dd>Read Committed in PostgreSQL, SQL Server, and Oracle. Repeatable Read in MySQL InnoDB.</dd></div>
+        </dl>
+
+        <div class="callout callout--tip">
+          <span class="callout__icon" aria-hidden="true">◆</span>
+          <div class="callout__body">
+            <p class="callout__title">What's next</p>
+            <p>Detail answers What / Where / When / How / Why: the anomaly-by-level matrix, how lock-based and snapshot-based engines differ, where PostgreSQL, MySQL InnoDB, and SQL Server depart from ANSI, and how Serializable Snapshot Isolation catches write skew without locking everything.</p>
+          </div>
+        </div>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="index.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Topic home</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="detail.html">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Detail — the deep dive</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>

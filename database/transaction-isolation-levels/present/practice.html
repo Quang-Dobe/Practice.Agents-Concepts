@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transaction Isolation Levels · Practice — Learning Notebook</title>
+  <link rel="icon" type="image/svg+xml" href="../../../assets/favicon.svg">
+  <link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body class="cat-database" data-category="database">
+
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="progress-bar" role="presentation"></div>
+
+  <header class="topbar">
+    <button class="hamburger" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="topbar__title">Transaction Isolation Levels</span>
+  </header>
+  <div class="scrim" aria-hidden="true"></div>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">Transaction Isolation Levels</h1>
+        <span class="pill pill--category">database</span>
+      </div>
+      <nav class="sidebar__nav" aria-label="Topic sections">
+        <a class="sidebar__link" href="index.html"><span class="ico" aria-hidden="true">◆</span> Home</a>
+        <a class="sidebar__link" href="overview.html"><span class="ico" aria-hidden="true">◔</span> Overview</a>
+        <a class="sidebar__link" href="detail.html"><span class="ico" aria-hidden="true">◑</span> Detail</a>
+        <a class="sidebar__link" href="practice.html"><span class="ico" aria-hidden="true">●</span> Practice</a>
+      </nav>
+      <div class="sidebar__divider"></div>
+      <a class="sidebar__code-link" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/transaction-isolation-levels/code" target="_blank" rel="noopener">View code ↗</a>
+      <div class="sidebar__spacer"></div>
+      <div class="sidebar__foot">
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme">
+          <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+          <span class="theme-toggle__sun" aria-hidden="true">☀</span>
+          <span>Theme</span>
+        </button>
+        <a class="sidebar__back" href="../../../index.html">← All topics</a>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="content">
+
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../../../index.html">All topics</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <a href="index.html">Transaction Isolation Levels</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page">Practice</span>
+        </nav>
+
+        <h1>Practice — how it plays out for real</h1>
+        <div class="meta-row">
+          <span class="meta-row__item">● ~10 min read</span>
+          <span class="meta-row__item">✎ best practices · anti-patterns · checklist</span>
+        </div>
+
+        <!-- WHERE YOU'LL MEET IT -->
+        <h2>Where you'll meet it</h2>
+        <p>In a typical SaaS backend you never choose a level. The ORM opens transactions at the server default, usually Read Committed. Nobody thinks about it until a counter loses increments, a coupon is redeemed twice, or stock goes negative in a flash sale. Isolation matters wherever two requests do <strong>read-check-write</strong> on the same data.</p>
+        <div class="card-grid">
+          <div class="card"><div class="card__title">Wallets and ledgers</div><p>A security boundary. Attackers fire parallel requests at transfer endpoints to hit the race window on purpose.</p></div>
+          <div class="card"><div class="card__title">Booking and quotas</div><p>Guards rules that span rows ("no overlapping reservations") — write-skew territory (see the How section on the Detail page).</p></div>
+          <div class="card"><div class="card__title">SQL Server</div><p>Usually shows up first as blocking: a report holds shared locks while checkout queues behind it.</p></div>
+          <div class="card"><div class="card__title">CockroachDB</div><p>Defaults to Serializable, so it shows up as retry errors that ported code never handled.</p></div>
+        </div>
+
+        <!-- BEST PRACTICES -->
+        <h2>Best practices</h2>
+
+        <article class="practice-card">
+          <div class="practice-card__num">1</div>
+          <h3 class="practice-card__title">Set the level per transaction, never per pooled session</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Pass the level when you open the transaction: <code>BEGIN ISOLATION LEVEL ...</code>, <code>BeginTransaction(IsolationLevel.X)</code>, <code>@Transactional(isolation = ...)</code>.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>On SQL Server, <code>sp_reset_connection</code> <a href="https://learn.microsoft.com/en-us/archive/blogs/jimmymay/sp_reset_connection-does-not-reset-transaction-isolation-level-unexpected-behavior-by-design" rel="noopener">does not reset the isolation level</a>. One Serializable request leaves its pooled connection at Serializable for the next, unrelated borrower — random blocking you cannot reproduce.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Raw <code>SET TRANSACTION ISOLATION LEVEL</code> on a borrowed connection, or <code>new TransactionScope()</code> with no options, whose default is Serializable.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">2</div>
+          <h3 class="practice-card__title">Fix single-row races with atomic SQL or constraints first</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Write <code>UPDATE accounts SET balance = balance - 50 WHERE id = 7 AND balance &gt;= 50</code> and check rows affected. Use unique indexes for "only once" and a PostgreSQL
+              <span class="term">exclusion constraint</span>
+              <span class="term__gloss"><code>EXCLUDE USING gist</code>: no two rows may match on the listed operators, e.g. same room and overlapping time</span>
+              for "no overlap".</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>These hold at every level on every engine, so a later engine migration or default change cannot silently remove the protection.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Raising the whole service to Serializable to fix one double-redeem bug.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">3</div>
+          <h3 class="practice-card__title">Lock read-check-write explicitly, in a fixed order</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p><code>SELECT ... FOR UPDATE</code> the rows you base a decision on, sorted by primary key when there are several. In an ORM, add a
+              <span class="term">concurrency token</span>
+              <span class="term__gloss">a column checked on save so a stale write fails instead of overwriting</span>
+              (<code>rowversion</code>, <code>xmin</code>, or a version column).</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>It turns a lost update into a write-write conflict every engine handles. The fixed order removes the classic two-account transfer deadlock.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Loading an entity, mutating it, and calling <code>SaveChanges()</code> with no token — that loses updates at RC and at MySQL Repeatable Read.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">4</div>
+          <h3 class="practice-card__title">Ship one retry wrapper before anyone uses Repeatable Read or Serializable</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Write a single <code>RunInTransaction(level, fn)</code> helper. It catches serialization failures and deadlocks — PostgreSQL <code>40001</code>/<code>40P01</code>, MySQL <code>1213</code>, SQL Server <code>1205</code>/<code>3960</code> — rolls back, and re-runs the whole <code>fn</code>, reads included. Stop after 3–5 attempts with jittered backoff.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Without it, every abort becomes a 500. With unbounded retries, aborts multiply load: one team logged <a href="https://www.nirvanatech.com/blog/investigating-serialization-anomalies-in-postgresql" rel="noopener">1.9M serialization errors on 1M requests</a> on day one.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Retrying only the failed statement. After <code>40001</code> the transaction is dead and its earlier reads are stale.</p></div>
+        </article>
+
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    S["RunInTransaction(level, fn)"] --> B["BEGIN at the chosen level"]
+    B --> F["Run the whole fn · reads and writes"]
+    F --> C{"Statements and COMMIT succeed?"}
+    C -->|"yes"| D["Done · side effects run after commit"]
+    C -->|"40001, 40P01, 1213, 1205, 3960"| R["ROLLBACK"]
+    R --> N{"Attempts left? cap at 3 to 5"}
+    N -->|"yes"| J["Jittered backoff"]
+    J --> B
+    N -->|"no"| E["Surface the error"]
+          </pre>
+          <figcaption class="diagram__caption">The one retry wrapper: on a serialization or deadlock code, roll back and replay the <em>entire</em> body — never just the last statement — with a bounded, jittered loop.</figcaption>
+        </figure>
+
+        <article class="practice-card">
+          <div class="practice-card__num">5</div>
+          <h3 class="practice-card__title">Keep side effects out of the retried body</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Call payment APIs, send email, and publish events after commit, or write them to an
+              <span class="term">outbox</span>
+              <span class="term__gloss">a table written inside the transaction; a separate worker sends its rows after commit</span>
+              table inside the transaction.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The wrapper replays <code>fn</code>, so a card charge inside it runs once per attempt.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>HTTP calls inside the transaction "because the write depends on the result."</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">6</div>
+          <h3 class="practice-card__title">Keep transactions short and cap them server-side</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Set PostgreSQL <code>idle_in_transaction_session_timeout</code> (plus <code>transaction_timeout</code> on 17+) and <code>lock_timeout</code>. Lower InnoDB <code>innodb_lock_wait_timeout</code> from its 50 s default for OLTP. Alert on oldest-transaction age.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>One forgotten open transaction pins the
+              <span class="term">snapshot horizon</span>
+              <span class="term__gloss">the oldest snapshot still in use; no row version newer than it can be cleaned up</span>.
+              Vacuum stalls, the InnoDB history list grows, the tempdb version store fills, and latency degrades hours later, far from the cause.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Holding a transaction across user think time ("lock the record while the form is open").</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">7</div>
+          <h3 class="practice-card__title">Make Serializable predicates hit indexes</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run <code>EXPLAIN</code> on every query inside a Serializable transaction. Raise <code>max_pred_locks_per_transaction</code> if <code>pg_locks</code> shows relation-level <code>SIReadLock</code>s.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>PostgreSQL takes SIREAD locks on what it scans. A sequential scan — which the planner picks readily on a 10-row table — locks the whole relation and makes every concurrent transaction a false-positive conflict.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>"Small table, no index needed" for tables read inside Serializable transactions.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">8</div>
+          <h3 class="practice-card__title">Give reports a snapshot, not a higher OLTP level</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Run multi-query reports at Repeatable Read / <code>SNAPSHOT</code>, or PostgreSQL <code>SERIALIZABLE READ ONLY DEFERRABLE</code>, which waits for a safe snapshot and then cannot fail serialization. Use a replica when you have one.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>The report's numbers agree with each other, and it never blocks or aborts checkout.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>A report built from separate autocommit queries, where totals and line items come from different moments.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">9</div>
+          <h3 class="practice-card__title">Enable SQL Server RCSI only after an audit</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>Before <code>SET READ_COMMITTED_SNAPSHOT ON</code> (turning on
+              <span class="term">RCSI</span>
+              <span class="term__gloss">Read Committed Snapshot Isolation: Read Committed served from a per-statement snapshot instead of S locks</span>),
+              find code that relies on readers blocking — queue tables, check-then-insert procs, triggers that validate other rows — and add <code>UPDLOCK</code> or <code>READCOMMITTEDLOCK</code> there. Size tempdb, or the ADR version store.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>Code that was accidentally correct because a read waited for a writer now reads the old version and races.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Flipping RCSI as a quick blocking fix.</p></div>
+        </article>
+
+        <article class="practice-card">
+          <div class="practice-card__num">10</div>
+          <h3 class="practice-card__title">Test races on the real engine with real concurrency</h3>
+          <div class="practice-card__row practice-card__row--do"><span class="practice-card__tag">Do</span>
+            <p>In CI, open two connections to the production engine (Testcontainers) and force the interleaving with a barrier. For money endpoints, fire 50 parallel requests and assert the invariant.</p></div>
+          <div class="practice-card__row practice-card__row--why"><span class="practice-card__tag">Why</span>
+            <p>SQLite, H2, and the EF Core in-memory provider have different semantics or no transactions at all, so a pass there proves nothing.</p></div>
+          <div class="practice-card__row practice-card__row--avoid"><span class="practice-card__tag">Avoid</span>
+            <p>Trusting staging, which rarely reaches the concurrency that opens the window.</p></div>
+        </article>
+
+        <h3>Name the anomaly, then pick the tool</h3>
+        <figure class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    Q{"What race are you fixing?"}
+    Q -->|"single-row check then write"| A["Atomic UPDATE ... WHERE, unique index, or exclusion constraint · any level"]
+    Q -->|"read-modify-write of rows you also write"| B["SELECT ... FOR UPDATE or a concurrency token · not InnoDB RR alone"]
+    Q -->|"rule spans rows you read but do not write"| C["Serializable through the retry helper, with indexed predicates"]
+    Q -->|"several reads must agree"| D["A snapshot · RR, SNAPSHOT, or SERIALIZABLE READ ONLY DEFERRABLE"]
+          </pre>
+          <figcaption class="diagram__caption">The practices above as one decision: the cheapest fix that holds at every level wins, and Serializable is reserved for rules that span rows you only read.</figcaption>
+        </figure>
+
+        <!-- ANTI-PATTERNS -->
+        <h2>Anti-patterns to recognize</h2>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title"><code>NOLOCK</code> as a performance hint</p>
+            <p><code>WITH (NOLOCK)</code> gets added to every SQL Server SELECT to stop blocking. It reads uncommitted data and can return rows twice or skip them during page splits. Enable RCSI instead.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Serializable as a global default with no retry path</p>
+            <p>Someone sets <code>default_transaction_isolation = 'serializable'</code> to be safe. The first traffic spike turns <code>40001</code> into user-facing errors. Ship the retry wrapper first, then scope Serializable to transactions that guard cross-row rules.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Mixed-level guard</p>
+            <p>The API path runs Serializable, but a nightly batch writes the same tables at Read Committed. SSI only protects transactions that all run at Serializable, so the rule breaks once a night. Enforce the level in the shared helper, not at call sites.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Trusting the name across engines</p>
+            <p>Code that relied on PostgreSQL Repeatable Read aborting on a concurrent update moves to MySQL, where InnoDB silently takes the latest version and loses the update. Re-audit every read-check-write when you change engines.</p></div></div>
+        <div class="callout callout--danger"><span class="callout__icon" aria-hidden="true">✕</span>
+          <div class="callout__body"><p class="callout__title">Distributed lock instead of a database guarantee</p>
+            <p>A Redis lock wraps "check balance, then debit." A GC pause or lease expiry lets two holders in, and the database never knew the rule existed. If the data lives in one database, use a row lock, conditional <code>UPDATE</code>, or constraint there.</p></div></div>
+
+        <!-- REAL-WORLD USAGE PATTERNS -->
+        <h2>Real-world usage patterns</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card__title">Custodial wallet with internal transfers</div>
+            <p>A small exchange lets users move balances between accounts, then withdraw. The <a href="https://hackingdistributed.com/2014/04/06/another-one-bites-the-dust-flexcoin" rel="noopener">Flexcoin incident (2014)</a> was a read-check-write race: thousands of simultaneous transfer requests overdrew accounts before balances updated, and 896 BTC left in one attack. Fix pattern: a conditional <code>UPDATE ... WHERE balance &gt;= amount</code> plus a ledger row with a unique idempotency key. <em>Lesson:</em> an isolation bug in a money path is a security hole. Rate limiting does not close it — a handful of concurrent requests inside the window is enough.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Resource allocation on PostgreSQL Serializable</div>
+            <p>An insurance-tech team guarded allocations across two tables with Serializable and expected rare aborts. They got <a href="https://www.nirvanatech.com/blog/investigating-serialization-anomalies-in-postgresql" rel="noopener">retry storms, with about 1,000 requests exhausting 30 retries</a>, caused by sequential scans on a roughly 10-row table that promoted SIREAD locks to the relation. They moved to Repeatable Read: their transactions read and wrote the <em>same</em> rows, so first-updater-wins was enough. <em>Lesson:</em> Serializable only earns its cost when reads and writes touch <em>different</em> rows.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Illustrative scenario: room booking</div>
+            <p>A clinic scheduler must never double-book a room. Serializable works, but at peak it aborts bookings for unrelated rooms. A PostgreSQL exclusion constraint on <code>(room_id WITH =, slot WITH &amp;&amp;)</code> enforces the rule at Read Committed, and conflicts surface as <code>23P01</code> ("slot taken"). <em>Lesson:</em> a constraint is cheaper, holds at every level, and survives code changes.</p>
+          </div>
+          <div class="card">
+            <div class="card__title">Illustrative composite: SQL Server ERP with daytime reporting</div>
+            <p>Finance dashboards held shared locks, and checkout latency spiked every morning. Enabling RCSI fixed the blocking. Later a job-queue table processed some jobs twice, because "SELECT TOP 1 pending, then UPDATE" had relied on the read blocking. <em>Lesson:</em> RCSI changes semantics, not only performance. Queue reads need <code>UPDLOCK, READPAST</code> or an atomic <code>UPDATE ... OUTPUT</code>.</p>
+          </div>
+        </div>
+
+        <div class="callout callout--info">
+          <span class="callout__icon" aria-hidden="true">ⓘ</span>
+          <div class="callout__body">
+            <p class="callout__title">Two camps on the default</p>
+            <ul>
+              <li><strong>CockroachDB / FoundationDB school:</strong> Serializable everywhere plus mandatory retries, so correctness never depends on spotting write skew.</li>
+              <li><strong>Most PostgreSQL and MySQL shops:</strong> keep Read Committed with targeted <code>FOR UPDATE</code>, conditional updates, and constraints.</li>
+              <li><strong>Tie-breaker:</strong> do you already have one enforced transaction helper with retries?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- OPERATIONAL CHECKLIST -->
+        <h2>Operational checklist</h2>
+        <div class="callout callout--success">
+          <span class="callout__icon" aria-hidden="true">✓</span>
+          <div class="callout__body">
+            <p class="callout__title">Before you call it done</p>
+            <ul>
+              <li><strong>Effective level:</strong> on a <em>pooled</em> connection mid-request, does <code>SHOW transaction_isolation</code> / <code>SELECT @@transaction_isolation</code> / <code>DBCC USEROPTIONS</code> report the level you think you run at?</li>
+              <li><strong>Retry coverage:</strong> is there exactly one transaction helper, does it re-run the whole body on the engine's serialization and deadlock codes, and does a test force a <code>40001</code> and assert success on attempt 2?</li>
+              <li><strong>Metrics:</strong> are serialization failures, deadlocks (<code>pg_stat_database.deadlocks</code>, SQL Server error 1205), retries per transaction, and lock-wait time graphed and alerted on?</li>
+              <li><strong>Long transactions:</strong> is there an alert on oldest-transaction age (<code>pg_stat_activity.xact_start</code>, InnoDB history list length, <code>sys.dm_tran_active_snapshot_database_transactions</code>) and a server-side timeout for idle-in-transaction sessions?</li>
+              <li><strong>Money, inventory, coupons:</strong> has every read-check-write been reviewed for atomic SQL, <code>FOR UPDATE</code>, or a constraint, and hit by a parallel-request test?</li>
+              <li><strong>Side effects:</strong> are external calls outside the retried body or routed through an outbox?</li>
+              <li><strong>Cost:</strong> are retries bounded, and is version storage (PostgreSQL bloat, InnoDB undo, tempdb version store) sized and monitored?</li>
+              <li><strong>Serializable hygiene:</strong> do all writers to Serializable-guarded tables also run at Serializable, with indexed predicates?</li>
+              <li><strong>Onboarding:</strong> is there a one-paragraph team rule ("default RC; <code>FOR UPDATE</code> for X; Serializable via the helper for Y") a new engineer reads on day one?</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- HOW IT EVOLVES -->
+        <h2>How it evolves in a codebase</h2>
+        <ol class="steps">
+          <li><span class="steps__title">Engine default, no policy.</span> ORM-managed transactions at the default level. The first concurrency bug — usually a lost increment or a duplicate redemption — gets patched locally with a <code>FOR UPDATE</code> or a unique index.</li>
+          <li><span class="steps__title">Six months in: scatter.</span> Scattered <code>SET TRANSACTION</code> calls, several hand-rolled retry loops catching different error codes, and nobody can say what level a given endpoint runs at.</li>
+          <li><span class="steps__title">Converge on one helper.</span> Mature teams build one transaction helper that owns the level, the retry policy, and the timeout. The default stays Read Committed, a short named list of rule-guarding operations runs Serializable, reports move to snapshots or replicas, and rules that fit a constraint move into the schema.</li>
+          <li><span class="steps__title">The painful migration: changing the default.</span> Raising to Serializable, enabling RCSI, or switching engines changes every transaction's semantics at once, and bugs appear only under production concurrency. Teams with the central helper change one function and watch one retry metric; teams without it audit every call site under deadline pressure.</li>
+        </ol>
+
+        <!-- FURTHER READING -->
+        <h2>Further reading</h2>
+        <ul>
+          <li><a href="https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html" rel="noopener">PostgreSQL docs: Serialization Failure Handling</a> — which SQLSTATEs to retry and why the whole transaction must re-run; short and exact.</li>
+          <li>Martin Kleppmann, <em>Designing Data-Intensive Applications</em>, chapter 7 "Transactions" — the best practitioner treatment of lost update and write skew in real application code.</li>
+          <li><a href="https://github.com/ept/hermitage" rel="noopener">Hermitage</a> — two-session scripts showing what each engine's level names actually do; run them against your engine version.</li>
+          <li><a href="https://blog.acolyer.org/2017/08/07/acidrain-concurrency-related-attacks-on-database-backed-web-applications/" rel="noopener">Warszawski &amp; Bailis, "ACIDRain" (SIGMOD 2017), summarized by Adrian Colyer</a> — 22 exploitable isolation bugs across 12 e-commerce apps; reframes isolation as an attack surface.</li>
+          <li><a href="https://www.nirvanatech.com/blog/investigating-serialization-anomalies-in-postgresql" rel="noopener">Nirvana: Investigating serialization anomalies in PostgreSQL</a> — a rare production SSI post-mortem with real numbers.</li>
+        </ul>
+
+        <nav class="next-nav" aria-label="Page navigation">
+          <a class="next-nav__link" href="detail.html">
+            <span class="next-nav__dir">← Back</span>
+            <span class="next-nav__label">Detail</span>
+          </a>
+          <a class="next-nav__link next-nav--next" href="https://github.com/Quang-Dobe/Practice.Agents-Concepts/tree/main/database/transaction-isolation-levels/code" target="_blank" rel="noopener">
+            <span class="next-nav__dir">Next →</span>
+            <span class="next-nav__label">Run the code ↗</span>
+          </a>
+        </nav>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="../../../assets/vendor/mermaid.min.js"></script>
+  <script src="../../../assets/site.js"></script>
+</body>
+</html>
